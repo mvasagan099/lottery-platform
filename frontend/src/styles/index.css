@@ -586,6 +586,9 @@ tbody tr:last-child td { border-bottom: none; }
   align-items: center;
   position: relative;
   overflow: hidden;
+  margin: var(--space-lg);
+  border-radius: 32px;
+  box-shadow: var(--shadow-xl);
 }
 
 .hero::before {
