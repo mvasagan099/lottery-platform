@@ -1,0 +1,653 @@
+// Prisma Schema for OzLotto Platform
+// Production-ready lottery platform database
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============ ENUMS ============
+
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+  BANNED
+  PENDING_VERIFICATION
+}
+
+enum KYCStatus {
+  NOT_SUBMITTED
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum TransactionType {
+  DEPOSIT
+  WITHDRAWAL
+  TICKET_PURCHASE
+  PRIZE_CREDIT
+  BONUS_CREDIT
+  REFUND
+  REFERRAL_BONUS
+  AFFILIATE_COMMISSION
+}
+
+enum TransactionStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  CANCELLED
+  REVERSED
+}
+
+enum DrawStatus {
+  SCHEDULED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+  FAILED
+}
+
+enum TicketStatus {
+  ACTIVE
+  CHECKED
+  WON
+  LOST
+  CANCELLED
+  EXPIRED
+}
+
+enum PaymentGateway {
+  STRIPE
+  PAYPAL
+  BANK_TRANSFER
+  CRYPTO
+}
+
+enum NotificationType {
+  EMAIL
+  IN_APP
+  PUSH
+  SMS
+}
+
+enum SupportTicketStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+}
+
+enum UserRole {
+  SUPER_ADMIN
+  ADMIN
+  SUPPORT
+  AFFILIATE_MANAGER
+  USER
+}
+
+// ============ MODELS ============
+
+model User {
+  id                String   @id @default(cuid())
+  email             String   @unique
+  username          String   @unique
+  passwordHash      String
+  firstName         String
+  lastName          String
+  dateOfBirth       DateTime?
+  phone             String?
+  role              UserRole @default(USER)
+  status            UserStatus @default(PENDING_VERIFICATION)
+  emailVerified     Boolean  @default(false)
+  emailVerifiedAt   DateTime?
+  twoFactorEnabled  Boolean  @default(false)
+  twoFactorSecret   String?
+  referralCode      String   @unique @default(cuid())
+  referredById      String?
+  referredBy        User?    @relation("Referrals", fields: [referredById], references: [id])
+  referrals         User[]   @relation("Referrals")
+  kycStatus         KYCStatus @default(NOT_SUBMITTED)
+  country           String?
+  state             String?
+  city              String?
+  address           String?
+  postcode          String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  lastLoginAt       DateTime?
+  lastLoginIp       String?
+
+  wallet            Wallet?
+  sessions          Session[]
+  transactions      Transaction[]
+  tickets           Ticket[]
+  kycRecords        KYCRecord[]
+  notifications     Notification[]
+  supportTickets    SupportTicket[]
+  affiliateAccount  AffiliateAccount?
+  auditLogs         AuditLog[]
+  devices           DeviceHistory[]
+  notificationPrefs NotificationPreference?
+
+  @@map("users")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token        String   @unique
+  refreshToken String   @unique
+  ipAddress    String?
+  userAgent    String?
+  deviceName   String?
+  isActive     Boolean  @default(true)
+  expiresAt    DateTime
+  createdAt    DateTime @default(now())
+  lastUsedAt   DateTime @default(now())
+
+  @@map("sessions")
+}
+
+model DeviceHistory {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deviceName  String
+  ipAddress   String
+  userAgent   String
+  location    String?
+  lastSeenAt  DateTime @default(now())
+  trusted     Boolean  @default(false)
+
+  @@map("device_history")
+}
+
+model KYCRecord {
+  id           String    @id @default(cuid())
+  userId       String
+  user         User      @relation(fields: [userId], references: [id])
+  documentType String
+  documentUrl  String
+  selfieUrl    String?
+  status       KYCStatus @default(PENDING)
+  reviewedById String?
+  reviewNotes  String?
+  submittedAt  DateTime  @default(now())
+  reviewedAt   DateTime?
+
+  @@map("kyc_records")
+}
+
+model Wallet {
+  id                String        @id @default(cuid())
+  userId            String        @unique
+  user              User          @relation(fields: [userId], references: [id])
+  balance           Decimal       @default(0) @db.Decimal(18, 2)
+  bonusBalance      Decimal       @default(0) @db.Decimal(18, 2)
+  pendingBalance    Decimal       @default(0) @db.Decimal(18, 2)
+  currency          String        @default("AUD")
+  totalDeposited    Decimal       @default(0) @db.Decimal(18, 2)
+  totalWithdrawn    Decimal       @default(0) @db.Decimal(18, 2)
+  totalWon          Decimal       @default(0) @db.Decimal(18, 2)
+  totalSpent        Decimal       @default(0) @db.Decimal(18, 2)
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+  transactions      Transaction[]
+  deposits          Deposit[]
+  withdrawals       Withdrawal[]
+
+  @@map("wallets")
+}
+
+model Transaction {
+  id              String            @id @default(cuid())
+  userId          String
+  user            User              @relation(fields: [userId], references: [id])
+  walletId        String
+  wallet          Wallet            @relation(fields: [walletId], references: [id])
+  type            TransactionType
+  status          TransactionStatus @default(PENDING)
+  amount          Decimal           @db.Decimal(18, 2)
+  balanceBefore   Decimal           @db.Decimal(18, 2)
+  balanceAfter    Decimal           @db.Decimal(18, 2)
+  currency        String            @default("AUD")
+  reference       String            @unique
+  description     String?
+  metadata        Json?
+  ticketId        String?
+  drawId          String?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  @@map("transactions")
+}
+
+model Deposit {
+  id              String            @id @default(cuid())
+  walletId        String
+  wallet          Wallet            @relation(fields: [walletId], references: [id])
+  amount          Decimal           @db.Decimal(18, 2)
+  currency        String            @default("AUD")
+  gateway         PaymentGateway
+  gatewayRef      String?
+  status          TransactionStatus @default(PENDING)
+  metadata        Json?
+  processedAt     DateTime?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  @@map("deposits")
+}
+
+model Withdrawal {
+  id              String            @id @default(cuid())
+  walletId        String
+  wallet          Wallet            @relation(fields: [walletId], references: [id])
+  amount          Decimal           @db.Decimal(18, 2)
+  currency        String            @default("AUD")
+  gateway         PaymentGateway
+  accountDetails  Json
+  status          TransactionStatus @default(PENDING)
+  reviewedById    String?
+  reviewNotes     String?
+  processedAt     DateTime?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  @@map("withdrawals")
+}
+
+model Game {
+  id               String   @id @default(cuid())
+  slug             String   @unique
+  name             String
+  description      String
+  shortDescription String?
+  rulesJson        Json
+  drawSchedule     String   // cron expression
+  jackpotAmount    Decimal  @db.Decimal(18, 2)
+  minJackpot       Decimal  @db.Decimal(18, 2)
+  ticketPrice      Decimal  @db.Decimal(18, 2)
+  minNumbers       Int
+  maxNumbers       Int
+  numberPool       Int
+  hasSupplementary Boolean  @default(false)
+  suppNumbers      Int?
+  suppPool         Int?
+  hasPowerball     Boolean  @default(false)
+  powerballPool    Int?
+  isActive         Boolean  @default(true)
+  isFeatured       Boolean  @default(false)
+  sortOrder        Int      @default(0)
+  imageUrl         String?
+  bannerUrl        String?
+  badgeText        String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  draws            Draw[]
+  tickets          Ticket[]
+  prizeDivisions   PrizeDivision[]
+
+  @@map("games")
+}
+
+model PrizeDivision {
+  id            String   @id @default(cuid())
+  gameId        String
+  game          Game     @relation(fields: [gameId], references: [id])
+  divisionName  String
+  divisionOrder Int
+  description   String
+  fixedPrize    Decimal? @db.Decimal(18, 2)
+  isJackpot     Boolean  @default(false)
+  matchNumbers  Int
+  matchSupp     Int      @default(0)
+  matchPB       Boolean  @default(false)
+  createdAt     DateTime @default(now())
+
+  @@map("prize_divisions")
+}
+
+model Draw {
+  id              String     @id @default(cuid())
+  gameId          String
+  game            Game       @relation(fields: [gameId], references: [id])
+  drawNumber      Int
+  scheduledAt     DateTime
+  drawnAt         DateTime?
+  status          DrawStatus @default(SCHEDULED)
+  jackpotAmount   Decimal    @db.Decimal(18, 2)
+  totalSales      Decimal    @default(0) @db.Decimal(18, 2)
+  totalPrizes     Decimal    @default(0) @db.Decimal(18, 2)
+  winningNumbers  Json?
+  supplementary   Json?
+  powerball       Int?
+  isVerified      Boolean    @default(false)
+  verifiedById    String?
+  publishedAt     DateTime?
+  notes           String?
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+
+  tickets         Ticket[]
+  winningEntries  WinningEntry[]
+
+  @@map("draws")
+}
+
+model Ticket {
+  id              String       @id @default(cuid())
+  userId          String
+  user            User         @relation(fields: [userId], references: [id])
+  gameId          String
+  game            Game         @relation(fields: [gameId], references: [id])
+  drawId          String?
+  draw            Draw?        @relation(fields: [drawId], references: [id])
+  ticketNumber    String       @unique
+  qrCode          String?
+  status          TicketStatus @default(ACTIVE)
+  isQuickPick     Boolean      @default(false)
+  isSystemEntry   Boolean      @default(false)
+  isSyndicate     Boolean      @default(false)
+  syndicateId     String?
+  draws           Int          @default(1)
+  totalCost       Decimal      @db.Decimal(18, 2)
+  prizeAmount     Decimal?     @db.Decimal(18, 2)
+  prizeDivision   String?
+  claimedAt       DateTime?
+  purchasedAt     DateTime     @default(now())
+  validUntil      DateTime?
+  metadata        Json?
+
+  numbers         TicketNumber[]
+  winningEntries  WinningEntry[]
+
+  @@map("tickets")
+}
+
+model TicketNumber {
+  id         String  @id @default(cuid())
+  ticketId   String
+  ticket     Ticket  @relation(fields: [ticketId], references: [id])
+  lineIndex  Int
+  numbers    Json    // array of selected numbers
+  supplementary Json? // supplementary numbers if applicable
+  powerball  Int?
+
+  @@map("ticket_numbers")
+}
+
+model WinningEntry {
+  id            String   @id @default(cuid())
+  ticketId      String
+  ticket        Ticket   @relation(fields: [ticketId], references: [id])
+  drawId        String
+  draw          Draw     @relation(fields: [drawId], references: [id])
+  divisionName  String
+  prizeAmount   Decimal  @db.Decimal(18, 2)
+  isPaid        Boolean  @default(false)
+  paidAt        DateTime?
+  createdAt     DateTime @default(now())
+
+  @@map("winning_entries")
+}
+
+model Syndicate {
+  id          String   @id @default(cuid())
+  gameId      String
+  name        String
+  description String?
+  shares      Int
+  sharePrice  Decimal  @db.Decimal(18, 2)
+  totalCost   Decimal  @db.Decimal(18, 2)
+  drawId      String?
+  maxMembers  Int
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  @@map("syndicates")
+}
+
+model Bonus {
+  id             String    @id @default(cuid())
+  name           String
+  description    String
+  type           String    // WELCOME, DEPOSIT, REFERRAL, PROMOTIONAL
+  amount         Decimal?  @db.Decimal(18, 2)
+  percentage     Decimal?  @db.Decimal(5, 2)
+  maxAmount      Decimal?  @db.Decimal(18, 2)
+  minDeposit     Decimal?  @db.Decimal(18, 2)
+  wageringReq    Decimal?  @db.Decimal(5, 2)
+  expiresAt      DateTime?
+  isActive       Boolean   @default(true)
+  usageLimit     Int?
+  usageCount     Int       @default(0)
+  createdAt      DateTime  @default(now())
+
+  @@map("bonuses")
+}
+
+model Promotion {
+  id          String    @id @default(cuid())
+  title       String
+  description String
+  imageUrl    String?
+  startDate   DateTime
+  endDate     DateTime
+  isActive    Boolean   @default(true)
+  priority    Int       @default(0)
+  gameId      String?
+  bonusId     String?
+  createdAt   DateTime  @default(now())
+
+  @@map("promotions")
+}
+
+model AffiliateAccount {
+  id                String   @id @default(cuid())
+  userId            String   @unique
+  user              User     @relation(fields: [userId], references: [id])
+  affiliateCode     String   @unique
+  commissionRate    Decimal  @default(10) @db.Decimal(5, 2)
+  totalEarned       Decimal  @default(0) @db.Decimal(18, 2)
+  totalPaid         Decimal  @default(0) @db.Decimal(18, 2)
+  pendingAmount     Decimal  @default(0) @db.Decimal(18, 2)
+  totalClicks       Int      @default(0)
+  totalSignups      Int      @default(0)
+  totalDeposits     Int      @default(0)
+  isActive          Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  commissions       AffiliateCommission[]
+
+  @@map("affiliate_accounts")
+}
+
+model AffiliateCommission {
+  id               String   @id @default(cuid())
+  affiliateId      String
+  affiliate        AffiliateAccount @relation(fields: [affiliateId], references: [id])
+  referredUserId   String
+  type             String   // SIGNUP, DEPOSIT, TICKET
+  amount           Decimal  @db.Decimal(18, 2)
+  isPaid           Boolean  @default(false)
+  paidAt           DateTime?
+  createdAt        DateTime @default(now())
+
+  @@map("affiliate_commissions")
+}
+
+model Notification {
+  id         String           @id @default(cuid())
+  userId     String
+  user       User             @relation(fields: [userId], references: [id])
+  type       NotificationType @default(IN_APP)
+  title      String
+  message    String
+  data       Json?
+  isRead     Boolean          @default(false)
+  readAt     DateTime?
+  sentAt     DateTime?
+  createdAt  DateTime         @default(now())
+
+  @@map("notifications")
+}
+
+model NotificationPreference {
+  id                String   @id @default(cuid())
+  userId            String   @unique
+  user              User     @relation(fields: [userId], references: [id])
+  emailDeposit      Boolean  @default(true)
+  emailWithdrawal   Boolean  @default(true)
+  emailTicket       Boolean  @default(true)
+  emailDraw         Boolean  @default(true)
+  emailWinning      Boolean  @default(true)
+  emailPromo        Boolean  @default(false)
+  inAppDeposit      Boolean  @default(true)
+  inAppWithdrawal   Boolean  @default(true)
+  inAppTicket       Boolean  @default(true)
+  inAppDraw         Boolean  @default(true)
+  inAppWinning      Boolean  @default(true)
+  inAppPromo        Boolean  @default(true)
+
+  @@map("notification_preferences")
+}
+
+model SupportTicket {
+  id           String              @id @default(cuid())
+  userId       String
+  user         User                @relation(fields: [userId], references: [id])
+  subject      String
+  category     String
+  status       SupportTicketStatus @default(OPEN)
+  priority     String              @default("MEDIUM")
+  assignedToId String?
+  resolvedAt   DateTime?
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
+
+  messages     SupportMessage[]
+
+  @@map("support_tickets")
+}
+
+model SupportMessage {
+  id         String        @id @default(cuid())
+  ticketId   String
+  ticket     SupportTicket @relation(fields: [ticketId], references: [id])
+  senderId   String
+  message    String
+  isInternal Boolean       @default(false)
+  attachments Json?
+  createdAt  DateTime      @default(now())
+
+  @@map("support_messages")
+}
+
+model FAQ {
+  id         String   @id @default(cuid())
+  question   String
+  answer     String
+  category   String
+  sortOrder  Int      @default(0)
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+
+  @@map("faqs")
+}
+
+model Banner {
+  id          String    @id @default(cuid())
+  title       String
+  description String?
+  imageUrl    String
+  mobileUrl   String?
+  linkUrl     String?
+  position    String    @default("HOME")
+  isActive    Boolean   @default(true)
+  startDate   DateTime?
+  endDate     DateTime?
+  sortOrder   Int       @default(0)
+  createdAt   DateTime  @default(now())
+
+  @@map("banners")
+}
+
+model CmsPage {
+  id        String   @id @default(cuid())
+  slug      String   @unique
+  title     String
+  content   String
+  metaTitle String?
+  metaDesc  String?
+  isActive  Boolean  @default(true)
+  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+
+  @@map("cms_pages")
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id])
+  action    String
+  resource  String
+  resourceId String?
+  oldValues Json?
+  newValues Json?
+  ipAddress String?
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  @@map("audit_logs")
+}
+
+model Setting {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  value     String
+  group     String   @default("GENERAL")
+  label     String?
+  isPublic  Boolean  @default(false)
+  updatedAt DateTime @updatedAt
+
+  @@map("settings")
+}
+
+model PaymentMethod {
+  id          String   @id @default(cuid())
+  gateway     PaymentGateway
+  name        String
+  description String?
+  isActive    Boolean  @default(true)
+  config      Json
+  minAmount   Decimal  @db.Decimal(18, 2)
+  maxAmount   Decimal  @db.Decimal(18, 2)
+  fees        Decimal  @default(0) @db.Decimal(5, 2)
+  createdAt   DateTime @default(now())
+
+  @@map("payment_methods")
+}
+
+model ApiKey {
+  id          String    @id @default(cuid())
+  name        String
+  key         String    @unique
+  permissions Json
+  isActive    Boolean   @default(true)
+  expiresAt   DateTime?
+  lastUsedAt  DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@map("api_keys")
+}
