@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useAuthStore } from '@/store/authStore'
 import { useForm } from 'react-hook-form'
 import { api } from '@/services/api'
@@ -9,6 +9,34 @@ import { Link } from 'react-router-dom'
 export default function ProfilePage() {
   const { user, updateUser } = useAuthStore()
   const [isEditing, setIsEditing] = useState(false)
+  const [isResending, setIsResending] = useState(false)
+
+  // Fetch fresh user data on mount to ensure status badges are up-to-date
+  useEffect(() => {
+    api.get('/users/me').then(res => {
+      if (res.data?.data) {
+        updateUser(res.data.data)
+      }
+    }).catch(console.error)
+  }, [updateUser])
+
+  const handleResendVerification = async () => {
+    setIsResending(true)
+    try {
+      await api.post('/auth/resend-verification')
+      toast.success('Verification email sent! Check your inbox (or terminal).')
+    } catch (err: any) {
+      const errorMsg = err.response?.data?.error
+      if (errorMsg === 'Email is already verified') {
+        updateUser({ ...user, emailVerified: true } as any)
+        toast.success('Your email is already verified!')
+      } else {
+        toast.error(errorMsg || 'Failed to resend email')
+      }
+    } finally {
+      setIsResending(false)
+    }
+  }
 
   const { register, handleSubmit } = useForm({
     defaultValues: {
@@ -20,12 +48,13 @@ export default function ProfilePage() {
       city: user?.city || '',
       address: user?.address || '',
       postcode: user?.postcode || '',
+      dateOfBirth: user?.dateOfBirth ? user.dateOfBirth.split('T')[0] : '',
     },
   })
 
   const onSubmit = async (data: any) => {
     try {
-      const res = await api.put('/users/me', data)
+      const res = await api.patch('/users/me', data)
       updateUser(res.data.data)
       setIsEditing(false)
       toast.success('Profile updated successfully')
@@ -81,7 +110,7 @@ export default function ProfilePage() {
                     <label className="form-label">Date of Birth</label>
                     <div className="input-wrapper has-icon-left">
                       <span className="input-icon"><Calendar size={16} /></span>
-                      <input type="date" className="form-input" value={user?.dateOfBirth?.split('T')[0] || ''} disabled />
+                      <input type="date" {...register('dateOfBirth')} className="form-input" disabled={!isEditing} />
                     </div>
                   </div>
                 </div>
@@ -137,6 +166,16 @@ export default function ProfilePage() {
                 <span className={`badge badge-${user?.emailVerified ? 'success' : 'warning'}`}>
                   {user?.emailVerified ? 'Email Verified' : 'Email Unverified'}
                 </span>
+                {!user?.emailVerified && (
+                  <button 
+                    onClick={handleResendVerification} 
+                    disabled={isResending}
+                    className="btn btn-outline btn-sm"
+                    style={{ padding: '4px 8px', fontSize: '12px' }}
+                  >
+                    {isResending ? 'Sending...' : 'Resend Email'}
+                  </button>
+                )}
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
                 <span className={`badge badge-${user?.kycStatus === 'APPROVED' ? 'success' : user?.kycStatus === 'PENDING' ? 'warning' : 'danger'}`}>

@@ -102,9 +102,9 @@ function GameCard({ game, index }: { game: any; index: number }) {
       </div>
 
       <div className="game-card-body">
-        <div className="jackpot-label">AUD JACKPOT</div>
+        <div className="jackpot-label">COINS JACKPOT</div>
         <div className="game-jackpot">
-          ${(Number(game.jackpotAmount) / 1_000_000 >= 1
+          🪙{(Number(game.jackpotAmount) / 1_000_000 >= 1
             ? `${(Number(game.jackpotAmount) / 1_000_000).toFixed(game.jackpotAmount >= 10_000_000 ? 0 : 1)}M`
             : `${(Number(game.jackpotAmount) / 1_000).toFixed(0)}K`)}
         </div>
@@ -121,7 +121,7 @@ function GameCard({ game, index }: { game: any; index: number }) {
 
         <div style={{ marginTop: 'auto', paddingTop: '8px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
-            From ${Number(game.ticketPrice).toFixed(2)}/line
+            From 🪙{(Number(game.ticketPrice).toFixed(2))}/line
           </span>
           <div className="btn btn-primary btn-sm" style={{ pointerEvents: 'none' }}>
             Play <ChevronRight size={13} />

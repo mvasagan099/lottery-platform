@@ -12,7 +12,7 @@ export default function DepositPage() {
   const mutation = useMutation({
     mutationFn: () => walletService.redeemCoupon(code),
     onSuccess: (r) => {
-      toast.success(`Redeemed successfully! Added $${r.data.data.amount} AUD to your wallet.`)
+      toast.success(`Redeemed successfully! Added ${r.data.data.amount} Coins to your wallet.`)
       setCode('')
       setTimeout(() => navigate('/wallet'), 2000)
     },

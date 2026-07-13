@@ -5,8 +5,8 @@ export default function PromotionsPage() {
   const promos = [
     {
       id: 1,
-      title: '$10 Welcome Bonus',
-      desc: 'Sign up today and get $10 free credit added to your wallet. No deposit required.',
+      title: '🪙10 Welcome Bonus',
+      desc: 'Sign up today and get 🪙10 free credit added to your wallet. No deposit required.',
       icon: <Gift size={32} style={{ color: '#f5a623' }} />,
       cta: 'Claim Bonus',
       link: '/register',
@@ -14,12 +14,12 @@ export default function PromotionsPage() {
     },
     {
       id: 2,
-      title: 'Refer a Friend, Get $20',
-      desc: 'Invite your friends to MegaDraw. When they make their first deposit, you both get $20 bonus credit.',
+      title: 'Refer a Friend, Get 🪙20',
+      desc: 'Invite your friends to MegaDraw. When they make their first deposit, you both get 🪙20 bonus credit.',
       icon: <Zap size={32} style={{ color: 'var(--color-primary)' }} />,
       cta: 'Get Referral Link',
       link: '/profile/referral',
-      terms: 'Minimum $20 deposit required by referred user.'
+      terms: 'Minimum 🪙20 deposit required by referred user.'
     },
     {
       id: 3,

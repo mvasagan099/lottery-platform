@@ -272,11 +272,11 @@ export default function GameDetailPage() {
               {/* Cost breakdown */}
               <div style={{ background: 'var(--bg-secondary)', borderRadius: '12px', padding: '14px', marginBottom: '16px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', color: 'var(--text-muted)', marginBottom: '6px' }}>
-                  <span>{lines.length} line{lines.length > 1 ? 's' : ''} × ${game.ticketPrice} × {numDraws} draw{numDraws > 1 ? 's' : ''}</span>
+                  <span>{lines.length} line{lines.length > 1 ? 's' : ''} × 🪙{game.ticketPrice} × {numDraws} draw{numDraws > 1 ? 's' : ''}</span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 800, fontSize: '20px', fontFamily: 'var(--font-display)' }}>
                   <span>Total</span>
-                  <span>${totalCost.toFixed(2)} AUD</span>
+                  <span>{totalCost.toFixed(2)} Coins</span>
                 </div>
               </div>
 
@@ -289,7 +289,7 @@ export default function GameDetailPage() {
                   {purchaseMutation.isPending ? (
                     <><div className="btn-spinner" /> Processing...</>
                   ) : (
-                    <><Ticket size={18} /> Buy Ticket for ${totalCost.toFixed(2)}</>
+                    <><Ticket size={18} /> Buy Ticket for 🪙{totalCost.toFixed(2)}</>
                   )}
                 </button>
               ) : (
@@ -316,7 +316,7 @@ export default function GameDetailPage() {
             <div className="card-header">
               <h2 className="modal-title">Prize Divisions</h2>
               <div style={{ fontSize: '14px', color: 'var(--text-muted)' }}>
-                Current jackpot: <strong style={{ color: 'var(--color-secondary)' }}>${(Number(game.jackpotAmount) / 1_000_000).toFixed(1)}M</strong>
+                Current jackpot: <strong style={{ color: 'var(--color-secondary)' }}>🪙{(Number(game.jackpotAmount) / 1_000_000).toFixed(1)}M</strong>
               </div>
             </div>
             <div className="table-wrapper" style={{ border: 'none', borderRadius: 0 }}>
@@ -336,11 +336,11 @@ export default function GameDetailPage() {
                       <td>
                         {div.isJackpot ? (
                           <span style={{ fontWeight: 800, fontSize: '16px', background: 'var(--gradient-gold)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>
-                            ${(Number(game.jackpotAmount) / 1_000_000).toFixed(1)}M+
+                            🪙{(Number(game.jackpotAmount) / 1_000_000).toFixed(1)}M+
                           </span>
                         ) : div.fixedPrize ? (
                           <span style={{ fontWeight: 700, color: 'var(--color-accent-dark)' }}>
-                            ${Number(div.fixedPrize).toFixed(2)}
+                            🪙{Number(div.fixedPrize).toFixed(2)}
                           </span>
                         ) : (
                           <span style={{ color: 'var(--text-muted)' }}>Varies</span>

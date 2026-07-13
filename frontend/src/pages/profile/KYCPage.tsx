@@ -7,15 +7,34 @@ export default function KYCPage() {
   const { user } = useAuthStore()
   const [docType, setDocType] = useState('PASSPORT')
   const [isUploading, setIsUploading] = useState(false)
+  const [frontFile, setFrontFile] = useState<File | null>(null)
+  const [backFile, setBackFile] = useState<File | null>(null)
 
-  const handleUpload = () => {
+  const handleUpload = async () => {
+    if (!frontFile) {
+      toast.error('Please select a document to upload')
+      return
+    }
+
     setIsUploading(true)
-    // Simulate upload delay
-    setTimeout(() => {
+    try {
+      // Import api inside component or ensure it's imported at top
+      const { api } = await import('@/services/api')
+      await api.post('/users/me/kyc', {
+        documentType: docType,
+        documentUrl: frontFile.name, // Mocking URL with filename for now
+        selfieUrl: 'selfie.jpg'
+      })
+      
       setIsUploading(false)
       toast.success('Document uploaded successfully. Verification pending.')
-      // In a real app we'd update user state here after API call
-    }, 2000)
+      
+      // Update local user state
+      useAuthStore.getState().updateUser({ ...user, kycStatus: 'PENDING' } as any)
+    } catch (err: any) {
+      setIsUploading(false)
+      toast.error(err.response?.data?.error || 'Failed to submit KYC documents')
+    }
   }
 
   return (
@@ -56,16 +75,38 @@ export default function KYCPage() {
               <div style={{ border: '2px dashed var(--border-color)', borderRadius: '12px', padding: '40px 20px', textAlign: 'center', background: 'var(--bg-secondary)', marginBottom: '24px' }}>
                 <UploadCloud size={48} style={{ color: 'var(--color-primary)', margin: '0 auto 16px' }} />
                 <h3 style={{ fontSize: '16px', fontWeight: 700, marginBottom: '8px' }}>Upload Front of Document</h3>
-                <p style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '16px' }}>JPEG, PNG or PDF (Max 5MB)</p>
-                <button className="btn btn-outline btn-sm">Select File</button>
+                <p style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '16px' }}>
+                  {frontFile ? frontFile.name : 'JPEG, PNG or PDF (Max 5MB)'}
+                </p>
+                <input 
+                  type="file" 
+                  id="frontFile" 
+                  style={{ display: 'none' }} 
+                  onChange={(e) => setFrontFile(e.target.files?.[0] || null)}
+                  accept="image/jpeg,image/png,application/pdf"
+                />
+                <label htmlFor="frontFile" className="btn btn-outline btn-sm" style={{ cursor: 'pointer' }}>
+                  {frontFile ? 'Change File' : 'Select File'}
+                </label>
               </div>
 
               {docType === 'DRIVERS_LICENSE' || docType === 'NATIONAL_ID' ? (
                 <div style={{ border: '2px dashed var(--border-color)', borderRadius: '12px', padding: '40px 20px', textAlign: 'center', background: 'var(--bg-secondary)', marginBottom: '24px' }}>
                   <UploadCloud size={48} style={{ color: 'var(--color-primary)', margin: '0 auto 16px' }} />
                   <h3 style={{ fontSize: '16px', fontWeight: 700, marginBottom: '8px' }}>Upload Back of Document</h3>
-                  <p style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '16px' }}>JPEG, PNG or PDF (Max 5MB)</p>
-                  <button className="btn btn-outline btn-sm">Select File</button>
+                  <p style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '16px' }}>
+                    {backFile ? backFile.name : 'JPEG, PNG or PDF (Max 5MB)'}
+                  </p>
+                  <input 
+                    type="file" 
+                    id="backFile" 
+                    style={{ display: 'none' }} 
+                    onChange={(e) => setBackFile(e.target.files?.[0] || null)}
+                    accept="image/jpeg,image/png,application/pdf"
+                  />
+                  <label htmlFor="backFile" className="btn btn-outline btn-sm" style={{ cursor: 'pointer' }}>
+                    {backFile ? 'Change File' : 'Select File'}
+                  </label>
                 </div>
               ) : null}
 

@@ -25,15 +25,21 @@ export default async function userRoutes(app: FastifyInstance) {
   })
 
   app.patch('/me', { preHandler: authenticate }, async (request, reply) => {
-    const { firstName, lastName, phone, country, state, city, address, postcode } =
+    const { firstName, lastName, phone, country, state, city, address, postcode, dateOfBirth } =
       request.body as any
+
+    const updateData: any = { firstName, lastName, phone, country, state, city, address, postcode }
+    if (dateOfBirth) {
+      updateData.dateOfBirth = new Date(dateOfBirth)
+    }
 
     const user = await prisma.user.update({
       where: { id: request.user.userId },
-      data: { firstName, lastName, phone, country, state, city, address, postcode },
+      data: updateData,
       select: {
         id: true, email: true, firstName: true, lastName: true,
         phone: true, country: true, state: true, city: true, address: true, postcode: true,
+        dateOfBirth: true,
       },
     })
 

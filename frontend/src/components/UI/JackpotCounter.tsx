@@ -10,12 +10,12 @@ interface JackpotCounterProps {
 function formatJackpot(amount: number): string {
   if (amount >= 1_000_000) {
     const m = amount / 1_000_000
-    return `$${m % 1 === 0 ? m.toFixed(0) : m.toFixed(1)} Million`
+    return `🪙${m % 1 === 0 ? m.toFixed(0) : m.toFixed(1)} Million`
   }
   if (amount >= 1_000) {
-    return `$${(amount / 1000).toFixed(0)}K`
+    return `🪙${(amount / 1000).toFixed(0)}K`
   }
-  return `$${amount.toLocaleString()}`
+  return `🪙${amount.toLocaleString()}`
 }
 
 export default function JackpotCounter({ amount, currency = 'AUD', className, size = 'md' }: JackpotCounterProps) {

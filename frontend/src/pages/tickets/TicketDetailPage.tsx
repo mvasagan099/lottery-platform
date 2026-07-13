@@ -20,7 +20,7 @@ export default function TicketDetailPage() {
   const claimMutation = useMutation({
     mutationFn: () => ticketsService.claimPrize(id!),
     onSuccess: (r) => {
-      toast.success(`Claimed $${r.data.data?.amount} successfully!`)
+      toast.success(`Claimed 🪙${r.data.data?.amount} successfully!`)
       queryClient.invalidateQueries({ queryKey: ['ticket', id] })
       queryClient.invalidateQueries({ queryKey: ['wallet'] })
     },

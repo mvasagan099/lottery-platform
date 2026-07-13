@@ -35,12 +35,12 @@ export function WalletDashboard() {
             Available Balance
           </div>
           <div className="wallet-amount">
-            <span className="wallet-currency">AUD</span>
             {Number(wallet?.balance || 0).toFixed(2)}
+            <span className="wallet-currency" style={{ marginLeft: '8px' }}>Coins</span>
           </div>
           {Number(wallet?.bonusBalance || 0) > 0 && (
             <div style={{ marginTop: '8px', fontSize: '14px', opacity: 0.7 }}>
-              + ${Number(wallet?.bonusBalance).toFixed(2)} bonus balance
+              + {Number(wallet?.bonusBalance).toFixed(2)} bonus coins
             </div>
           )}
           <div style={{ display: 'flex', gap: '12px', marginTop: '24px', flexWrap: 'wrap' }}>
@@ -56,10 +56,10 @@ export function WalletDashboard() {
         {/* Quick Stats */}
         <div className="grid-4" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', marginBottom: '24px' }}>
           {[
-            { label: 'Total Deposited', value: `$${Number(wallet?.totalDeposited || 0).toFixed(2)}`, icon: <ArrowDownLeft size={20} /> },
-            { label: 'Total Withdrawn', value: `$${Number(wallet?.totalWithdrawn || 0).toFixed(2)}`, icon: <ArrowUpRight size={20} /> },
-            { label: 'Total Spent', value: `$${Number(wallet?.totalSpent || 0).toFixed(2)}`, icon: <CreditCard size={20} /> },
-            { label: 'Total Won', value: `$${Number(wallet?.totalWon || 0).toFixed(2)}`, icon: <Wallet size={20} />, variant: 'green' },
+            { label: 'Total Deposited', value: `${Number(wallet?.totalDeposited || 0).toFixed(2)} Coins`, icon: <ArrowDownLeft size={20} /> },
+            { label: 'Total Withdrawn', value: `${Number(wallet?.totalWithdrawn || 0).toFixed(2)} Coins`, icon: <ArrowUpRight size={20} /> },
+            { label: 'Total Spent', value: `${Number(wallet?.totalSpent || 0).toFixed(2)} Coins`, icon: <CreditCard size={20} /> },
+            { label: 'Total Won', value: `${Number(wallet?.totalWon || 0).toFixed(2)} Coins`, icon: <Wallet size={20} />, variant: 'green' },
           ].map((s) => (
             <div key={s.label} className={`stat-card ${(s as any).variant || ''}`}>
               <div className="stat-icon">{s.icon}</div>
@@ -83,7 +83,7 @@ export function WalletDashboard() {
                   <tr key={tx.id}>
                     <td style={{ fontWeight: 600 }}>{tx.type.replace(/_/g, ' ')}</td>
                     <td style={{ fontWeight: 700, color: tx.amount > 0 ? '#10b981' : '#ef4444' }}>
-                      {tx.amount > 0 ? '+' : ''}${Math.abs(tx.amount).toFixed(2)}
+                      {tx.amount > 0 ? '+' : ''}{Math.abs(tx.amount).toFixed(2)} Coins
                     </td>
                     <td><span className={`badge badge-${tx.status === 'COMPLETED' ? 'success' : tx.status === 'PENDING' ? 'warning' : 'danger'}`}>{tx.status}</span></td>
                     <td style={{ color: 'var(--text-muted)', fontSize: '13px' }}>{new Date(tx.createdAt).toLocaleDateString()}</td>

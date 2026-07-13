@@ -7,12 +7,120 @@
 import { FastifyInstance } from 'fastify'
 import { prisma } from '../server'
 import { authenticate, requireAdmin } from '../middleware/auth'
+import dayjs from 'dayjs'
 
 export default async function reportRoutes(app: FastifyInstance) {
 
   // All report routes require admin
   app.addHook('preHandler', authenticate)
   app.addHook('preHandler', requireAdmin)
+
+  // GET /reports/overview - High level financial KPIs
+  app.get('/overview', async (request, reply) => {
+    const { from, to } = request.query as Record<string, string>
+    
+    const fromDate = from ? new Date(from) : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
+    const toDate = to ? new Date(to) : new Date()
+    const dateFilter = { gte: fromDate, lte: toDate }
+
+    const [
+      deposits, withdrawals, ticketSales, prizes, bonuses, affiliateCommissions, pendingWithdrawals
+    ] = await Promise.all([
+      prisma.transaction.aggregate({ where: { type: 'DEPOSIT', status: 'COMPLETED', createdAt: dateFilter }, _sum: { amount: true }, _count: true }),
+      prisma.transaction.aggregate({ where: { type: 'WITHDRAWAL', status: 'COMPLETED', createdAt: dateFilter }, _sum: { amount: true }, _count: true }),
+      prisma.transaction.aggregate({ where: { type: 'TICKET_PURCHASE', status: 'COMPLETED', createdAt: dateFilter }, _sum: { amount: true }, _count: true }),
+      prisma.transaction.aggregate({ where: { type: 'PRIZE_CREDIT', status: 'COMPLETED', createdAt: dateFilter }, _sum: { amount: true }, _count: true }),
+      prisma.transaction.aggregate({ where: { type: { in: ['BONUS_CREDIT', 'REFERRAL_BONUS'] }, status: 'COMPLETED', createdAt: dateFilter }, _sum: { amount: true }, _count: true }),
+      prisma.transaction.aggregate({ where: { type: 'AFFILIATE_COMMISSION', status: 'COMPLETED', createdAt: dateFilter }, _sum: { amount: true }, _count: true }),
+      prisma.transaction.aggregate({ where: { type: 'WITHDRAWAL', status: 'PENDING' }, _sum: { amount: true }, _count: true })
+    ])
+
+    const totalDeposits = Number(deposits._sum.amount || 0)
+    const totalWithdrawals = Math.abs(Number(withdrawals._sum.amount || 0))
+    const totalTicketSales = Math.abs(Number(ticketSales._sum.amount || 0))
+    const totalPrizes = Number(prizes._sum.amount || 0)
+    const totalBonuses = Number(bonuses._sum.amount || 0)
+    const totalAffiliate = Number(affiliateCommissions._sum.amount || 0)
+
+    const grossProfit = totalTicketSales - totalPrizes
+    const netProfit = grossProfit - totalBonuses - totalAffiliate
+
+    return reply.send({
+      success: true,
+      data: {
+        totalDeposits, depositCount: deposits._count,
+        totalWithdrawals, withdrawalCount: withdrawals._count,
+        totalTicketSales, ticketSalesCount: ticketSales._count,
+        totalPrizes, totalBonuses, totalAffiliate,
+        grossProfit, netProfit,
+        pendingWithdrawals: { total: Math.abs(Number(pendingWithdrawals._sum.amount || 0)), count: pendingWithdrawals._count }
+      }
+    })
+  })
+
+  // GET /reports/charts - Time-series data for Recharts
+  app.get('/charts', async (request, reply) => {
+    const { from, to, interval = 'day' } = request.query as Record<string, string>
+    
+    const fromDate = from ? dayjs(from).toDate() : dayjs().subtract(30, 'day').toDate()
+    const toDate = to ? dayjs(to).toDate() : dayjs().toDate()
+
+    // For a simple approach, we fetch all relevant transactions in the period and bucket them in JS
+    // (In a true massive DB, we'd use raw SQL date_trunc, but this is safer for SQLite/Postgres compatibility here)
+    const txs = await prisma.transaction.findMany({
+      where: {
+        status: 'COMPLETED',
+        createdAt: { gte: fromDate, lte: toDate },
+        type: { in: ['DEPOSIT', 'WITHDRAWAL', 'TICKET_PURCHASE', 'PRIZE_CREDIT'] }
+      },
+      select: { createdAt: true, amount: true, type: true }
+    })
+
+    const chartDataMap: Record<string, any> = {}
+    
+    // Initialize buckets
+    let curr = dayjs(fromDate)
+    const end = dayjs(toDate)
+    while (curr.isBefore(end) || curr.isSame(end, interval as any)) {
+      const key = curr.format(interval === 'month' ? 'MMM YYYY' : 'MMM DD')
+      chartDataMap[key] = { name: key, revenue: 0, deposits: 0, withdrawals: 0, tickets: 0 }
+      curr = curr.add(1, interval as dayjs.ManipulateType)
+    }
+
+    // Fill buckets
+    for (const tx of txs) {
+      const key = dayjs(tx.createdAt).format(interval === 'month' ? 'MMM YYYY' : 'MMM DD')
+      if (!chartDataMap[key]) continue
+
+      const amount = Number(tx.amount)
+      if (tx.type === 'DEPOSIT') chartDataMap[key].deposits += amount
+      else if (tx.type === 'WITHDRAWAL') chartDataMap[key].withdrawals += Math.abs(amount)
+      else if (tx.type === 'TICKET_PURCHASE') {
+        const absAmount = Math.abs(amount)
+        chartDataMap[key].tickets += absAmount
+        chartDataMap[key].revenue += absAmount
+      }
+      else if (tx.type === 'PRIZE_CREDIT') {
+        chartDataMap[key].revenue -= amount // prizes reduce net revenue
+      }
+    }
+
+    return reply.send({
+      success: true,
+      data: Object.values(chartDataMap)
+    })
+  })
+
+  // GET /reports/live - Live recent transactions for dashboard feed
+  app.get('/live', async (request, reply) => {
+    const transactions = await prisma.transaction.findMany({
+      take: 20,
+      orderBy: { createdAt: 'desc' },
+      include: { user: { select: { username: true, email: true } } }
+    })
+
+    return reply.send({ success: true, data: transactions })
+  })
 
   // GET /reports/revenue - Revenue report
   app.get('/revenue', async (request, reply) => {

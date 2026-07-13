@@ -83,6 +83,7 @@ export default async function notificationRoutes(app: FastifyInstance) {
 
   // DELETE /notifications/:id - Delete notification
   app.delete('/:id', { preHandler: authenticate }, async (request, reply) => {
+    const { id } = request.params as { id: string }
     await prisma.notification.deleteMany({
       where: { id, userId: request.user.userId },
     })

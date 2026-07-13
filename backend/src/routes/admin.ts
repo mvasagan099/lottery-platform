@@ -58,7 +58,7 @@ export default async function adminRoutes(app: FastifyInstance) {
   // ── User Management ───────────────────────────────────────────────────────
 
   app.get('/users', async (request, reply) => {
-    const { page = '1', limit = '20', search, status, role } = request.query as Record<string, string>
+    const { page = '1', limit = '20', search, status, role, kycStatus, sortField = 'createdAt', sortDir = 'desc' } = request.query as Record<string, string>
     const skip = (Number(page) - 1) * Number(limit)
 
     const where: any = {}
@@ -72,13 +72,17 @@ export default async function adminRoutes(app: FastifyInstance) {
     }
     if (status) where.status = status
     if (role) where.role = role
+    if (kycStatus) where.kycStatus = kycStatus
+
+    const orderBy: any = {}
+    orderBy[sortField] = sortDir
 
     const [users, total] = await Promise.all([
       prisma.user.findMany({
         where,
         skip,
         take: Number(limit),
-        orderBy: { createdAt: 'desc' },
+        orderBy,
         select: {
           id: true,
           email: true,
@@ -117,9 +121,13 @@ export default async function adminRoutes(app: FastifyInstance) {
           take: 10,
           include: { game: { select: { name: true } } },
         },
+        transactions: {
+          orderBy: { createdAt: 'desc' },
+          take: 10,
+        },
         sessions: {
           where: { isActive: true },
-          select: { id: true, ipAddress: true, lastUsedAt: true },
+          select: { id: true, ipAddress: true, lastUsedAt: true, userAgent: true },
         },
       },
     })
@@ -142,39 +150,133 @@ export default async function adminRoutes(app: FastifyInstance) {
       await prisma.session.updateMany({ where: { userId: id }, data: { isActive: false } })
     }
 
-    await auditLog(
-      request.user.userId,
-      'USER_STATUS_CHANGED',
-      'User',
-      id,
-      { status: oldUser?.status },
-      { status, reason },
-      request
-    )
+    await auditLog(request.user.userId, 'USER_STATUS_CHANGED', 'User', id, { oldStatus: oldUser?.status }, { newStatus: status, reason }, request)
 
-    return reply.send({ success: true, message: `User ${status.toLowerCase()}` })
+    return reply.send({ success: true, message: `User status changed to ${status}` })
+  })
+
+  // POST /users/bulk-action - Bulk suspend/activate/delete
+  app.post('/users/bulk-action', async (request, reply) => {
+    const { userIds, action } = request.body as { userIds: string[]; action: 'SUSPEND' | 'ACTIVATE' | 'DELETE' }
+    
+    if (!userIds || userIds.length === 0) return reply.status(400).send({ success: false, error: 'No users selected' })
+
+    if (action === 'DELETE') {
+      await prisma.user.deleteMany({ where: { id: { in: userIds } } })
+    } else {
+      const status = action === 'ACTIVATE' ? 'ACTIVE' : 'SUSPENDED'
+      await prisma.user.updateMany({
+        where: { id: { in: userIds } },
+        data: { status }
+      })
+    }
+
+    await auditLog(request.user.userId, `BULK_${action}`, 'User', 'Multiple', undefined, { count: userIds.length }, request)
+
+    return reply.send({ success: true, message: `Successfully applied ${action} to ${userIds.length} users` })
+  })
+
+  // POST /users/:id/wallet/adjust - Manual wallet adjustment
+  app.post('/users/:id/wallet/adjust', async (request, reply) => {
+    const { id } = request.params as { id: string }
+    const { amount, reason, type } = request.body as { amount: number; reason: string; type: 'CREDIT' | 'DEBIT' }
+
+    if (amount <= 0) return reply.status(400).send({ success: false, error: 'Amount must be positive' })
+
+    const user = await prisma.user.findUnique({ where: { id }, include: { wallet: true } })
+    if (!user || !user.wallet) return reply.status(404).send({ success: false, error: 'User or wallet not found' })
+
+    if (type === 'DEBIT' && user.wallet.balance.toNumber() < amount) {
+      return reply.status(400).send({ success: false, error: 'Insufficient balance for debit' })
+    }
+
+    const newBalance = type === 'CREDIT' ? user.wallet.balance.toNumber() + amount : user.wallet.balance.toNumber() - amount
+
+    await prisma.$transaction(async (tx) => {
+      await tx.wallet.update({
+        where: { id: user.wallet!.id },
+        data: { balance: newBalance }
+      })
+
+      await tx.transaction.create({
+        data: {
+          userId: id,
+          walletId: user.wallet!.id,
+          type: type === 'CREDIT' ? 'BONUS_CREDIT' : 'WITHDRAWAL',
+          amount: amount,
+          balanceBefore: user.wallet!.balance,
+          balanceAfter: newBalance,
+          status: 'COMPLETED',
+          reference: `Admin Adjustment: ${reason}`
+        }
+      })
+    })
+
+    await auditLog(request.user.userId, 'WALLET_ADJUSTED', 'Wallet', user.wallet.id, undefined, { type, amount, reason }, request)
+
+    return reply.send({ success: true, message: `Successfully ${type.toLowerCase()}ed $${amount}`, newBalance })
   })
 
   // ── KYC Management ────────────────────────────────────────────────────────
 
   app.get('/kyc', async (request, reply) => {
-    const { page = '1', limit = '20', status = 'PENDING' } = request.query as Record<string, string>
+    const { page = '1', limit = '10', search, status, documentType, sortField = 'submittedAt', sortDir = 'desc' } = request.query as Record<string, string>
     const skip = (Number(page) - 1) * Number(limit)
 
-    const [records, total] = await Promise.all([
+    const where: any = {}
+    if (status) where.status = status
+    if (documentType) where.documentType = documentType
+
+    if (search) {
+      where.OR = [
+        { id: { contains: search, mode: 'insensitive' } },
+        { user: { email: { contains: search, mode: 'insensitive' } } },
+        { user: { username: { contains: search, mode: 'insensitive' } } },
+        { user: { firstName: { contains: search, mode: 'insensitive' } } },
+        { user: { lastName: { contains: search, mode: 'insensitive' } } },
+      ]
+    }
+
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+
+    const [records, total, totalRequests, pendingReview, approvedToday, rejectedToday] = await Promise.all([
       prisma.kYCRecord.findMany({
-        where: { status: status as any },
+        where,
         skip,
         take: Number(limit),
-        orderBy: { submittedAt: 'asc' },
+        orderBy: { [sortField]: sortDir },
         include: {
-          user: { select: { id: true, email: true, firstName: true, lastName: true } },
+          user: { select: { id: true, email: true, username: true, firstName: true, lastName: true, country: true } },
         },
       }),
-      prisma.kYCRecord.count({ where: { status: status as any } }),
+      prisma.kYCRecord.count({ where }),
+      prisma.kYCRecord.count(),
+      prisma.kYCRecord.count({ where: { status: 'PENDING' } }),
+      prisma.kYCRecord.count({ where: { status: 'APPROVED', reviewedAt: { gte: today } } }),
+      prisma.kYCRecord.count({ where: { status: 'REJECTED', reviewedAt: { gte: today } } }),
     ])
 
-    return reply.send({ success: true, data: records, pagination: { page: Number(page), limit: Number(limit), total } })
+    const stats = { totalRequests, pendingReview, approvedToday, rejectedToday }
+    return reply.send({ success: true, data: records, pagination: { page: Number(page), limit: Number(limit), total, pages: Math.ceil(total / Number(limit)) }, stats })
+  })
+
+  app.get('/kyc/:id', async (request, reply) => {
+    const { id } = request.params as { id: string }
+    const record = await prisma.kYCRecord.findUnique({
+      where: { id },
+      include: {
+        user: {
+          include: {
+            wallet: true,
+            sessions: { where: { isActive: true } },
+            kycRecords: { orderBy: { submittedAt: 'desc' } }
+          }
+        }
+      }
+    })
+    if (!record) return reply.status(404).send({ success: false, error: 'KYC Record not found' })
+    return reply.send({ success: true, data: record })
   })
 
   app.patch('/kyc/:id/review', async (request, reply) => {
@@ -183,34 +285,132 @@ export default async function adminRoutes(app: FastifyInstance) {
 
     const record = await prisma.kYCRecord.update({
       where: { id },
-      data: {
-        status,
-        reviewedById: request.user.userId,
-        reviewNotes: notes,
-        reviewedAt: new Date(),
-      },
+      data: { status, reviewedById: request.user.userId, reviewNotes: notes, reviewedAt: new Date() },
     })
 
-    // Update user KYC status
-    await prisma.user.update({
-      where: { id: record.userId },
-      data: { kycStatus: status },
-    })
-
-    // Notify user
+    await prisma.user.update({ where: { id: record.userId }, data: { kycStatus: status } })
     await prisma.notification.create({
       data: {
         userId: record.userId,
         title: `Identity verification ${status === 'APPROVED' ? 'approved' : 'rejected'}`,
-        message: status === 'APPROVED'
-          ? 'Your identity has been verified. You can now make withdrawals.'
-          : `Your verification was rejected: ${notes || 'Please resubmit with clearer documents.'}`,
+        message: status === 'APPROVED' ? 'Your identity has been verified.' : `Verification rejected: ${notes || 'Please resubmit.'}`,
       },
     })
-
     await auditLog(request.user.userId, `KYC_${status}`, 'KYCRecord', id, undefined, { status, notes }, request)
-
     return reply.send({ success: true, message: `KYC ${status.toLowerCase()}` })
+  })
+
+  app.post('/kyc/bulk-action', async (request, reply) => {
+    const { recordIds, action, notes } = request.body as { recordIds: string[]; action: 'APPROVED' | 'REJECTED', notes?: string }
+    if (!recordIds || recordIds.length === 0) return reply.status(400).send({ success: false, error: 'No records provided' })
+
+    const records = await prisma.kYCRecord.findMany({ where: { id: { in: recordIds } } })
+    
+    await prisma.kYCRecord.updateMany({
+      where: { id: { in: recordIds } },
+      data: { status: action, reviewedById: request.user.userId, reviewNotes: notes, reviewedAt: new Date() }
+    })
+
+    for (const record of records) {
+      await prisma.user.update({ where: { id: record.userId }, data: { kycStatus: action } })
+      await prisma.notification.create({
+        data: {
+          userId: record.userId,
+          title: `Identity verification ${action === 'APPROVED' ? 'approved' : 'rejected'}`,
+          message: action === 'APPROVED' ? 'Your identity has been verified.' : `Verification rejected: ${notes || 'Please resubmit.'}`,
+        },
+      })
+    }
+    
+    await auditLog(request.user.userId, `BULK_KYC_${action}`, 'KYCRecord', 'BULK', undefined, { count: recordIds.length }, request)
+    return reply.send({ success: true, message: `Successfully ${action.toLowerCase()} ${recordIds.length} records` })
+  })
+
+  // ── Affiliate Management ───────────────────────────────────────────────────
+
+  app.get('/affiliates', async (request, reply) => {
+    const { page = '1', limit = '10', search, status, sortField = 'createdAt', sortDir = 'desc' } = request.query as Record<string, string>
+    const skip = (Number(page) - 1) * Number(limit)
+
+    const where: any = {}
+    if (status) where.isActive = status === 'ACTIVE'
+
+    if (search) {
+      where.OR = [
+        { affiliateCode: { contains: search, mode: 'insensitive' } },
+        { user: { email: { contains: search, mode: 'insensitive' } } },
+        { user: { username: { contains: search, mode: 'insensitive' } } },
+      ]
+    }
+
+    const [records, total, totalAffiliates, activeAffiliates, totalEarned, totalPending] = await Promise.all([
+      prisma.affiliateAccount.findMany({
+        where,
+        skip,
+        take: Number(limit),
+        orderBy: { [sortField]: sortDir },
+        include: {
+          user: { select: { id: true, email: true, username: true, country: true } },
+          _count: { select: { commissions: true } }
+        },
+      }),
+      prisma.affiliateAccount.count({ where }),
+      prisma.affiliateAccount.count(),
+      prisma.affiliateAccount.count({ where: { isActive: true } }),
+      prisma.affiliateAccount.aggregate({ _sum: { totalEarned: true } }),
+      prisma.affiliateAccount.aggregate({ _sum: { pendingAmount: true } }),
+    ])
+
+    const stats = { 
+      totalAffiliates, 
+      activeAffiliates, 
+      totalEarned: totalEarned._sum.totalEarned || 0, 
+      totalPending: totalPending._sum.pendingAmount || 0 
+    }
+    return reply.send({ success: true, data: records, pagination: { page: Number(page), limit: Number(limit), total, pages: Math.ceil(total / Number(limit)) }, stats })
+  })
+
+  app.get('/affiliates/:id', async (request, reply) => {
+    const { id } = request.params as { id: string }
+    const record = await prisma.affiliateAccount.findUnique({
+      where: { id },
+      include: {
+        user: { select: { id: true, email: true, username: true, firstName: true, lastName: true, phone: true, country: true, createdAt: true } },
+        commissions: {
+          orderBy: { createdAt: 'desc' },
+          take: 20
+        }
+      }
+    })
+    if (!record) return reply.status(404).send({ success: false, error: 'Affiliate not found' })
+    return reply.send({ success: true, data: record })
+  })
+
+  app.patch('/affiliates/:id', async (request, reply) => {
+    const { id } = request.params as { id: string }
+    const { isActive, commissionRate } = request.body as { isActive?: boolean; commissionRate?: number }
+
+    const dataToUpdate: any = {}
+    if (isActive !== undefined) dataToUpdate.isActive = isActive
+    if (commissionRate !== undefined) dataToUpdate.commissionRate = commissionRate
+
+    await prisma.affiliateAccount.update({ where: { id }, data: dataToUpdate })
+    await auditLog(request.user.userId, 'AFFILIATE_UPDATED', 'AffiliateAccount', id, undefined, dataToUpdate, request)
+    return reply.send({ success: true, message: 'Affiliate updated successfully' })
+  })
+
+  app.post('/affiliates/bulk-action', async (request, reply) => {
+    const { recordIds, action } = request.body as { recordIds: string[]; action: 'SUSPEND' | 'ACTIVATE' }
+    if (!recordIds || recordIds.length === 0) return reply.status(400).send({ success: false, error: 'No records provided' })
+
+    const isActive = action === 'ACTIVATE'
+    await prisma.affiliateAccount.updateMany({
+      where: { id: { in: recordIds } },
+      data: { isActive }
+    })
+
+    await auditLog(request.user.userId, `BULK_AFFILIATE_${action}`, 'AffiliateAccount', 'BULK', undefined, { count: recordIds.length }, request)
+    return reply.send({ success: true, message: `Successfully ${action.toLowerCase()}d ${recordIds.length} affiliates` })
   })
 
   // ── Draw Management ───────────────────────────────────────────────────────
@@ -455,7 +655,92 @@ export default async function adminRoutes(app: FastifyInstance) {
     return reply.send({ success: true, message: 'Withdrawal rejected and funds returned' })
   })
 
-  // ── Reports ───────────────────────────────────────────────────────────────
+  // ── Game Management ────────────────────────────────────────────────────────
+
+  app.get('/games', async (request, reply) => {
+    const { page = '1', limit = '10', search, status, sortField = 'createdAt', sortDir = 'desc' } = request.query as Record<string, string>
+    const skip = (Number(page) - 1) * Number(limit)
+
+    const where: any = {}
+    if (status) where.isActive = status === 'ACTIVE'
+
+    if (search) {
+      where.OR = [
+        { name: { contains: search, mode: 'insensitive' } },
+        { slug: { contains: search, mode: 'insensitive' } },
+      ]
+    }
+
+    const [records, total, totalGames, activeGames, totalJackpots] = await Promise.all([
+      prisma.game.findMany({
+        where,
+        skip,
+        take: Number(limit),
+        orderBy: { [sortField]: sortDir },
+        include: {
+          _count: { select: { draws: true, tickets: true } }
+        },
+      }),
+      prisma.game.count({ where }),
+      prisma.game.count(),
+      prisma.game.count({ where: { isActive: true } }),
+      prisma.game.aggregate({ _sum: { jackpotAmount: true } }),
+    ])
+
+    const stats = { 
+      totalGames, 
+      activeGames, 
+      disabledGames: totalGames - activeGames,
+      totalJackpots: totalJackpots._sum.jackpotAmount || 0 
+    }
+    return reply.send({ success: true, data: records, pagination: { page: Number(page), limit: Number(limit), total, pages: Math.ceil(total / Number(limit)) }, stats })
+  })
+
+  app.get('/games/:id', async (request, reply) => {
+    const { id } = request.params as { id: string }
+    const record = await prisma.game.findUnique({
+      where: { id },
+      include: {
+        prizeDivisions: { orderBy: { divisionOrder: 'asc' } },
+        draws: {
+          orderBy: { scheduledAt: 'desc' },
+          take: 5
+        }
+      }
+    })
+    if (!record) return reply.status(404).send({ success: false, error: 'Game not found' })
+    return reply.send({ success: true, data: record })
+  })
+
+  app.patch('/games/:id', async (request, reply) => {
+    const { id } = request.params as { id: string }
+    const { isActive, jackpotAmount, ticketPrice } = request.body as { isActive?: boolean; jackpotAmount?: number; ticketPrice?: number }
+
+    const dataToUpdate: any = {}
+    if (isActive !== undefined) dataToUpdate.isActive = isActive
+    if (jackpotAmount !== undefined) dataToUpdate.jackpotAmount = jackpotAmount
+    if (ticketPrice !== undefined) dataToUpdate.ticketPrice = ticketPrice
+
+    await prisma.game.update({ where: { id }, data: dataToUpdate })
+    await auditLog(request.user.userId, 'GAME_UPDATED', 'Game', id, undefined, dataToUpdate, request)
+    return reply.send({ success: true, message: 'Game updated successfully' })
+  })
+
+  app.post('/games/bulk-action', async (request, reply) => {
+    const { recordIds, action } = request.body as { recordIds: string[]; action: 'DISABLE' | 'ENABLE' }
+    if (!recordIds || recordIds.length === 0) return reply.status(400).send({ success: false, error: 'No records provided' })
+
+    const isActive = action === 'ENABLE'
+    await prisma.game.updateMany({
+      where: { id: { in: recordIds } },
+      data: { isActive }
+    })
+
+    await auditLog(request.user.userId, `BULK_GAME_${action}`, 'Game', 'BULK', undefined, { count: recordIds.length }, request)
+    return reply.send({ success: true, message: `Successfully ${action.toLowerCase()}d ${recordIds.length} games` })
+  })
+
+  // ── Stats ───────────────────────────────────────────────────────────────
 
   app.get('/reports/revenue', async (request, reply) => {
     const { from, to } = request.query as { from?: string; to?: string }

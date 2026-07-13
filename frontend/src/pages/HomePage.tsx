@@ -29,7 +29,7 @@ export default function HomePage() {
     { icon: <Shield size={28} />, title: 'Safe & Secure', desc: 'Bank-grade SSL encryption and licensed by Australian authorities.', color: '#10b981' },
     { icon: <Zap size={28} />, title: 'Instant Prizes', desc: 'Prizes automatically credited to your wallet after each draw.', color: '#f5a623' },
     { icon: <Users size={28} />, title: '100K+ Members', desc: 'Join hundreds of thousands of Australians playing online.', color: '#6366f1' },
-    { icon: <Trophy size={28} />, title: '$50M+ Paid Out', desc: 'Verified winners from every major Australian lottery.', color: '#3b82f6' },
+    { icon: <Trophy size={28} />, title: '🪙50M+ Paid Out', desc: 'Verified winners from every major Australian lottery.', color: '#3b82f6' },
   ]
 
   const gameCategories = [
@@ -78,7 +78,7 @@ export default function HomePage() {
                 {[
                   { value: '9', label: 'Lottery Games' },
                   { value: '100K+', label: 'Members' },
-                  { value: '$50M+', label: 'Prizes Paid' },
+                  { value: '🪙50M+', label: 'Prizes Paid' },
                 ].map((s) => (
                   <div key={s.label}>
                     <div style={{ fontSize: '28px', fontWeight: 900, fontFamily: 'var(--font-display)', color: 'white', letterSpacing: '-0.03em' }}>{s.value}</div>
@@ -99,7 +99,7 @@ export default function HomePage() {
                   </div>
                   <div style={{ fontSize: '56px', fontWeight: 900, fontFamily: 'var(--font-display)', letterSpacing: '-0.04em', lineHeight: 1 }}>
                     <span style={{ background: 'linear-gradient(135deg, #f5a623, #f7b84b)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>
-                      ${(totalJackpot / 1_000_000).toFixed(0)}M
+                      🪙{(totalJackpot / 1_000_000).toFixed(0)}M
                     </span>
                   </div>
                   <div style={{ fontSize: '13px', color: 'rgba(255,255,255,0.5)', marginTop: '4px' }}>Across all 9 games this week</div>
@@ -261,7 +261,7 @@ export default function HomePage() {
                     )}
                   </div>
                   <div style={{ fontFamily: 'var(--font-display)', fontWeight: 900, background: 'var(--gradient-gold)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text', fontSize: '22px', whiteSpace: 'nowrap' }}>
-                    ${(Number(game.jackpotAmount) / 1_000_000).toFixed(0)}M
+                    🪙{(Number(game.jackpotAmount) / 1_000_000).toFixed(0)}M
                   </div>
                 </div>
               </Link>
@@ -277,10 +277,10 @@ export default function HomePage() {
             LIMITED TIME
           </div>
           <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(28px, 5vw, 52px)', fontWeight: 900, letterSpacing: '-0.03em', marginBottom: '16px' }}>
-            Get a <span style={{ background: 'var(--gradient-gold)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>$10 Welcome Bonus</span>
+            Get a <span style={{ background: 'var(--gradient-gold)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>🪙10 Welcome Bonus</span>
           </h2>
           <p style={{ fontSize: '18px', color: 'rgba(255,255,255,0.7)', marginBottom: '36px', maxWidth: '480px', margin: '0 auto 36px' }}>
-            Register today and get $10 free credit to start playing. No deposit required.
+            Register today and get 🪙10 free credit to start playing. No deposit required.
           </p>
           <Link to="/register" className="btn btn-gold btn-xl">
             Claim Bonus <ArrowRight size={18} />
@@ -314,7 +314,7 @@ function GameCard({ game, index }: { game: any; index: number }) {
       <div className="game-card-body">
         <div className="jackpot-label">JACKPOT</div>
         <div className="game-jackpot">
-          ${(Number(game.jackpotAmount) / 1_000_000).toFixed(game.jackpotAmount >= 10_000_000 ? 0 : 1)}M
+          🪙{(Number(game.jackpotAmount) / 1_000_000).toFixed(game.jackpotAmount >= 10_000_000 ? 0 : 1)}M
         </div>
 
         <p style={{ fontSize: '13px', color: 'var(--text-muted)', margin: '8px 0 12px', lineHeight: 1.5 }}>
@@ -338,7 +338,7 @@ function GameCard({ game, index }: { game: any; index: number }) {
 }
 
 function hexToRgb(hex: string): string {
-  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex)
+  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})🪙/i.exec(hex)
   return result
     ? `${parseInt(result[1], 16)}, ${parseInt(result[2], 16)}, ${parseInt(result[3], 16)}`
     : '0, 0, 0'

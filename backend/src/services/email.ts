@@ -85,6 +85,17 @@ const templates: Record<string, (data: any) => string> = {
 export async function sendEmail({ to, subject, template, data }: EmailOptions): Promise<void> {
   const html = templates[template]?.(data) || `<p>${JSON.stringify(data)}</p>`
 
+  // If no SMTP user is configured, just log the email contents to the terminal for local testing
+  if (!process.env.SMTP_USER) {
+    console.log('\n======================================================')
+    console.log(`✉️ MOCK EMAIL SENT TO: ${to}`)
+    console.log(`Subject: ${subject}`)
+    if (data.verifyUrl) console.log(`👉 VERIFICATION LINK: ${data.verifyUrl}`)
+    if (data.resetUrl) console.log(`👉 RESET LINK: ${data.resetUrl}`)
+    console.log('======================================================\n')
+    return
+  }
+
   try {
     await transporter.sendMail({
       from: `MegaDraw <${process.env.FROM_EMAIL || 'noreply@MegaDraw.com'}>`,

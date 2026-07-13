@@ -55,8 +55,8 @@ export default function AffiliateDashboard() {
         </div>
 
         <div className="grid-4" style={{ marginBottom: '32px' }}>
-          <StatCard title="Total Earned" value={`$${Number(profile.totalEarned).toFixed(2)}`} icon={<Trophy size={20} />} variant="gold" />
-          <StatCard title="Pending Payout" value={`$${Number(profile.pendingAmount).toFixed(2)}`} icon={<DollarSign size={20} />} variant="green" />
+          <StatCard title="Total Earned" value={`🪙${Number(profile.totalEarned).toFixed(2)}`} icon={<Trophy size={20} />} variant="gold" />
+          <StatCard title="Pending Payout" value={`🪙${Number(profile.pendingAmount).toFixed(2)}`} icon={<DollarSign size={20} />} variant="green" />
           <StatCard title="Total Signups" value={profile.totalSignups} icon={<Users size={20} />} />
           <StatCard title="Link Clicks" value={profile.totalClicks} icon={<MousePointerClick size={20} />} />
         </div>

@@ -153,6 +153,28 @@ export default async function authRoutes(app: FastifyInstance) {
     })
   })
 
+  // POST /auth/resend-verification
+  app.post('/resend-verification', { preHandler: authenticate }, async (request, reply) => {
+    const user = await prisma.user.findUnique({ where: { id: request.user.userId } })
+    if (!user) return reply.status(404).send({ success: false, error: 'User not found' })
+    if (user.emailVerified) return reply.status(400).send({ success: false, error: 'Email is already verified' })
+
+    const verifyToken = randomBytes(32).toString('hex')
+    await redis.setex(`email_verify:${verifyToken}`, 86400, user.id) // 24h TTL
+
+    await sendEmail({
+      to: user.email,
+      subject: 'Verify your MegaDraw account',
+      template: 'email-verification',
+      data: {
+        name: user.firstName,
+        verifyUrl: `${process.env.FRONTEND_URL}/verify-email?token=${verifyToken}`,
+      },
+    })
+
+    return reply.send({ success: true, message: 'Verification email resent' })
+  })
+
   // POST /auth/login
   app.post('/login', {
     config: { rateLimit: { max: 10, timeWindow: '15 minutes' } },
@@ -165,14 +187,14 @@ export default async function authRoutes(app: FastifyInstance) {
     })
 
     if (!user) {
-      return reply.status(401).send({ success: false, error: 'Invalid credentials' })
+      return reply.status(401).send({ success: false, error: 'Incorrect email or password' })
     }
 
     // Check password
     const validPassword = await argon2.verify(user.passwordHash, body.password)
     if (!validPassword) {
       await auditLog(user.id, 'LOGIN_FAILED', 'User', user.id, undefined, undefined, request)
-      return reply.status(401).send({ success: false, error: 'Invalid credentials' })
+      return reply.status(401).send({ success: false, error: 'Incorrect email or password' })
     }
 
     // Check account status

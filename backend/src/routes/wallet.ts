@@ -402,7 +402,7 @@ export default async function walletRoutes(app: FastifyInstance) {
           amount,
           balanceBefore: balBefore,
           balanceAfter: balBefore + amount,
-          reference: \`CPN-\${coupon.code}\`,
+          reference: `CPN-${coupon.code}`,
           description: 'Coupon Redemption',
         },
       })
@@ -415,7 +415,7 @@ export default async function walletRoutes(app: FastifyInstance) {
       data: {
         userId,
         title: 'Coupon Redeemed',
-        message: \`$\${Number(coupon.amount).toFixed(2)} AUD has been added to your wallet.\`,
+        message: `${Number(coupon.amount).toFixed(2)} Coins have been added to your wallet.`,
       },
     })
 

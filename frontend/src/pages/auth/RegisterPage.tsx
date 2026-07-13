@@ -11,7 +11,7 @@ import toast from 'react-hot-toast'
 const schema = z.object({
   firstName: z.string().min(2, 'First name must be at least 2 characters'),
   lastName: z.string().min(2, 'Last name must be at least 2 characters'),
-  username: z.string().min(3).regex(/^[a-zA-Z0-9_]+$/, 'Letters, numbers, underscores only'),
+  username: z.string().min(3).regex(/^[a-zA-Z0-9_]+🪙/, 'Letters, numbers, underscores only'),
   email: z.string().email('Invalid email address'),
   dateOfBirth: z.string().refine((dob) => {
     const age = (Date.now() - new Date(dob).getTime()) / (1000 * 60 * 60 * 24 * 365.25)

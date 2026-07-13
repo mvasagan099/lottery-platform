@@ -65,7 +65,7 @@ export default async function drawRoutes(app: FastifyInstance) {
           include: { prizeDivisions: { orderBy: { divisionOrder: 'asc' } } },
         },
         winningEntries: {
-          select: { divisionName: true, prizeAmount: true, _count: true },
+          select: { divisionName: true, prizeAmount: true, id: true },
         },
       },
     })
@@ -170,8 +170,8 @@ export default async function drawRoutes(app: FastifyInstance) {
       data: {
         status: 'IN_PROGRESS',
         winningNumbers: body.winningNumbers,
-        supplementary: body.supplementary || null,
-        powerball: body.powerball || null,
+        supplementary: body.supplementary ?? undefined,
+        powerball: body.powerball ?? undefined,
         drawnAt: new Date(),
       },
     })

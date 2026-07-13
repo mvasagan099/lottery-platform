@@ -99,8 +99,8 @@ export default function Header() {
                 {/* Wallet */}
                 <Link to="/wallet" className="wallet-chip">
                   <Wallet size={15} />
-                  <span>${Number(balance).toFixed(2)}</span>
-                  <span style={{ opacity: 0.6, fontSize: '11px' }}>AUD</span>
+                  <span>{Number(balance).toFixed(2)}</span>
+                  <span style={{ opacity: 0.6, fontSize: '11px', marginLeft: '4px' }}>Coins</span>
                 </Link>
 
                 {/* Notifications */}

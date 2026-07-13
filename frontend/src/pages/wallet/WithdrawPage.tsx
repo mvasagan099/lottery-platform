@@ -45,7 +45,7 @@ export default function WithdrawPage() {
           <div className="alert alert-info">
             <Info size={18} className="alert-icon" />
             <div>
-              <strong>Available to Withdraw: ${available.toFixed(2)} AUD</strong>
+              <strong>Available to Withdraw: {available.toFixed(2)} Coins</strong>
               <div style={{ fontSize: '13px', marginTop: '4px' }}>Bonus balances cannot be withdrawn. Withdrawals take 1-3 business days to process.</div>
             </div>
           </div>
@@ -64,9 +64,9 @@ export default function WithdrawPage() {
           </div>
 
           <div>
-            <div className="form-label" style={{ marginBottom: '12px' }}>Amount to Withdraw (Min $50)</div>
+            <div className="form-label" style={{ marginBottom: '12px' }}>Amount to Withdraw (Min 🪙50)</div>
             <div className="input-wrapper">
-              <span style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', fontWeight: 700, color: 'var(--text-muted)' }}>$</span>
+              <span style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', fontWeight: 700, color: 'var(--text-muted)' }}>🪙</span>
               <input
                 type="number"
                 className="form-input"
