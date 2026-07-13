@@ -6,6 +6,7 @@
  */
 
 import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios'
+import { useAuthStore } from '@/store/authStore'
 
 const BASE_URL = import.meta.env.VITE_API_URL || '/api'
 
@@ -54,11 +55,10 @@ api.interceptors.response.use(
       originalRequest._retry = true
       isRefreshing = true
 
-      const refreshToken = localStorage.getItem('refresh_token')
+      const refreshToken = useAuthStore.getState().refreshToken || localStorage.getItem('refresh_token')
       if (!refreshToken) {
         isRefreshing = false
-        localStorage.removeItem('access_token')
-        localStorage.removeItem('refresh_token')
+        useAuthStore.getState().logout()
         window.location.href = '/login'
         return Promise.reject(error)
       }
@@ -66,14 +66,16 @@ api.interceptors.response.use(
       try {
         const { data } = await axios.post(`${BASE_URL}/auth/refresh`, { refreshToken })
         const newToken = data.data.accessToken
-        localStorage.setItem('access_token', newToken)
+        
+        // Update store with new token
+        useAuthStore.getState().setToken(newToken)
+        
         processQueue(null, newToken)
         originalRequest.headers.Authorization = `Bearer ${newToken}`
         return api(originalRequest)
       } catch (refreshError) {
         processQueue(refreshError, null)
-        localStorage.removeItem('access_token')
-        localStorage.removeItem('refresh_token')
+        useAuthStore.getState().logout()
         window.location.href = '/login'
         return Promise.reject(refreshError)
       } finally {

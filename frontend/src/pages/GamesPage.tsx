@@ -1,4 +1,2 @@
-// Stub pages that will be expanded - all essential routes covered
-
-// ── Games Page ─────────────────────────────────────────────────────────────────
-export { default } from './GamesPageFull'
+import GamesPageFull from './GamesPageFull'
+export default GamesPageFull

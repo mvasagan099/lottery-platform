@@ -15,7 +15,7 @@ export default function GamesPageFull() {
   })
 
   const filtered = games.filter((g: any) =>
-    g.name.toLowerCase().includes(search.toLowerCase())
+    g.name?.toLowerCase().includes(search.toLowerCase())
   )
 
   return (
@@ -121,7 +121,7 @@ function GameCard({ game, index }: { game: any; index: number }) {
 
         <div style={{ marginTop: 'auto', paddingTop: '8px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
-            From ${game.ticketPrice?.toFixed(2)}/line
+            From ${Number(game.ticketPrice).toFixed(2)}/line
           </span>
           <div className="btn btn-primary btn-sm" style={{ pointerEvents: 'none' }}>
             Play <ChevronRight size={13} />

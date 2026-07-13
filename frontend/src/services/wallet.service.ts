@@ -24,4 +24,6 @@ export const walletService = {
     gateway: string
     accountDetails: { accountName: string; accountNumber?: string; bsb?: string; paypalEmail?: string }
   }) => api.post<ApiResponse>('/wallet/withdraw', payload),
+
+  redeemCoupon: (code: string) => api.post<ApiResponse<any>>('/wallet/redeem', { code }),
 }

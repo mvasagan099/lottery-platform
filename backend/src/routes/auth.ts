@@ -23,7 +23,7 @@ const registerSchema = z.object({
   password: z.string().min(8).max(100),
   firstName: z.string().min(1).max(50),
   lastName: z.string().min(1).max(50),
-  dateOfBirth: z.string().datetime().optional(),
+  dateOfBirth: z.string().optional(),
   referralCode: z.string().optional(),
 })
 
@@ -57,7 +57,7 @@ export default async function authRoutes(app: FastifyInstance) {
 
   // POST /auth/register
   app.post('/register', {
-    config: { rateLimit: { max: 5, timeWindow: '15 minutes' } },
+    config: { rateLimit: { max: 50, timeWindow: '15 minutes' } },
   }, async (request, reply) => {
     const body = registerSchema.parse(request.body)
 

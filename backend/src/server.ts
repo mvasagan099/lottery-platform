@@ -3,6 +3,9 @@
  * Production-ready lottery platform API
  */
 
+import * as dotenv from 'dotenv'
+dotenv.config()
+
 import Fastify from 'fastify'
 import cors from '@fastify/cors'
 import helmet from '@fastify/helmet'
@@ -143,11 +146,11 @@ async function buildApp() {
   app.setErrorHandler(async (error, request, reply) => {
     request.log.error({ err: error, url: request.url, method: request.method })
 
-    if (error.validation) {
+    if (error.validation || error.name === 'ZodError') {
       return reply.status(400).send({
         success: false,
         error: 'Validation Error',
-        details: error.validation,
+        details: error.validation || (error as any).issues,
       })
     }
 

@@ -25,6 +25,10 @@ const withdrawalSchema = z.object({
   }),
 })
 
+const redeemSchema = z.object({
+  code: z.string().min(3).max(50),
+})
+
 export default async function walletRoutes(app: FastifyInstance) {
 
   // GET /wallet - Get wallet info
@@ -349,5 +353,72 @@ export default async function walletRoutes(app: FastifyInstance) {
       data: withdrawals,
       pagination: { page: Number(page), limit: Number(limit), total, pages: Math.ceil(total / Number(limit)) },
     })
+  })
+
+  // POST /wallet/redeem - Redeem a coupon code
+  app.post('/redeem', { preHandler: [authenticate, requireVerifiedEmail] }, async (request, reply) => {
+    const body = redeemSchema.parse(request.body)
+    const userId = request.user.userId
+
+    const wallet = await prisma.wallet.findUnique({ where: { userId } })
+    if (!wallet) return reply.status(404).send({ success: false, error: 'Wallet not found' })
+
+    const codeUpper = body.code.trim().toUpperCase()
+
+    // Needs to use raw query because Prisma Client might not have Coupon types generated locally due to EPERM
+    const coupons: any[] = await prisma.$queryRaw`SELECT * FROM "coupons" WHERE "code" = ${codeUpper} LIMIT 1`
+    const coupon = coupons[0]
+
+    if (!coupon) {
+      return reply.status(404).send({ success: false, error: 'Invalid coupon code' })
+    }
+    if (coupon.isUsed) {
+      return reply.status(400).send({ success: false, error: 'Coupon code has already been redeemed' })
+    }
+
+    await prisma.$transaction(async (tx) => {
+      // Mark used
+      await tx.$executeRaw`UPDATE "coupons" SET "isUsed" = true, "usedById" = ${userId}, "usedAt" = NOW() WHERE "id" = ${coupon.id}`
+
+      const amount = Number(coupon.amount)
+      const balBefore = Number(wallet.balance)
+
+      // Credit wallet
+      await tx.wallet.update({
+        where: { id: wallet.id },
+        data: {
+          balance: { increment: amount },
+          totalDeposited: { increment: amount },
+        },
+      })
+
+      // Log transaction
+      await tx.transaction.create({
+        data: {
+          userId,
+          walletId: wallet.id,
+          type: 'DEPOSIT',
+          status: 'COMPLETED',
+          amount,
+          balanceBefore: balBefore,
+          balanceAfter: balBefore + amount,
+          reference: \`CPN-\${coupon.code}\`,
+          description: 'Coupon Redemption',
+        },
+      })
+    })
+
+    await auditLog(userId, 'COUPON_REDEEMED', 'Deposit', undefined, undefined, { code: codeUpper, amount: Number(coupon.amount) }, request)
+
+    // Notify user
+    await prisma.notification.create({
+      data: {
+        userId,
+        title: 'Coupon Redeemed',
+        message: \`$\${Number(coupon.amount).toFixed(2)} AUD has been added to your wallet.\`,
+      },
+    })
+
+    return reply.send({ success: true, message: 'Coupon redeemed successfully', data: { amount: Number(coupon.amount) } })
   })
 }

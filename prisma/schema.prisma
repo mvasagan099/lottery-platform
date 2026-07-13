@@ -134,6 +134,7 @@ model User {
   auditLogs         AuditLog[]
   devices           DeviceHistory[]
   notificationPrefs NotificationPreference?
+  couponsUsed       Coupon[]
 
   @@map("users")
 }
@@ -650,4 +651,17 @@ model ApiKey {
   createdAt   DateTime  @default(now())
 
   @@map("api_keys")
+}
+
+model Coupon {
+  id        String   @id @default(cuid())
+  code      String   @unique
+  amount    Decimal  @db.Decimal(10, 2)
+  isUsed    Boolean  @default(false)
+  usedById  String?
+  usedBy    User?    @relation(fields: [usedById], references: [id])
+  createdAt DateTime @default(now())
+  usedAt    DateTime?
+
+  @@map("coupons")
 }
