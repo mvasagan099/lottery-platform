@@ -124,7 +124,6 @@ export default async function gameRoutes(app: FastifyInstance) {
             select: {
               divisionName: true,
               prizeAmount: true,
-              _count: true,
             },
           },
         },

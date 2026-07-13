@@ -20,6 +20,17 @@ export default function HomePage() {
     select: (r) => r.data?.data || [],
   })
 
+  const { data: settingsData } = useQuery({
+    queryKey: ['public-settings'],
+    queryFn: () => cmsService.getPublicSettings(),
+    select: (r) => r.data?.data || [],
+  })
+
+  const settings = settingsData?.reduce((acc: any, s: any) => {
+    acc[s.key] = s.value
+    return acc
+  }, {}) || {}
+
   const featuredGames = gamesData?.filter((g: any) => g.isFeatured).slice(0, 4) || []
   const allGames = gamesData || []
 
@@ -40,11 +51,13 @@ export default function HomePage() {
     { label: 'Saturday', filter: 'saturday' },
   ]
 
+  const heroBanner = banners?.[0]
+
   return (
     <div className="page-wrapper">
 
       {/* ── Hero ─────────────────────────────────────────────────── */}
-      <section className="hero">
+      <section className="hero" style={heroBanner?.imageUrl ? { backgroundImage: `url(${heroBanner.imageUrl})`, backgroundSize: 'cover', backgroundPosition: 'center', backgroundBlendMode: 'overlay', backgroundColor: 'rgba(0,0,0,0.6)' } : {}}>
         <div className="container">
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '48px', alignItems: 'center' }}>
             <div className="hero-content animate-fade-in-up">
@@ -53,18 +66,14 @@ export default function HomePage() {
                 Australia's #1 Online Lottery Platform
               </div>
 
-              <h1 className="hero-title">
-                Win Big with<br />
-                <span className="jackpot-text">Australia's Biggest</span><br />
-                Jackpots
-              </h1>
+              <h1 className="hero-title" dangerouslySetInnerHTML={{ __html: heroBanner?.title || `Win Big with<br /><span class="jackpot-text">Australia's Biggest</span><br />Jackpots` }}></h1>
 
               <p className="hero-subtitle">
-                Play MegaDraw, Powerball, Saturday Lotto and 6 more games — all in one place. Safe, secure, and 100% Australian.
+                {heroBanner?.description || 'Play MegaDraw, Powerball, Saturday Lotto and 6 more games — all in one place. Safe, secure, and 100% Australian.'}
               </p>
 
               <div className="flex gap-md flex-wrap">
-                <Link to="/games" className="btn btn-gold btn-xl">
+                <Link to={heroBanner?.linkUrl || "/games"} className="btn btn-gold btn-xl">
                   <Play size={18} fill="currentColor" />
                   Play Now
                 </Link>
@@ -73,12 +82,11 @@ export default function HomePage() {
                 </Link>
               </div>
 
-              {/* Mini stats */}
               <div className="flex gap-xl" style={{ marginTop: '40px', flexWrap: 'wrap' }}>
                 {[
-                  { value: '9', label: 'Lottery Games' },
-                  { value: '100K+', label: 'Members' },
-                  { value: '🪙50M+', label: 'Prizes Paid' },
+                  { value: settings?.HERO_STATS_GAMES || '9', label: 'Lottery Games' },
+                  { value: settings?.HERO_STATS_MEMBERS || '100K+', label: 'Members' },
+                  { value: settings?.HERO_STATS_PAID || '🪙50M+', label: 'Prizes Paid' },
                 ].map((s) => (
                   <div key={s.label}>
                     <div style={{ fontSize: '28px', fontWeight: 900, fontFamily: 'var(--font-display)', color: 'white', letterSpacing: '-0.03em' }}>{s.value}</div>
@@ -95,14 +103,16 @@ export default function HomePage() {
               }}>
                 <div style={{ textAlign: 'center', marginBottom: '20px' }}>
                   <div style={{ fontSize: '13px', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.5)', marginBottom: '8px' }}>
-                    COMBINED JACKPOT
+                    {settings?.HERO_JACKPOT_TITLE || 'COMBINED JACKPOT'}
                   </div>
                   <div style={{ fontSize: '56px', fontWeight: 900, fontFamily: 'var(--font-display)', letterSpacing: '-0.04em', lineHeight: 1 }}>
                     <span style={{ background: 'linear-gradient(135deg, #f5a623, #f7b84b)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>
                       🪙{(totalJackpot / 1_000_000).toFixed(0)}M
                     </span>
                   </div>
-                  <div style={{ fontSize: '13px', color: 'rgba(255,255,255,0.5)', marginTop: '4px' }}>Across all 9 games this week</div>
+                  <div style={{ fontSize: '13px', color: 'rgba(255,255,255,0.5)', marginTop: '4px' }}>
+                    {settings?.HERO_JACKPOT_SUBTITLE || 'Across all 9 games this week'}
+                  </div>
                 </div>
 
                 {/* Next draw countdown */}

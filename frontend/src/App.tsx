@@ -59,7 +59,8 @@ const ResponsibleGamingPage = lazy(() => import('@/pages/cms/ResponsibleGamingPa
 const AdminDashboard = lazy(() => import('@/pages/admin/AdminDashboard'))
 const AdminUsersPage = lazy(() => import('@/pages/admin/UsersPage'))
 const AdminKYCPage = lazy(() => import('@/pages/admin/KYCPage'))
-const AdminDrawsPage = lazy(() => import('@/pages/admin/DrawsPage'))
+const AdminDrawsPage = lazy(() => import('@/pages/admin/DrawsAdminPage'))
+const AdminWithdrawalsPage = lazy(() => import('@/pages/admin/WithdrawalsAdminPage'))
 const AdminGamesPage = lazy(() => import('@/pages/admin/GamesAdminPage'))
 const AdminWalletPage = lazy(() => import('@/pages/admin/WalletAdminPage'))
 const AdminReportsPage = lazy(() => import('@/pages/admin/ReportsPage'))
@@ -134,6 +135,7 @@ export default function App() {
             <Route path="/admin/draws" element={<AdminDrawsPage />} />
             <Route path="/admin/games" element={<AdminGamesPage />} />
             <Route path="/admin/wallet" element={<AdminWalletPage />} />
+            <Route path="/admin/withdrawals" element={<AdminWithdrawalsPage />} />
             <Route path="/admin/reports" element={<AdminReportsPage />} />
             <Route path="/admin/cms" element={<AdminCmsPage />} />
             <Route path="/admin/support" element={<AdminSupportPage />} />

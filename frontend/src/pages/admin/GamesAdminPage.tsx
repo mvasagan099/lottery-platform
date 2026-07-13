@@ -5,6 +5,7 @@ import {
 } from '@tanstack/react-table'
 import api from '../../services/api'
 import { GameProfileDrawer } from './GameProfileDrawer'
+import { CreateGameDrawer } from './CreateGameDrawer'
 import { 
   Search, Dices, DollarSign, Activity, Percent, Ban, CheckCircle, Calendar 
 } from 'lucide-react'
@@ -23,6 +24,7 @@ export default function GamesAdminPage() {
   const [searchInput, setSearchInput] = useState('')
   
   const [selectedGameId, setSelectedGameId] = useState<string | null>(null)
+  const [isCreateOpen, setIsCreateOpen] = useState(false)
 
   useEffect(() => {
     const timeout = setTimeout(() => {
@@ -173,7 +175,7 @@ export default function GamesAdminPage() {
           <h2 style={{ fontSize: '1.5rem', fontWeight: 600, margin: 0, color: 'var(--text-primary)' }}>Games Management</h2>
           <p style={{ color: 'var(--text-secondary)', margin: '4px 0 0' }}>Configure games, jackpots, draws, and prize divisions.</p>
         </div>
-        <button className="btn btn-primary">Create Game</button>
+        <button className="btn btn-primary" onClick={() => setIsCreateOpen(true)}>Create Game</button>
       </div>
 
       {/* Summary Cards */}
@@ -290,6 +292,8 @@ export default function GamesAdminPage() {
       {selectedGameId && (
         <GameProfileDrawer gameId={selectedGameId} onClose={() => setSelectedGameId(null)} />
       )}
+
+      <CreateGameDrawer isOpen={isCreateOpen} onClose={() => setIsCreateOpen(false)} />
     </div>
   )
 }

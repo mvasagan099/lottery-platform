@@ -28,7 +28,7 @@ import adminRoutes from './routes/admin'
 import affiliateRoutes from './routes/affiliates'
 import notificationRoutes from './routes/notifications'
 import supportRoutes from './routes/support'
-import cmsRoutes from './routes/cms'
+import publicCmsRoutes from './routes/publicCms'
 import reportRoutes from './routes/reports'
 import paymentRoutes from './routes/payments'
 
@@ -138,7 +138,7 @@ async function buildApp() {
   await app.register(affiliateRoutes, { prefix: '/affiliates' })
   await app.register(notificationRoutes, { prefix: '/notifications' })
   await app.register(supportRoutes, { prefix: '/support' })
-  await app.register(cmsRoutes, { prefix: '/cms' })
+  await app.register(publicCmsRoutes, { prefix: '/cms' })
   await app.register(reportRoutes, { prefix: '/reports' })
   await app.register(paymentRoutes, { prefix: '/payments' })
 

@@ -460,6 +460,7 @@ ul, ol { list-style: none; }
 .number-ball.sm { width: 32px; height: 32px; font-size: var(--text-xs); }
 .number-ball.lg { width: 52px; height: 52px; font-size: var(--text-md); }
 .number-ball.xl { width: 64px; height: 64px; font-size: var(--text-xl); }
+.number-ball.raffle-pill { width: auto; height: auto; min-width: 32px; padding: 4px 12px; border-radius: 20px; font-size: var(--text-sm); font-weight: 700; }
 .number-ball.clickable { cursor: pointer; }
 .number-ball.clickable:hover { transform: scale(1.15); }
 

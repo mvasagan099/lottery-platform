@@ -578,6 +578,7 @@ model Banner {
   startDate   DateTime?
   endDate     DateTime?
   sortOrder   Int       @default(0)
+  metadata    Json?
   createdAt   DateTime  @default(now())
 
   @@map("banners")

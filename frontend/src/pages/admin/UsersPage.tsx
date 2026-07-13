@@ -55,7 +55,7 @@ export default function UsersPage() {
       const res = await api.get(`/admin/users?${query.toString()}`)
       return res.data
     },
-    keepPreviousData: true,
+    placeholderData: (previousData) => previousData,
   })
 
   // Bulk Action Mutation
@@ -71,9 +71,9 @@ export default function UsersPage() {
     onError: (err: any) => toast.error(err.response?.data?.error || 'Bulk action failed')
   })
 
-  const users = data?.data || []
-  const totalItems = data?.pagination?.total || 0
-  const totalPages = data?.pagination?.pages || 0
+  const users = (data as any)?.data || []
+  const totalItems = (data as any)?.pagination?.total || 0
+  const totalPages = (data as any)?.pagination?.pages || 0
 
   const handleBulkAction = (action: 'SUSPEND' | 'ACTIVATE' | 'DELETE') => {
     const selectedIds = Object.keys(rowSelection).map(idx => users[idx as any].id)

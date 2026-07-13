@@ -2,19 +2,13 @@ import React from 'react'
 
 
 export { default as KYCPage } from './KYCQueuePage'
-export function DrawsPage() {
-  return <div className="section"><div className="container"><h2>Manage Draws</h2><p>Run draws, publish results, and calculate prizes here.</p></div></div>
-}
+
 export function GamesPage() {
   return <div className="section"><div className="container"><h2>Manage Games</h2><p>Edit game settings and schedules here.</p></div></div>
 }
-export function WalletAdminPage() {
-  return <div className="section"><div className="container"><h2>Manage Withdrawals</h2><p>Approve/Reject pending withdrawals here.</p></div></div>
-}
+export { default as WalletAdminPage } from './WalletAdminPage'
 
-export function CmsAdminPage() {
-  return <div className="section"><div className="container"><h2>CMS & Banners</h2><p>Manage home page banners and static content.</p></div></div>
-}
+export { default as CmsAdminPage } from './CmsAdminPage'
 export function SupportAdminPage() {
   return <div className="section"><div className="container"><h2>Support Tickets</h2><p>Reply to user support tickets.</p></div></div>
 }
@@ -24,6 +18,8 @@ export function AuditLogsPage() {
 export { default as AdminDashboard } from './AdminDashboard'
 export { default as UsersPage } from './UsersPage'
 export { default as ReportsPage } from './ReportsPage'
+export { default as DrawsPage } from './DrawsAdminPage'
+export { default as WithdrawalsPage } from './WithdrawalsAdminPage'
 
 export { default as AffiliatesPage } from './AffiliatesPage'
 export { default as GamesAdminPage } from './GamesAdminPage'

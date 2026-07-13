@@ -21,6 +21,7 @@ export default function NumberBall({
         'number-ball',
         variant !== 'default' && variant,
         size !== 'md' && size,
+        String(number).length > 2 && 'raffle-pill',
         (clickable || onClick) && 'clickable'
       )}
       onClick={() => onClick?.(number)}

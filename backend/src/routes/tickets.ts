@@ -121,6 +121,7 @@ export default async function ticketRoutes(app: FastifyInstance) {
       include: {
         draw: true,
         numbers: true,
+        winningEntries: true,
         game: { select: { name: true } },
       },
     })

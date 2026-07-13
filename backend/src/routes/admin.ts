@@ -8,12 +8,16 @@ import { FastifyInstance } from 'fastify'
 import { z } from 'zod'
 import { prisma } from '../server'
 import { authenticate, requireAdmin, auditLog } from '../middleware/auth'
+import cmsRoutes from './cms'
 
 export default async function adminRoutes(app: FastifyInstance) {
 
   // All admin routes require authentication + admin role
   app.addHook('preHandler', authenticate)
   app.addHook('preHandler', requireAdmin)
+
+  // Register Sub-routers
+  app.register(cmsRoutes, { prefix: '/cms' })
 
   // ── Dashboard Stats ───────────────────────────────────────────────────────
 
@@ -413,249 +417,407 @@ export default async function adminRoutes(app: FastifyInstance) {
     return reply.send({ success: true, message: `Successfully ${action.toLowerCase()}d ${recordIds.length} affiliates` })
   })
 
-  // ── Draw Management ───────────────────────────────────────────────────────
 
-  app.get('/draws', async (request, reply) => {
-    const { page = '1', limit = '20', status, gameId } = request.query as Record<string, string>
+
+  // ── Withdrawal Management ─────────────────────────────────────────────────
+
+  app.get('/withdrawals', async (request, reply) => {
+    const { page = '1', limit = '20', search, status, sortField = 'createdAt', sortDir = 'desc' } = request.query as Record<string, string>
     const skip = (Number(page) - 1) * Number(limit)
 
     const where: any = {}
     if (status) where.status = status
-    if (gameId) where.gameId = gameId
+    if (search) {
+      where.OR = [
+        { id: { contains: search, mode: 'insensitive' } },
+        { wallet: { user: { email: { contains: search, mode: 'insensitive' } } } },
+        { wallet: { user: { username: { contains: search, mode: 'insensitive' } } } },
+      ]
+    }
 
-    const [draws, total] = await Promise.all([
-      prisma.draw.findMany({
+    const [withdrawals, total, stats] = await Promise.all([
+      prisma.withdrawal.findMany({
         where,
         skip,
         take: Number(limit),
-        orderBy: { scheduledAt: 'desc' },
-        include: { game: { select: { name: true, slug: true } } },
-      }),
-      prisma.draw.count({ where }),
-    ])
-
-    return reply.send({ success: true, data: draws, pagination: { page: Number(page), limit: Number(limit), total } })
-  })
-
-  app.post('/draws/:id/run', async (request, reply) => {
-    const { id } = request.params as { id: string }
-    const { winningNumbers, supplementary, powerball } = request.body as {
-      winningNumbers: number[]
-      supplementary?: number[]
-      powerball?: number
-    }
-
-    const draw = await prisma.draw.findUnique({
-      where: { id },
-      include: { game: true, tickets: { include: { numbers: true } } },
-    })
-
-    if (!draw) return reply.status(404).send({ success: false, error: 'Draw not found' })
-    if (draw.status !== 'SCHEDULED') {
-      return reply.status(400).send({ success: false, error: 'Draw already processed' })
-    }
-
-    // Process winning entries
-    await prisma.$transaction(async (tx) => {
-      await tx.draw.update({
-        where: { id },
-        data: {
-          status: 'IN_PROGRESS',
-          winningNumbers,
-          supplementary,
-          powerball,
-          drawnAt: new Date(),
-          verifiedById: request.user.userId,
-        },
-      })
-
-      // Check all tickets against winning numbers
-      for (const ticket of draw.tickets) {
-        for (const line of ticket.numbers) {
-          const nums = line.numbers as number[]
-          const matchCount = nums.filter((n) => winningNumbers.includes(n)).length
-          const hasSupp = supplementary ? (line.supplementary as number[] || []).some((s) => supplementary.includes(s)) : false
-          const hasPB = powerball ? line.powerball === powerball : false
-
-          // Determine division (simplified - real logic would use game rules)
-          const divisionName = getDivision(draw.game, matchCount, hasSupp, hasPB)
-
-          if (divisionName) {
-            const prize = getPrizeForDivision(draw, divisionName)
-            await tx.winningEntry.create({
-              data: {
-                ticketId: ticket.id,
-                drawId: id,
-                divisionName,
-                prizeAmount: prize,
-              },
-            })
-
-            await tx.ticket.update({
-              where: { id: ticket.id },
-              data: { status: 'WON', prizeDivision: divisionName, prizeAmount: prize },
-            })
-          } else {
-            await tx.ticket.update({
-              where: { id: ticket.id },
-              data: { status: 'LOST' },
-            })
-          }
-        }
-      }
-
-      await tx.draw.update({
-        where: { id },
-        data: { status: 'COMPLETED', publishedAt: new Date() },
-      })
-    })
-
-    await auditLog(request.user.userId, 'DRAW_RUN', 'Draw', id, undefined, { winningNumbers }, request)
-
-    return reply.send({ success: true, message: 'Draw completed and results published' })
-  })
-
-  // ── Game Management ───────────────────────────────────────────────────────
-
-  app.get('/games', async (request, reply) => {
-    const games = await prisma.game.findMany({
-      include: {
-        prizeDivisions: { orderBy: { divisionOrder: 'asc' } },
-        _count: { select: { draws: true, tickets: true } },
-      },
-      orderBy: { sortOrder: 'asc' },
-    })
-
-    return reply.send({ success: true, data: games })
-  })
-
-  app.patch('/games/:id', async (request, reply) => {
-    const { id } = request.params as { id: string }
-    const updates = request.body as any
-
-    const game = await prisma.game.update({ where: { id }, data: updates })
-
-    await auditLog(request.user.userId, 'GAME_UPDATED', 'Game', id, undefined, updates, request)
-
-    return reply.send({ success: true, data: game })
-  })
-
-  // ── Withdrawal Approval ───────────────────────────────────────────────────
-
-  app.get('/withdrawals', async (request, reply) => {
-    const { page = '1', limit = '20', status = 'PENDING' } = request.query as Record<string, string>
-    const skip = (Number(page) - 1) * Number(limit)
-
-    const [withdrawals, total] = await Promise.all([
-      prisma.withdrawal.findMany({
-        where: { status: status as any },
-        skip,
-        take: Number(limit),
-        orderBy: { createdAt: 'asc' },
+        orderBy: { [sortField]: sortDir },
         include: {
           wallet: {
-            select: {
-              user: { select: { id: true, email: true, firstName: true, lastName: true } },
-            },
-          },
-        },
+            include: { user: { select: { id: true, username: true, email: true, country: true } } }
+          }
+        }
       }),
-      prisma.withdrawal.count({ where: { status: status as any } }),
+      prisma.withdrawal.count({ where }),
+      prisma.withdrawal.groupBy({
+        by: ['status'],
+        _count: true,
+        _sum: { amount: true }
+      })
     ])
 
-    return reply.send({ success: true, data: withdrawals, pagination: { page: Number(page), limit: Number(limit), total } })
+    return reply.send({ success: true, data: withdrawals, pagination: { page: Number(page), limit: Number(limit), total }, stats })
   })
 
-  app.patch('/withdrawals/:id/approve', async (request, reply) => {
+  app.get('/withdrawals/:id', async (request, reply) => {
     const { id } = request.params as { id: string }
+    const withdrawal = await prisma.withdrawal.findUnique({
+      where: { id },
+      include: {
+        wallet: {
+          include: { user: true }
+        }
+      }
+    })
+    if (!withdrawal) return reply.status(404).send({ success: false, error: 'Withdrawal not found' })
+    return reply.send({ success: true, data: withdrawal })
+  })
+
+  app.patch('/withdrawals/:id/status', async (request, reply) => {
+    const { id } = request.params as { id: string }
+    const { status, reviewNotes } = request.body as { status: 'COMPLETED' | 'FAILED' | 'CANCELLED' | 'PENDING', reviewNotes?: string }
 
     const withdrawal = await prisma.withdrawal.findUnique({
       where: { id },
-      include: { wallet: true },
+      include: { wallet: true }
     })
+    
+    if (!withdrawal) return reply.status(404).send({ success: false, error: 'Withdrawal not found' })
 
-    if (!withdrawal) return reply.status(404).send({ success: false, error: 'Not found' })
-    if (withdrawal.status !== 'PENDING') {
-      return reply.status(400).send({ success: false, error: 'Already processed' })
-    }
+    const updated = await prisma.$transaction(async (tx) => {
+      // If rejecting, we must refund the user's balance
+      if (status === 'CANCELLED' && withdrawal.status !== 'CANCELLED') {
+        await tx.wallet.update({
+          where: { id: withdrawal.walletId },
+          data: {
+            balance: { increment: withdrawal.amount },
+            pendingBalance: { decrement: withdrawal.amount }
+          }
+        })
+      }
+      
+      // If completing, we finalize deduction
+      if (status === 'COMPLETED' && withdrawal.status !== 'COMPLETED') {
+        await tx.wallet.update({
+          where: { id: withdrawal.walletId },
+          data: {
+            pendingBalance: { decrement: withdrawal.amount },
+            totalWithdrawn: { increment: withdrawal.amount }
+          }
+        })
+      }
 
-    await prisma.$transaction(async (tx) => {
-      await tx.withdrawal.update({
+      return tx.withdrawal.update({
         where: { id },
         data: {
-          status: 'COMPLETED',
+          status,
+          reviewNotes,
           reviewedById: request.user.userId,
-          processedAt: new Date(),
-        },
+          processedAt: ['COMPLETED', 'FAILED', 'CANCELLED'].includes(status) ? new Date() : undefined
+        }
       })
+    })
 
-      const amount = Number(withdrawal.amount)
-      await tx.wallet.update({
-        where: { id: withdrawal.walletId },
+    await auditLog(request.user.userId, `WITHDRAWAL_${status}`, 'Withdrawal', id, undefined, { amount: updated.amount, reviewNotes }, request)
+    return reply.send({ success: true, data: updated })
+  })
+
+  // ── Deposit Management ───────────────────────────────────────────────────
+
+  app.get('/deposits', async (request, reply) => {
+    const { page = '1', limit = '20', search, status, sortField = 'createdAt', sortDir = 'desc' } = request.query as Record<string, string>
+    const skip = (Number(page) - 1) * Number(limit)
+
+    const where: any = {}
+    if (status) where.status = status
+    if (search) {
+      where.OR = [
+        { id: { contains: search, mode: 'insensitive' } },
+        { gatewayRef: { contains: search, mode: 'insensitive' } },
+        { wallet: { user: { email: { contains: search, mode: 'insensitive' } } } },
+        { wallet: { user: { username: { contains: search, mode: 'insensitive' } } } },
+      ]
+    }
+
+    const [deposits, total, stats] = await Promise.all([
+      prisma.deposit.findMany({
+        where,
+        skip,
+        take: Number(limit),
+        orderBy: { [sortField]: sortDir },
+        include: {
+          wallet: {
+            include: { user: { select: { id: true, username: true, email: true, country: true } } }
+          }
+        }
+      }),
+      prisma.deposit.count({ where }),
+      prisma.deposit.groupBy({
+        by: ['status'],
+        _count: true,
+        _sum: { amount: true }
+      })
+    ])
+
+    return reply.send({ success: true, data: deposits, pagination: { page: Number(page), limit: Number(limit), total }, stats })
+  })
+
+  app.get('/deposits/:id', async (request, reply) => {
+    const { id } = request.params as { id: string }
+    const deposit = await prisma.deposit.findUnique({
+      where: { id },
+      include: {
+        wallet: {
+          include: { user: true }
+        }
+      }
+    })
+    if (!deposit) return reply.status(404).send({ success: false, error: 'Deposit not found' })
+    return reply.send({ success: true, data: deposit })
+  })
+
+  app.patch('/deposits/:id/status', async (request, reply) => {
+    const { id } = request.params as { id: string }
+    const { status, reviewNotes } = request.body as { status: 'COMPLETED' | 'FAILED' | 'CANCELLED' | 'PENDING', reviewNotes?: string }
+
+    const deposit = await prisma.deposit.findUnique({
+      where: { id },
+      include: { wallet: true }
+    })
+    
+    if (!deposit) return reply.status(404).send({ success: false, error: 'Deposit not found' })
+
+    const updated = await prisma.$transaction(async (tx) => {
+      // If we are forcing a pending/failed deposit to completed
+      if (status === 'COMPLETED' && deposit.status !== 'COMPLETED') {
+        await tx.wallet.update({
+          where: { id: deposit.walletId },
+          data: {
+            balance: { increment: deposit.amount },
+            totalDeposited: { increment: deposit.amount }
+          }
+        })
+      }
+      
+      // If we are reversing a completed deposit
+      if ((status === 'FAILED' || status === 'CANCELLED') && deposit.status === 'COMPLETED') {
+        await tx.wallet.update({
+          where: { id: deposit.walletId },
+          data: {
+            balance: { decrement: deposit.amount },
+            totalDeposited: { decrement: deposit.amount }
+          }
+        })
+      }
+
+      return tx.deposit.update({
+        where: { id },
         data: {
-          pendingBalance: { decrement: amount },
-          totalWithdrawn: { increment: amount },
-        },
+          status,
+          processedAt: ['COMPLETED', 'FAILED', 'CANCELLED'].includes(status) ? new Date() : undefined
+        }
+      })
+    })
+
+    await auditLog(request.user.userId, `DEPOSIT_${status}`, 'Deposit', id, undefined, { amount: updated.amount, reviewNotes }, request)
+    return reply.send({ success: true, data: updated })
+  })
+
+  // ── Wallet Management ──────────────────────────────────────────────────────
+
+  app.post('/wallets/:id/adjustment', async (request, reply) => {
+    const { id } = request.params as { id: string }
+    const { amount, type, reason } = request.body as { amount: number, type: 'CREDIT' | 'DEBIT' | 'BONUS', reason: string }
+
+    if (!amount || amount <= 0) return reply.status(400).send({ success: false, error: 'Invalid amount' })
+
+    const wallet = await prisma.wallet.findUnique({ where: { id } })
+    if (!wallet) return reply.status(404).send({ success: false, error: 'Wallet not found' })
+
+    await prisma.$transaction(async (tx) => {
+      const data: any = {}
+      let balanceBefore = 0
+      let balanceAfter = 0
+
+      if (type === 'CREDIT') {
+        balanceBefore = Number(wallet.balance)
+        balanceAfter = balanceBefore + amount
+        data.balance = { increment: amount }
+      } else if (type === 'DEBIT') {
+        balanceBefore = Number(wallet.balance)
+        if (balanceBefore < amount) throw new Error('Insufficient available balance')
+        balanceAfter = balanceBefore - amount
+        data.balance = { decrement: amount }
+      } else if (type === 'BONUS') {
+        balanceBefore = Number(wallet.bonusBalance)
+        balanceAfter = balanceBefore + amount
+        data.bonusBalance = { increment: amount }
+      }
+
+      await tx.wallet.update({
+        where: { id },
+        data
       })
 
       await tx.transaction.create({
         data: {
-          userId: withdrawal.wallet.userId,
-          walletId: withdrawal.walletId,
-          type: 'WITHDRAWAL',
+          userId: wallet.userId,
+          walletId: id,
+          type: type === 'BONUS' ? 'BONUS_CREDIT' : type === 'CREDIT' ? 'DEPOSIT' : 'WITHDRAWAL',
           status: 'COMPLETED',
-          amount: -amount,
-          balanceBefore: Number(withdrawal.wallet.pendingBalance),
-          balanceAfter: 0,
-          reference: `WDR-${id.substring(0, 8).toUpperCase()}`,
-          description: `Withdrawal via ${withdrawal.gateway}`,
-        },
+          amount: type === 'DEBIT' ? -amount : amount,
+          balanceBefore,
+          balanceAfter,
+          reference: `ADJ-${Math.random().toString(36).substring(2, 10).toUpperCase()}`,
+          description: `Admin Adjustment: ${reason}`
+        }
       })
     })
 
-    return reply.send({ success: true, message: 'Withdrawal approved' })
+    await auditLog(request.user.userId, `WALLET_ADJUSTMENT`, 'Wallet', id, undefined, { amount, type, reason }, request)
+    return reply.send({ success: true, message: 'Wallet adjusted successfully' })
   })
 
-  app.patch('/withdrawals/:id/reject', async (request, reply) => {
-    const { id } = request.params as { id: string }
-    const { reason } = request.body as { reason: string }
 
-    const withdrawal = await prisma.withdrawal.findUnique({
-      where: { id },
-      include: { wallet: true },
-    })
+  // ── Draw Management ────────────────────────────────────────────────────────
 
-    if (!withdrawal) return reply.status(404).send({ success: false, error: 'Not found' })
+  app.post('/draws', async (request, reply) => {
+    const { gameId, drawNumber, scheduledAt, jackpotAmount } = request.body as any
+    if (!gameId || !drawNumber || !scheduledAt || jackpotAmount === undefined) {
+      return reply.status(400).send({ success: false, error: 'Missing required fields' })
+    }
 
-    await prisma.$transaction(async (tx) => {
-      await tx.withdrawal.update({
-        where: { id },
-        data: { status: 'FAILED', reviewedById: request.user.userId, reviewNotes: reason },
-      })
-
-      const amount = Number(withdrawal.amount)
-      await tx.wallet.update({
-        where: { id: withdrawal.walletId },
-        data: {
-          balance: { increment: amount },
-          pendingBalance: { decrement: amount },
-        },
-      })
-    })
-
-    // Notify user
-    await prisma.notification.create({
+    const draw = await prisma.draw.create({
       data: {
-        userId: withdrawal.wallet.userId,
-        title: 'Withdrawal rejected',
-        message: `Your withdrawal of $${withdrawal.amount} was rejected: ${reason}. Funds returned to your wallet.`,
-      },
+        gameId,
+        drawNumber: Number(drawNumber),
+        scheduledAt: new Date(scheduledAt),
+        jackpotAmount: Number(jackpotAmount),
+        status: 'SCHEDULED',
+      }
     })
 
-    return reply.send({ success: true, message: 'Withdrawal rejected and funds returned' })
+    await auditLog(request.user.userId, 'DRAW_SCHEDULED', 'Draw', draw.id, undefined, { gameId, drawNumber, scheduledAt }, request)
+    return reply.send({ success: true, message: 'Draw scheduled successfully', data: draw })
+  })
+
+  app.get('/draws', async (request, reply) => {
+    const { page = '1', limit = '10', search, status, sortField = 'scheduledAt', sortDir = 'desc' } = request.query as Record<string, string>
+    const skip = (Number(page) - 1) * Number(limit)
+
+    const where: any = {}
+    if (status) where.status = status
+
+    if (search) {
+      where.OR = [
+        { id: { contains: search, mode: 'insensitive' } },
+        { game: { name: { contains: search, mode: 'insensitive' } } },
+      ]
+    }
+
+    const [records, total, totalDraws, liveDraws, scheduledDraws, totalSales] = await Promise.all([
+      prisma.draw.findMany({
+        where,
+        skip,
+        take: Number(limit),
+        orderBy: { [sortField]: sortDir },
+        include: {
+          game: { select: { name: true, slug: true, badgeText: true } },
+          _count: { select: { tickets: true } }
+        },
+      }),
+      prisma.draw.count({ where }),
+      prisma.draw.count(),
+      prisma.draw.count({ where: { status: 'IN_PROGRESS' } }),
+      prisma.draw.count({ where: { status: 'SCHEDULED' } }),
+      prisma.draw.aggregate({ _sum: { totalSales: true } }),
+    ])
+
+    const stats = { 
+      totalDraws, 
+      liveDraws, 
+      scheduledDraws,
+      totalSales: totalSales._sum.totalSales || 0 
+    }
+    return reply.send({ success: true, data: records, pagination: { page: Number(page), limit: Number(limit), total, pages: Math.ceil(total / Number(limit)) }, stats })
+  })
+
+  app.get('/draws/:id', async (request, reply) => {
+    const { id } = request.params as { id: string }
+    const record = await prisma.draw.findUnique({
+      where: { id },
+      include: {
+        game: {
+          include: { prizeDivisions: { orderBy: { divisionOrder: 'asc' } } }
+        },
+        _count: { select: { tickets: true } }
+      }
+    })
+    if (!record) return reply.status(404).send({ success: false, error: 'Draw not found' })
+    return reply.send({ success: true, data: record })
+  })
+
+  app.patch('/draws/:id/execute', async (request, reply) => {
+    const { id } = request.params as { id: string }
+    const { winningNumbers, powerball } = request.body as any
+    
+    // In a real system, this would trigger workers to calculate winners.
+    // Here we just mark it as COMPLETED and save the numbers.
+    const draw = await prisma.draw.update({
+      where: { id },
+      data: {
+        status: 'COMPLETED',
+        drawnAt: new Date(),
+        winningNumbers: winningNumbers || [],
+        powerball: powerball || null,
+        isVerified: true,
+        verifiedById: request.user.userId
+      }
+    })
+
+    await auditLog(request.user.userId, 'DRAW_EXECUTED', 'Draw', id, undefined, { winningNumbers, powerball }, request)
+    return reply.send({ success: true, message: 'Draw executed successfully', data: draw })
+  })
+
+  app.patch('/draws/:id/publish', async (request, reply) => {
+    const { id } = request.params as { id: string }
+    
+    const draw = await prisma.draw.update({
+      where: { id },
+      data: {
+        publishedAt: new Date()
+      }
+    })
+
+    await auditLog(request.user.userId, 'DRAW_PUBLISHED', 'Draw', id, undefined, {}, request)
+    return reply.send({ success: true, message: 'Draw results published securely' })
   })
 
   // ── Game Management ────────────────────────────────────────────────────────
+
+  app.post('/games', async (request, reply) => {
+    const data = request.body as any
+    const game = await prisma.game.create({
+      data: {
+        name: data.name,
+        slug: data.slug,
+        description: data.description || '',
+        shortDescription: data.shortDescription || '',
+        rulesJson: {},
+        drawSchedule: data.drawSchedule || '0 0 * * *',
+        jackpotAmount: Number(data.jackpotAmount || 0),
+        minJackpot: Number(data.minJackpot || 0),
+        ticketPrice: Number(data.ticketPrice || 0),
+        minNumbers: Number(data.minNumbers || 6),
+        maxNumbers: Number(data.maxNumbers || 6),
+        numberPool: Number(data.numberPool || 45),
+        hasPowerball: Boolean(data.hasPowerball),
+        powerballPool: data.hasPowerball ? Number(data.powerballPool || 20) : null,
+        isActive: true,
+      }
+    })
+    await auditLog(request.user.userId, 'GAME_CREATED', 'Game', game.id, undefined, data, request)
+    return reply.send({ success: true, message: 'Game created successfully', data: game })
+  })
 
   app.get('/games', async (request, reply) => {
     const { page = '1', limit = '10', search, status, sortField = 'createdAt', sortDir = 'desc' } = request.query as Record<string, string>

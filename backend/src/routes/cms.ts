@@ -1,192 +1,183 @@
-/**
- * CMS Routes
- * - Pages, banners, promotions management
- */
+import { FastifyPluginAsync } from 'fastify'
+import { PrismaClient } from '@prisma/client'
+import { auditLog } from '../middleware/auth'
 
-import { FastifyInstance } from 'fastify'
-import { z } from 'zod'
-import { prisma } from '../server'
-import { authenticate, requireAdmin } from '../middleware/auth'
+const prisma = new PrismaClient()
 
-export default async function cmsRoutes(app: FastifyInstance) {
+const cmsRoutes: FastifyPluginAsync = async (app) => {
+  // ── Pages Management ──────────────────────────────────────────────────────
 
-  // GET /cms/pages/:slug - Get a CMS page
-  app.get('/pages/:slug', async (request, reply) => {
-    const { slug } = request.params as { slug: string }
+  app.get('/pages', async (request, reply) => {
+    const { page = '1', limit = '20', search, status } = request.query as Record<string, string>
+    const skip = (Number(page) - 1) * Number(limit)
 
-    const page = await prisma.cmsPage.findUnique({
-      where: { slug, isActive: true },
-    })
-
-    if (!page) {
-      return reply.status(404).send({ success: false, error: 'Page not found' })
+    const where: any = {}
+    if (status === 'PUBLISHED') where.isActive = true
+    if (status === 'DRAFT') where.isActive = false
+    if (search) {
+      where.OR = [
+        { title: { contains: search, mode: 'insensitive' } },
+        { slug: { contains: search, mode: 'insensitive' } }
+      ]
     }
 
-    return reply.send({ success: true, data: page })
+    const [pages, total] = await Promise.all([
+      prisma.cmsPage.findMany({
+        where,
+        skip,
+        take: Number(limit),
+        orderBy: { updatedAt: 'desc' }
+      }),
+      prisma.cmsPage.count({ where })
+    ])
+
+    return reply.send({ success: true, data: pages, pagination: { page: Number(page), limit: Number(limit), total } })
   })
 
-  // GET /cms/pages - List all pages (admin)
-  app.get('/pages', { preHandler: [authenticate, requireAdmin] }, async (request, reply) => {
-    const pages = await prisma.cmsPage.findMany({
-      orderBy: { slug: 'asc' },
+  app.post('/pages', async (request, reply) => {
+    const { title, slug, content, metaTitle, metaDesc, isActive } = request.body as any
+    const existing = await prisma.cmsPage.findUnique({ where: { slug } })
+    if (existing) return reply.status(400).send({ success: false, error: 'Slug already exists' })
+
+    const cmsPage = await prisma.cmsPage.create({
+      data: { title, slug, content, metaTitle, metaDesc, isActive }
     })
-    return reply.send({ success: true, data: pages })
+    
+    await auditLog(request.user?.userId || 'system', 'PAGE_CREATE', 'CmsPage', cmsPage.id, undefined, { slug }, request)
+    return reply.send({ success: true, data: cmsPage })
   })
 
-  // POST /cms/pages - Create page (admin)
-  app.post('/pages', { preHandler: [authenticate, requireAdmin] }, async (request, reply) => {
-    const { slug, title, content, metaTitle, metaDesc } = request.body as any
-
-    const page = await prisma.cmsPage.create({
-      data: { slug, title, content, metaTitle, metaDesc },
-    })
-
-    return reply.status(201).send({ success: true, data: page })
-  })
-
-  // PUT /cms/pages/:slug - Update page (admin)
-  app.put('/pages/:slug', { preHandler: [authenticate, requireAdmin] }, async (request, reply) => {
-    const { slug } = request.params as { slug: string }
-    const data = request.body as any
-
-    const page = await prisma.cmsPage.update({ where: { slug }, data })
-    return reply.send({ success: true, data: page })
-  })
-
-  // DELETE /cms/pages/:slug - Delete page (admin)
-  app.delete('/pages/:slug', { preHandler: [authenticate, requireAdmin] }, async (request, reply) => {
-    const { slug } = request.params as { slug: string }
-    await prisma.cmsPage.delete({ where: { slug } })
-    return reply.send({ success: true })
-  })
-
-  // ── Banners ───────────────────────────────────────────────────────────────
-
-  // GET /cms/banners - Get active banners
-  app.get('/banners', async (request, reply) => {
-    const { position } = request.query as { position?: string }
-    const now = new Date()
-
-    const banners = await prisma.banner.findMany({
-      where: {
-        isActive: true,
-        ...(position && { position }),
-        OR: [
-          { startDate: null },
-          { startDate: { lte: now } },
-        ],
-        AND: [
-          { OR: [{ endDate: null }, { endDate: { gte: now } }] },
-        ],
-      },
-      orderBy: { sortOrder: 'asc' },
-    })
-
-    return reply.send({ success: true, data: banners })
-  })
-
-  // GET /cms/banners/all - All banners for admin
-  app.get('/banners/all', { preHandler: [authenticate, requireAdmin] }, async (request, reply) => {
-    const banners = await prisma.banner.findMany({ orderBy: { sortOrder: 'asc' } })
-    return reply.send({ success: true, data: banners })
-  })
-
-  // POST /cms/banners - Create banner (admin)
-  app.post('/banners', { preHandler: [authenticate, requireAdmin] }, async (request, reply) => {
-    const data = request.body as any
-    const banner = await prisma.banner.create({ data })
-    return reply.status(201).send({ success: true, data: banner })
-  })
-
-  // PUT /cms/banners/:id - Update banner (admin)
-  app.put('/banners/:id', { preHandler: [authenticate, requireAdmin] }, async (request, reply) => {
+  app.put('/pages/:id', async (request, reply) => {
     const { id } = request.params as { id: string }
+    const { title, slug, content, metaTitle, metaDesc, isActive } = request.body as any
+    
+    const existing = await prisma.cmsPage.findUnique({ where: { slug } })
+    if (existing && existing.id !== id) return reply.status(400).send({ success: false, error: 'Slug already exists on another page' })
+
+    const cmsPage = await prisma.cmsPage.update({
+      where: { id },
+      data: { title, slug, content, metaTitle, metaDesc, isActive }
+    })
+    
+    await auditLog(request.user?.userId || 'system', 'PAGE_UPDATE', 'CmsPage', id, undefined, { slug }, request)
+    return reply.send({ success: true, data: cmsPage })
+  })
+
+  app.delete('/pages/:id', async (request, reply) => {
+    const { id } = request.params as { id: string }
+    await prisma.cmsPage.delete({ where: { id } })
+    await auditLog(request.user?.userId || 'system', 'PAGE_DELETE', 'CmsPage', id, undefined, undefined, request)
+    return reply.send({ success: true, message: 'Page deleted' })
+  })
+
+  // ── Banner Management ─────────────────────────────────────────────────────
+
+  app.get('/banners', async (request, reply) => {
+    const { page = '1', limit = '20', search, position, status } = request.query as Record<string, string>
+    const skip = (Number(page) - 1) * Number(limit)
+
+    const where: any = {}
+    if (position) where.position = position
+    if (status === 'ACTIVE') {
+      where.isActive = true
+      where.OR = [
+        { endDate: null },
+        { endDate: { gt: new Date() } }
+      ]
+    }
+    if (status === 'EXPIRED') {
+      where.endDate = { lte: new Date() }
+    }
+    if (status === 'DRAFT') {
+      where.isActive = false
+    }
+    
+    if (search) {
+      where.title = { contains: search, mode: 'insensitive' }
+    }
+
+    const [banners, total] = await Promise.all([
+      prisma.banner.findMany({
+        where,
+        skip,
+        take: Number(limit),
+        orderBy: [{ sortOrder: 'asc' }, { createdAt: 'desc' }]
+      }),
+      prisma.banner.count({ where })
+    ])
+
+    return reply.send({ success: true, data: banners, pagination: { page: Number(page), limit: Number(limit), total } })
+  })
+
+  app.post('/banners', async (request, reply) => {
     const data = request.body as any
-    const banner = await prisma.banner.update({ where: { id }, data })
+    if (data.startDate) data.startDate = new Date(data.startDate)
+    if (data.endDate) data.endDate = new Date(data.endDate)
+
+    const banner = await prisma.banner.create({ data })
+    await auditLog(request.user?.userId || 'system', 'BANNER_CREATE', 'Banner', banner.id, undefined, { title: banner.title }, request)
     return reply.send({ success: true, data: banner })
   })
 
-  // DELETE /cms/banners/:id - Delete banner (admin)
-  app.delete('/banners/:id', { preHandler: [authenticate, requireAdmin] }, async (request, reply) => {
+  app.put('/banners/:id', async (request, reply) => {
+    const { id } = request.params as { id: string }
+    const data = request.body as any
+    if (data.startDate) data.startDate = new Date(data.startDate)
+    if (data.endDate) data.endDate = new Date(data.endDate)
+
+    const banner = await prisma.banner.update({ where: { id }, data })
+    await auditLog(request.user?.userId || 'system', 'BANNER_UPDATE', 'Banner', id, undefined, { title: banner.title }, request)
+    return reply.send({ success: true, data: banner })
+  })
+
+  app.delete('/banners/:id', async (request, reply) => {
     const { id } = request.params as { id: string }
     await prisma.banner.delete({ where: { id } })
-    return reply.send({ success: true })
+    await auditLog(request.user?.userId || 'system', 'BANNER_DELETE', 'Banner', id, undefined, undefined, request)
+    return reply.send({ success: true, message: 'Banner deleted' })
   })
 
-  // ── Promotions ─────────────────────────────────────────────────────────────
+  // ── Analytics (Mock) ──────────────────────────────────────────────────────
 
-  // GET /cms/promotions - Active promotions
-  app.get('/promotions', async (request, reply) => {
-    const now = new Date()
+  app.get('/analytics', async (request, reply) => {
+    const [totalPages, totalBanners, publishedPages] = await Promise.all([
+      prisma.cmsPage.count(),
+      prisma.banner.count(),
+      prisma.cmsPage.count({ where: { isActive: true } })
+    ])
+    
+    const trafficSources = [
+      { name: 'Organic Search', value: 45 },
+      { name: 'Direct', value: 30 },
+      { name: 'Social Media', value: 15 },
+      { name: 'Referral', value: 10 }
+    ]
 
-    const promos = await prisma.promotion.findMany({
-      where: {
-        isActive: true,
-        startDate: { lte: now },
-        endDate: { gte: now },
-      },
-      orderBy: [{ priority: 'desc' }, { startDate: 'desc' }],
+    const pageViews = Array.from({ length: 7 }).map((_, i) => {
+      const d = new Date()
+      d.setDate(d.getDate() - (6 - i))
+      return {
+        date: d.toLocaleDateString('en-US', { weekday: 'short' }),
+        views: Math.floor(Math.random() * 5000) + 1000,
+        conversions: Math.floor(Math.random() * 200) + 50
+      }
     })
 
-    return reply.send({ success: true, data: promos })
-  })
-
-  // GET /cms/promotions/all - Admin: all promotions
-  app.get('/promotions/all', { preHandler: [authenticate, requireAdmin] }, async (request, reply) => {
-    const promos = await prisma.promotion.findMany({ orderBy: { startDate: 'desc' } })
-    return reply.send({ success: true, data: promos })
-  })
-
-  // POST /cms/promotions - Create promotion (admin)
-  app.post('/promotions', { preHandler: [authenticate, requireAdmin] }, async (request, reply) => {
-    const data = request.body as any
-    const promo = await prisma.promotion.create({ data })
-    return reply.status(201).send({ success: true, data: promo })
-  })
-
-  // PUT /cms/promotions/:id - Update promotion (admin)
-  app.put('/promotions/:id', { preHandler: [authenticate, requireAdmin] }, async (request, reply) => {
-    const { id } = request.params as { id: string }
-    const data = request.body as any
-    const promo = await prisma.promotion.update({ where: { id }, data })
-    return reply.send({ success: true, data: promo })
-  })
-
-  // DELETE /cms/promotions/:id - Delete promotion (admin)
-  app.delete('/promotions/:id', { preHandler: [authenticate, requireAdmin] }, async (request, reply) => {
-    const { id } = request.params as { id: string }
-    await prisma.promotion.delete({ where: { id } })
-    return reply.send({ success: true })
-  })
-
-  // ── Settings (public read, admin write) ────────────────────────────────────
-
-  // GET /cms/settings - Public settings
-  app.get('/settings', async (request, reply) => {
-    const settings = await prisma.setting.findMany({
-      where: { isPublic: true },
+    return reply.send({
+      success: true,
+      data: {
+        totalPages,
+        publishedPages,
+        totalBanners,
+        draftPages: totalPages - publishedPages,
+        trafficSources,
+        pageViews,
+        bannerClicks: 12450,
+        averageCtr: 4.8
+      }
     })
-    const map = Object.fromEntries(settings.map((s) => [s.key, s.value]))
-    return reply.send({ success: true, data: map })
   })
 
-  // GET /cms/settings/all - All settings (admin)
-  app.get('/settings/all', { preHandler: [authenticate, requireAdmin] }, async (request, reply) => {
-    const settings = await prisma.setting.findMany({ orderBy: [{ group: 'asc' }, { key: 'asc' }] })
-    return reply.send({ success: true, data: settings })
-  })
-
-  // PUT /cms/settings/:key - Update setting (admin)
-  app.put('/settings/:key', { preHandler: [authenticate, requireAdmin] }, async (request, reply) => {
-    const { key } = request.params as { key: string }
-    const { value } = request.body as { value: string }
-
-    const setting = await prisma.setting.upsert({
-      where: { key },
-      update: { value },
-      create: { key, value },
-    })
-
-    return reply.send({ success: true, data: setting })
-  })
 }
+
+export default cmsRoutes

@@ -64,6 +64,12 @@ export const cmsService = {
   getPromotions: () => api.get('/cms/promotions'),
   getFaqs: () => api.get('/support/faqs'),
   getPublicSettings: () => api.get('/cms/settings'),
+  
+  // Admin CMS endpoints
+  getAllBanners: () => api.get('/admin/banners'),
+  createBanner: (data: Record<string, unknown>) => api.post('/admin/banners', data),
+  updateBanner: (id: string, data: any) => api.patch(`/admin/banners/${id}`, data),
+  deleteBanner: (id: string) => api.delete(`/admin/banners/${id}`),
 }
 
 export const adminService = {
@@ -111,13 +117,8 @@ export const adminService = {
   getRevenueReport: (from?: string, to?: string) =>
     api.get('/reports/revenue', { params: { from, to } }),
 
-  getBanners: () => api.get('/cms/banners/all'),
-  createBanner: (data: Record<string, unknown>) => api.post('/cms/banners', data),
-  updateBanner: (id: string, data: Record<string, unknown>) => api.put(`/cms/banners/${id}`, data),
-  deleteBanner: (id: string) => api.delete(`/cms/banners/${id}`),
-
-  getSettings: () => api.get('/cms/settings/all'),
-  updateSetting: (key: string, value: string) => api.put(`/cms/settings/${key}`, { value }),
+  getSettings: () => api.get('/admin/settings'),
+  updateSetting: (data: Record<string, string>) => api.patch(`/admin/settings`, data),
 
   getSupportQueue: (params?: { page?: number; status?: string }) =>
     api.get('/support/admin/queue', { params }),

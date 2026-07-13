@@ -2,7 +2,7 @@ import { Link, useLocation } from 'react-router-dom'
 import {
   LayoutDashboard, Users, ShieldCheck, Dices,
   Gamepad2, Wallet, BarChart3, FileText,
-  HeadphonesIcon, ClipboardList, Settings, Trophy, Zap
+  HeadphonesIcon, ClipboardList, Settings, Trophy, Zap, ArrowRightLeft
 } from 'lucide-react'
 
 const sections = [
@@ -31,7 +31,8 @@ const sections = [
   {
     label: 'Finance',
     links: [
-      { href: '/admin/wallet', label: 'Withdrawals', icon: <Wallet size={16} /> },
+      { href: '/admin/wallet', label: 'Wallets & Deposits', icon: <Wallet size={16} /> },
+      { href: '/admin/withdrawals', label: 'Withdrawals', icon: <ArrowRightLeft size={16} /> },
     ],
   },
   {
