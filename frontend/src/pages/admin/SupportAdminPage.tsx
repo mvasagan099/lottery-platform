@@ -33,7 +33,7 @@ export default function SupportAdminPage() {
       <div className="page-wrapper">
         <div className="admin-header">
         <div className="container">
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '16px', justifyContent: 'space-between', alignItems: 'flex-start' }}>
             <div>
               <h1 className="admin-title" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                 <HeadphonesIcon className="text-brand" /> Support Center

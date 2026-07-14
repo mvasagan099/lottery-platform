@@ -61,14 +61,27 @@ export default function Header() {
   const balance = (user?.wallet?.balance ?? 0)
 
   return (
-    <header className="header">
+    <>
+      <header className="header">
       <div className="container">
         <div className="header-inner">
-          {/* Logo */}
-          <Link to="/" className="logo">
-            <Zap size={22} style={{ color: 'var(--color-secondary)' }} />
-            Mega<span>Draw</span>
-          </Link>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            {/* Mobile Menu Toggle */}
+            <button
+              className="btn btn-ghost btn-icon mobile-only"
+              id="mobile-nav-toggle"
+              onClick={() => setMobileNavOpen(!mobileNavOpen)}
+              style={{ padding: '4px', marginLeft: '-8px' }}
+            >
+              {mobileNavOpen ? <X size={24} /> : <Menu size={24} />}
+            </button>
+
+            {/* Logo */}
+            <Link to="/" className="logo">
+              <Zap size={22} style={{ color: 'var(--color-secondary)' }} />
+              Mega<span>Draw</span>
+            </Link>
+          </div>
 
           {/* Desktop Nav */}
           <nav className="nav">
@@ -87,7 +100,7 @@ export default function Header() {
           <div className="header-actions">
             {/* Theme Toggle */}
             <button
-              className="btn btn-ghost btn-icon"
+              className="btn btn-ghost btn-icon desktop-only"
               onClick={toggleTheme}
               title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
             >
@@ -104,7 +117,7 @@ export default function Header() {
                 </Link>
 
                 {/* Notifications */}
-                <Link to="/notifications" className="btn btn-ghost btn-icon" style={{ position: 'relative' }}>
+                <Link to="/notifications" className="btn btn-ghost btn-icon desktop-only" style={{ position: 'relative' }}>
                   <Bell size={18} />
                   {(unreadData ?? 0) > 0 && (
                     <span style={{
@@ -116,7 +129,7 @@ export default function Header() {
                 </Link>
 
                 {/* User Menu */}
-                <div ref={userMenuRef} style={{ position: 'relative' }}>
+                <div ref={userMenuRef} style={{ position: 'relative' }} className="desktop-only">
                   <button
                     className="btn btn-ghost"
                     style={{ gap: '8px', padding: '7px 12px' }}
@@ -179,44 +192,108 @@ export default function Header() {
                 </div>
               </>
             ) : (
-              <>
+              <div className="desktop-only" style={{ display: 'flex', gap: '8px' }}>
                 <Link to="/login" className="btn btn-ghost btn-sm">Sign In</Link>
                 <Link to="/register" className="btn btn-gold btn-sm">Get Started</Link>
-              </>
+              </div>
             )}
 
-            {/* Mobile Menu Toggle */}
-            <button
-              className="btn btn-ghost btn-icon"
-              style={{ display: 'none' }}
-              id="mobile-nav-toggle"
-              onClick={() => setMobileNavOpen(!mobileNavOpen)}
-            >
-              {mobileNavOpen ? <X size={20} /> : <Menu size={20} />}
-            </button>
           </div>
         </div>
       </div>
+    </header>
 
       {/* Mobile Nav */}
       {mobileNavOpen && (
-        <div style={{
-          position: 'absolute', top: '100%', left: 0, right: 0,
-          background: 'var(--bg-card)', borderBottom: '1px solid var(--border-color)',
-          padding: '12px', boxShadow: 'var(--shadow-lg)', zIndex: 99,
-        }}>
-          {navLinks.map((link) => (
-            <Link
-              key={link.href}
-              to={link.href}
-              className={`nav-link ${isActive(link.href) ? 'active' : ''}`}
-              style={{ display: 'block', padding: '10px 12px' }}
+        <>
+          <div className="admin-sidebar-overlay" style={{ zIndex: 99 }} onClick={() => setMobileNavOpen(false)} />
+          <div style={{
+            position: 'fixed', top: 'var(--header-height)', left: 0, bottom: 0, width: '280px',
+            background: 'var(--bg-card)', borderRight: '1px solid var(--border-color)',
+            padding: 'var(--space-lg)', boxShadow: 'var(--shadow-xl)', zIndex: 100,
+            display: 'flex', flexDirection: 'column', gap: 'var(--space-lg)',
+            overflowY: 'auto'
+          }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {navLinks.map((link) => (
+                <Link
+                  key={link.href}
+                  to={link.href}
+                  className={`nav-link ${isActive(link.href) ? 'active' : ''}`}
+                  style={{ display: 'block', padding: '12px 16px', fontSize: '16px' }}
+                  onClick={() => setMobileNavOpen(false)}
+                >
+                  {link.label}
+                </Link>
+              ))}
+            </div>
+
+            <div style={{ height: '1px', background: 'var(--border-color)' }} />
+
+            <button 
+              className="btn btn-ghost" 
+              style={{ justifyContent: 'flex-start', padding: '12px', width: '100%', border: 'none' }} 
+              onClick={toggleTheme}
             >
-              {link.label}
-            </Link>
-          ))}
-        </div>
+              {theme === 'dark' ? <Sun size={20} style={{ marginRight: '8px' }} /> : <Moon size={20} style={{ marginRight: '8px' }} />}
+              {theme === 'dark' ? 'Light Mode' : 'Dark Mode'}
+            </button>
+
+            {isAuthenticated ? (
+              <>
+                <Link to="/notifications" className="btn btn-ghost" style={{ justifyContent: 'flex-start', padding: '12px' }} onClick={() => setMobileNavOpen(false)}>
+                  <Bell size={20} style={{ marginRight: '8px' }} />
+                  Notifications
+                  {(unreadData ?? 0) > 0 && (
+                    <span className="badge badge-danger" style={{ marginLeft: 'auto' }}>
+                      {unreadData}
+                    </span>
+                  )}
+                </Link>
+
+                <div style={{ height: '1px', background: 'var(--border-color)' }} />
+                
+                <div style={{ fontWeight: 600, color: 'var(--text-secondary)', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>My Account</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  {[
+                    { icon: <User size={18} />, label: 'Profile', href: '/profile' },
+                    { icon: <Ticket size={18} />, label: 'My Tickets', href: '/tickets' },
+                    { icon: <Trophy size={18} />, label: 'Affiliate', href: '/affiliate' },
+                    { icon: <MessageCircle size={18} />, label: 'Support', href: '/support' },
+                    ...(user?.role !== 'USER' || (user?.roles && user.roles.length > 0) ? [{ icon: <LayoutDashboard size={18} />, label: 'Admin Panel', href: '/admin' }] : []),
+                    { icon: <Settings size={18} />, label: 'Settings', href: '/profile/security' },
+                  ].map((item) => (
+                    <Link
+                      key={item.href}
+                      to={item.href}
+                      className="sidebar-link"
+                      style={{ padding: '12px', borderRadius: '8px', color: 'var(--text-primary)', background: 'transparent' }}
+                      onClick={() => setMobileNavOpen(false)}
+                    >
+                      {item.icon}
+                      {item.label}
+                    </Link>
+                  ))}
+                  
+                  <button
+                    className="sidebar-link"
+                    style={{ padding: '12px', borderRadius: '8px', color: '#ef4444', background: 'transparent', border: 'none', textAlign: 'left' }}
+                    onClick={() => { handleLogout(); setMobileNavOpen(false); }}
+                  >
+                    <LogOut size={18} />
+                    Sign Out
+                  </button>
+                </div>
+              </>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: 'auto' }}>
+                <Link to="/login" className="btn btn-ghost" onClick={() => setMobileNavOpen(false)}>Sign In</Link>
+                <Link to="/register" className="btn btn-gold" onClick={() => setMobileNavOpen(false)}>Get Started</Link>
+              </div>
+            )}
+          </div>
+        </>
       )}
-    </header>
+    </>
   )
 }

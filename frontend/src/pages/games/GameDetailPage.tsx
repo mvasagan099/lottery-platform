@@ -105,7 +105,7 @@ export default function GameDetailPage() {
             <Link to="/games" style={{ color: 'inherit' }}>Games</Link>
             <ChevronRight size={14} /> {game.name}
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '40px', alignItems: 'center', flexWrap: 'wrap' }}>
+          <div className="game-detail-hero-grid">
             <div>
               {game.badgeText && <span className="game-card-badge" style={{ marginBottom: '12px', display: 'inline-flex' }}>{game.badgeText}</span>}
               <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '48px', fontWeight: 900, letterSpacing: '-0.03em', marginBottom: '8px' }}>
@@ -143,10 +143,10 @@ export default function GameDetailPage() {
       <div className="container" style={{ padding: '32px var(--space-lg)' }}>
         {/* ── Play Tab ── */}
         {activeTab === 'play' && (
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: '32px', alignItems: 'start' }}>
+          <div className="game-play-grid">
             {/* Number Picker */}
-            <div className="card">
-              <div className="card-header">
+            <div className="card" style={{ minWidth: 0, overflow: 'hidden' }}>
+              <div className="card-header" style={{ flexWrap: 'wrap', gap: '16px' }}>
                 <h2 className="modal-title">Select Your Numbers</h2>
                 <div style={{ display: 'flex', gap: '8px' }}>
                   <button
@@ -160,7 +160,7 @@ export default function GameDetailPage() {
               </div>
 
               {/* Line Tabs */}
-              <div style={{ padding: '12px 20px', borderBottom: '1px solid var(--border-color)', display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+              <div style={{ padding: '12px 20px', borderBottom: '1px solid var(--border-color)', display: 'flex', gap: '8px', flexWrap: 'wrap', overflowX: 'auto' }}>
                 {lines.map((line, i) => (
                   <button
                     key={i}

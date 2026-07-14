@@ -30,7 +30,7 @@ export default function WithdrawPage() {
     onError: (err: any) => toast.error(err.response?.data?.error || 'Withdrawal failed'),
   })
 
-  const available = wallet?.balance || 0
+  const available = Number(wallet?.balance || 0)
   const isInvalid = !amount || Number(amount) < 50 || Number(amount) > available
 
   return (

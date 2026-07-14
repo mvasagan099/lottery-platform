@@ -26,7 +26,7 @@ export function GeneralSettingsPage() {
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '16px', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px' }}>
         <div>
           <h2 style={{ fontSize: '24px', fontWeight: 600 }}>General Settings</h2>
           <p style={{ color: 'var(--text-secondary)', fontSize: '14px', marginTop: '4px' }}>
@@ -46,7 +46,7 @@ export function GeneralSettingsPage() {
 
       <div className="card" style={{ padding: '24px', marginBottom: '24px' }}>
         <h3 style={{ fontSize: '18px', fontWeight: 600, marginBottom: '24px', borderBottom: '1px solid var(--border-color)', paddingBottom: '12px' }}>Platform Identity</h3>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '24px' }}>
           <div className="form-group">
             <label className="form-label">Platform Name</label>
             <input {...register('platformName')} className={`form-input ${errors.platformName ? 'error' : ''}`} />
@@ -65,7 +65,7 @@ export function GeneralSettingsPage() {
             <label className="form-label">Support Phone</label>
             <input {...register('supportPhone')} className="form-input" />
           </div>
-          <div className="form-group" style={{ gridColumn: 'span 2' }}>
+          <div className="form-group" style={{ gridColumn: '1 / -1' }}>
             <label className="form-label">Website URL</label>
             <input {...register('websiteUrl')} type="url" className="form-input" />
           </div>
@@ -74,7 +74,7 @@ export function GeneralSettingsPage() {
 
       <div className="card" style={{ padding: '24px', marginBottom: '24px' }}>
         <h3 style={{ fontSize: '18px', fontWeight: 600, marginBottom: '24px', borderBottom: '1px solid var(--border-color)', paddingBottom: '12px' }}>Localization</h3>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '24px' }}>
           <div className="form-group">
             <label className="form-label">Timezone</label>
             <select {...register('timezone')} className="form-input">

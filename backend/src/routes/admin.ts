@@ -895,6 +895,34 @@ export default async function adminRoutes(app: FastifyInstance) {
     return reply.send({ success: true, message: 'Game updated successfully' })
   })
 
+  app.patch('/games/:id/divisions', async (request, reply) => {
+    const { id } = request.params as { id: string }
+    const { divisions } = request.body as { divisions: any[] }
+
+    // Use a transaction to delete old and create new divisions
+    await prisma.$transaction(async (tx) => {
+      await tx.prizeDivision.deleteMany({ where: { gameId: id } })
+      if (divisions && divisions.length > 0) {
+        await tx.prizeDivision.createMany({
+          data: divisions.map((div, i) => ({
+            gameId: id,
+            divisionName: div.divisionName,
+            divisionOrder: div.divisionOrder ?? i + 1,
+            description: div.description || '',
+            fixedPrize: div.fixedPrize ? parseFloat(div.fixedPrize) : null,
+            isJackpot: Boolean(div.isJackpot),
+            matchNumbers: parseInt(div.matchNumbers),
+            matchSupp: div.matchSupp ? parseInt(div.matchSupp) : 0,
+            matchPB: Boolean(div.matchPB)
+          }))
+        })
+      }
+    })
+
+    await auditLog(request.user.userId, 'GAME_DIVISIONS_UPDATED', 'Game', id, undefined, { divisions }, request)
+    return reply.send({ success: true, message: 'Prize divisions updated successfully' })
+  })
+
   app.post('/games/bulk-action', async (request, reply) => {
     const { recordIds, action } = request.body as { recordIds: string[]; action: 'DISABLE' | 'ENABLE' }
     if (!recordIds || recordIds.length === 0) return reply.status(400).send({ success: false, error: 'No records provided' })

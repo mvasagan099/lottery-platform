@@ -64,8 +64,8 @@ export function AffiliateProfileDrawer({ affiliateId, onClose }: Props) {
             <div style={{ width: 80, height: 80, borderRadius: '50%', backgroundColor: 'var(--primary-color)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '2rem', color: 'white', fontWeight: 600 }}>
               {record?.user?.username?.charAt(0).toUpperCase()}
             </div>
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div style={{ paddingRight: 40 }}>
+              <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '12px' }}>
                 <h1 style={{ margin: 0, fontSize: '1.8rem' }}>{record?.user?.username}</h1>
                 <span style={{ padding: '4px 12px', borderRadius: '16px', fontSize: '0.8rem', fontWeight: 600, backgroundColor: isSuspended ? 'rgba(239,68,68,0.1)' : 'rgba(16,185,129,0.1)', color: isSuspended ? '#ef4444' : '#10b981' }}>
                   {isSuspended ? 'Suspended' : 'Active'}
@@ -79,7 +79,7 @@ export function AffiliateProfileDrawer({ affiliateId, onClose }: Props) {
           </div>
 
           {/* Quick Stats */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 'var(--space-md)' }}>
+          <div className="grid-4" style={{ gap: 'var(--space-md)' }}>
             <div className="card" style={{ padding: 'var(--space-md)' }}>
               <div style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: 4 }}>Total Earned</div>
               <div style={{ fontSize: '1.2rem', fontWeight: 600 }}>${Number(record?.totalEarned || 0).toFixed(2)}</div>
@@ -123,13 +123,13 @@ export function AffiliateProfileDrawer({ affiliateId, onClose }: Props) {
                         <input type="text" className="form-input" value={`https://lottery.app/ref/${record?.affiliateCode}`} readOnly style={{ flex: 1 }} />
                         <button className="btn btn-outline">Copy</button>
                       </div>
-                      <div style={{ marginTop: 'var(--space-lg)', display: 'flex', gap: 'var(--space-xl)', alignItems: 'center' }}>
+                      <div style={{ marginTop: 'var(--space-lg)', display: 'flex', flexWrap: 'wrap', gap: 'var(--space-xl)', alignItems: 'center' }}>
                         <div style={{ width: 120, height: 120, backgroundColor: 'white', padding: 8, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                           <QrCode size={100} color="black"/>
                         </div>
                         <div>
                           <p style={{ margin: '0 0 8px', fontWeight: 600 }}>Download Assets</p>
-                          <div style={{ display: 'flex', gap: '8px' }}>
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
                             <button className="btn btn-outline btn-sm">Banners</button>
                             <button className="btn btn-outline btn-sm">Logos</button>
                             <button className="btn btn-outline btn-sm">Landing Page Templates</button>

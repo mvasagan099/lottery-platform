@@ -181,7 +181,7 @@ export default function KYCQueuePage() {
       <div className="card" style={{ marginBottom: 'var(--space-md)' }}>
         <div className="card-body" style={{ padding: 'var(--space-md)', display: 'flex', flexWrap: 'wrap', gap: 'var(--space-md)', alignItems: 'center', justifyContent: 'space-between' }}>
           
-          <div style={{ display: 'flex', gap: 'var(--space-md)', flex: 1 }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-md)', flex: 1 }}>
             <div style={{ position: 'relative', width: '300px' }}>
               <Search size={16} style={{ position: 'absolute', left: 12, top: 12, color: 'var(--text-secondary)' }} />
               <input 
@@ -209,7 +209,7 @@ export default function KYCQueuePage() {
             </select>
           </div>
 
-          <div style={{ display: 'flex', gap: 'var(--space-sm)' }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-sm)' }}>
             <span style={{ alignSelf: 'center', fontSize: '0.9rem', color: 'var(--text-secondary)', marginRight: '8px' }}>
               {Object.keys(rowSelection).length} selected
             </span>

@@ -53,7 +53,7 @@ const sections = [
   },
 ]
 
-export default function AdminSidebar() {
+export default function AdminSidebar({ isOpen, onClose }: { isOpen?: boolean, onClose?: () => void }) {
   const location = useLocation()
   const { user } = useAuthStore()
 
@@ -67,7 +67,7 @@ export default function AdminSidebar() {
   })).filter(section => section.links.length > 0)
 
   return (
-    <aside className="sidebar">
+    <aside className={`sidebar ${isOpen ? 'mobile-open' : ''}`}>
       <div style={{ padding: '0 20px 16px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
         <Link to="/" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <Zap size={18} style={{ color: 'var(--color-secondary)' }} />
@@ -88,6 +88,7 @@ export default function AdminSidebar() {
               key={link.href}
               to={link.href}
               className={`sidebar-link ${isActive(link.href) ? 'active' : ''}`}
+              onClick={() => { if (onClose) onClose(); }}
             >
               {link.icon}
               {link.label}

@@ -8,7 +8,7 @@ export function SettingsDashboard() {
     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
       <h2 style={{ fontSize: '24px', fontWeight: 600, marginBottom: '24px' }}>Platform Overview</h2>
       
-      <div className="grid-cols-3" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '24px', marginBottom: '32px' }}>
+      <div className="grid-cols-3" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '24px', marginBottom: '32px' }}>
         <StatCard
           title="System Health"
           value="99.98%"
@@ -32,7 +32,7 @@ export function SettingsDashboard() {
         />
       </div>
 
-      <div className="grid-cols-3" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '24px' }}>
+      <div className="grid-cols-3" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '24px' }}>
         <StatCard
           title="Database Load"
           value="42%"

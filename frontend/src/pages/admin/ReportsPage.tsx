@@ -84,13 +84,13 @@ export function ReportsPage() {
   return (
     <div className="section" style={{ padding: 'var(--space-md) var(--space-lg)' }}>
       {/* Header Area */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-xl)' }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: '16px', marginBottom: 'var(--space-xl)' }}>
         <div>
           <h2 style={{ fontSize: '1.5rem', fontWeight: 600, margin: 0, color: 'var(--text-primary)' }}>Financial Reports</h2>
           <p style={{ color: 'var(--text-secondary)', margin: '4px 0 0' }}>Real-time analytics and performance metrics</p>
         </div>
         
-        <div style={{ display: 'flex', gap: 'var(--space-md)' }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-md)' }}>
           <select 
             className="input" 
             style={{ width: '180px', backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-color)' }}
@@ -102,7 +102,7 @@ export function ReportsPage() {
             <option value="90">Last 90 Days</option>
             <option value="365">This Year</option>
           </select>
-          <div style={{ display: 'flex', gap: '8px' }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
             <button className="btn btn-outline" onClick={() => handleExport('csv')}><Download size={16} /> CSV</button>
             <button className="btn btn-outline" onClick={() => handleExport('excel')}><Download size={16} /> Excel</button>
             <button className="btn btn-outline" onClick={() => handleExport('pdf')}><Download size={16} /> PDF</button>
@@ -121,7 +121,7 @@ export function ReportsPage() {
       )}
 
       {/* Main Charts Area */}
-      <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 'var(--space-lg)', marginBottom: 'var(--space-xl)' }}>
+      <div className="reports-chart-grid">
         {/* Revenue Trend Area Chart */}
         <div className="card">
           <div className="card-header">

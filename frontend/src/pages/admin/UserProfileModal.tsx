@@ -90,7 +90,7 @@ export function UserProfileModal({ userId, onClose }: Props) {
           {isLoading ? <div className="loading-spinner" style={{ margin: 'auto' }}></div> : (
             <>
               {activeTab === 'INFO' && (
-                <div style={{ display: 'flex', gap: 'var(--space-xl)' }}>
+                <div className="modal-2-col">
                   <div style={{ flex: 2 }}>
                     <h3 style={{ marginTop: 0 }}>Personal Information</h3>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-md)' }}>
@@ -122,7 +122,7 @@ export function UserProfileModal({ userId, onClose }: Props) {
 
               {activeTab === 'WALLET' && (
                 <div>
-                  <div style={{ display: 'flex', gap: 'var(--space-md)', marginBottom: 'var(--space-lg)' }}>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-md)', marginBottom: 'var(--space-lg)' }}>
                     <div className="card-body" style={{ flex: 1, backgroundColor: 'var(--bg-secondary)', borderRadius: '8px', padding: 'var(--space-md)' }}>
                       <p style={{ margin: '0 0 4px', color: 'var(--text-secondary)', fontSize: '0.9rem' }}>Current Balance</p>
                       <h2 style={{ margin: 0 }}>${Number(user?.wallet?.balance || 0).toFixed(2)}</h2>
@@ -134,19 +134,23 @@ export function UserProfileModal({ userId, onClose }: Props) {
                   </div>
 
                   <h3 style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: '8px' }}>Manual Adjustment</h3>
-                  <div style={{ display: 'flex', gap: 'var(--space-md)', marginBottom: 'var(--space-lg)' }}>
-                    <input type="number" id="adjAmount" placeholder="Amount" className="input" style={{ width: 120 }} />
-                    <input type="text" id="adjReason" placeholder="Reason for adjustment" className="input" style={{ flex: 1 }} />
-                    <button className="btn btn-primary" onClick={() => {
-                      const amt = Number((document.getElementById('adjAmount') as HTMLInputElement).value)
-                      const rsn = (document.getElementById('adjReason') as HTMLInputElement).value
-                      if (amt > 0 && rsn) walletMutation.mutate({ type: 'CREDIT', amount: amt, reason: rsn })
-                    }}>Credit</button>
-                    <button className="btn btn-outline" style={{ borderColor: '#ef4444', color: '#ef4444' }} onClick={() => {
-                      const amt = Number((document.getElementById('adjAmount') as HTMLInputElement).value)
-                      const rsn = (document.getElementById('adjReason') as HTMLInputElement).value
-                      if (amt > 0 && rsn) walletMutation.mutate({ type: 'DEBIT', amount: amt, reason: rsn })
-                    }}>Debit</button>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-md)', marginBottom: 'var(--space-lg)' }}>
+                    <div style={{ display: 'flex', flex: '1 1 250px', gap: 'var(--space-md)' }}>
+                      <input type="number" id="adjAmount" placeholder="Amount" className="input" style={{ width: 100 }} />
+                      <input type="text" id="adjReason" placeholder="Reason for adjustment" className="input" style={{ flex: 1 }} />
+                    </div>
+                    <div style={{ display: 'flex', flex: '1 1 200px', gap: 'var(--space-md)' }}>
+                      <button className="btn btn-primary" style={{ flex: 1 }} onClick={() => {
+                        const amt = Number((document.getElementById('adjAmount') as HTMLInputElement).value)
+                        const rsn = (document.getElementById('adjReason') as HTMLInputElement).value
+                        if (amt > 0 && rsn) walletMutation.mutate({ type: 'CREDIT', amount: amt, reason: rsn })
+                      }}>Credit</button>
+                      <button className="btn btn-outline" style={{ flex: 1, borderColor: '#ef4444', color: '#ef4444' }} onClick={() => {
+                        const amt = Number((document.getElementById('adjAmount') as HTMLInputElement).value)
+                        const rsn = (document.getElementById('adjReason') as HTMLInputElement).value
+                        if (amt > 0 && rsn) walletMutation.mutate({ type: 'DEBIT', amount: amt, reason: rsn })
+                      }}>Debit</button>
+                    </div>
                   </div>
 
                   <h3 style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: '8px' }}>Recent Transactions</h3>

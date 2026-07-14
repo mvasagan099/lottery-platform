@@ -22,7 +22,7 @@ export function RolesDashboard() {
 
   return (
     <div style={{ maxWidth: '1000px' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '16px', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px' }}>
         <div>
           <h2 style={{ fontSize: '24px', fontWeight: 700, margin: 0 }}>Roles & Permissions</h2>
           <p style={{ color: 'var(--text-secondary)', margin: '4px 0 0 0' }}>Manage access controls and security roles</p>
@@ -35,14 +35,14 @@ export function RolesDashboard() {
         </button>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px', marginBottom: '32px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginBottom: '32px' }}>
         <StatCard title="Total Roles" value={totalRoles.toString()} icon={<Shield size={24} />} change="0%" />
         <StatCard title="Custom Roles" value={customRoles.toString()} icon={<Users size={24} />} change="0%" />
         <StatCard title="Active Admins" value="12" icon={<Lock size={24} />} change="+2 this week" changePositive />
         <StatCard title="Pending Requests" value="3" icon={<ShieldAlert size={24} />} change="Requires review" />
       </div>
 
-      <div style={{ background: 'var(--bg-secondary)', borderRadius: '12px', border: '1px solid var(--border-color)', overflow: 'hidden' }}>
+      <div style={{ background: 'var(--bg-secondary)', borderRadius: '12px', border: '1px solid var(--border-color)', overflowX: 'auto' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
           <thead>
             <tr style={{ borderBottom: '1px solid var(--border-color)', background: 'var(--bg-tertiary)' }}>

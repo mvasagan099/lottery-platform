@@ -44,9 +44,9 @@ export function SettingsLayout() {
         </p>
       </div>
 
-      <div style={{ display: 'flex', gap: '32px', alignItems: 'flex-start' }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '32px', alignItems: 'flex-start' }}>
         {/* Sidebar */}
-        <aside style={{ width: '280px', flexShrink: 0, position: 'sticky', top: '100px' }}>
+        <aside style={{ width: '100%', maxWidth: '280px', flexShrink: 0, position: 'sticky', top: '100px' }}>
           <nav style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
             {SETTINGS_CATEGORIES.map((category) => (
               <NavLink
@@ -73,7 +73,7 @@ export function SettingsLayout() {
         </aside>
 
         {/* Content Area */}
-        <main style={{ flex: 1, minWidth: 0, paddingBottom: '100px' }}>
+        <main style={{ flex: '1 1 300px', minWidth: 0, paddingBottom: '100px' }}>
           <Outlet />
         </main>
       </div>

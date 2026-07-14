@@ -142,7 +142,7 @@ export function DrawExecutionDrawer({ drawId, onClose }: Props) {
             </div>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 'var(--space-md)' }}>
+          <div className="grid-4" style={{ gap: 'var(--space-md)' }}>
             <div className="card" style={{ padding: 'var(--space-md)' }}>
               <div style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: 4 }}>Jackpot</div>
               <div style={{ fontSize: '1.2rem', fontWeight: 600, color: '#f59e0b' }}>🪙{Number(record?.jackpotAmount || 0).toLocaleString()}</div>

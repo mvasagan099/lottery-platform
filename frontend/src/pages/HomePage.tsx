@@ -67,7 +67,7 @@ export default function HomePage() {
         } : heroBanner?.backgroundColor ? { backgroundColor: heroBanner.backgroundColor } : {})
       }}>
         <div className="container">
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '48px', alignItems: 'center' }}>
+          <div className="grid-2" style={{ gap: '48px', alignItems: 'center' }}>
             <div className="hero-content animate-fade-in-up">
               <div className="hero-badge">
                 <Star size={14} fill="currentColor" />

@@ -7,9 +7,10 @@ import toast from 'react-hot-toast'
 interface Props {
   isOpen: boolean
   onClose: () => void
+  defaultGameId?: string
 }
 
-export function ScheduleDrawDrawer({ isOpen, onClose }: Props) {
+export function ScheduleDrawDrawer({ isOpen, onClose, defaultGameId }: Props) {
   const queryClient = useQueryClient()
   
   const [gameId, setGameId] = useState('')
@@ -37,6 +38,20 @@ export function ScheduleDrawDrawer({ isOpen, onClose }: Props) {
       setDrawNumber(String((game._count?.draws || 0) + 1))
     }
   }
+
+  React.useEffect(() => {
+    if (isOpen) {
+      if (defaultGameId && gamesData) {
+        handleGameSelect(defaultGameId)
+      } else if (!defaultGameId) {
+        setGameId('')
+        setDrawNumber('')
+        setScheduledDate('')
+        setScheduledTime('')
+        setJackpotAmount('')
+      }
+    }
+  }, [isOpen, defaultGameId, gamesData])
 
   const scheduleMutation = useMutation({
     mutationFn: async () => {

@@ -83,7 +83,7 @@ export function SupportDashboard() {
       </div>
 
       {/* ── Charts ─────────────────────────────────────────── */}
-      <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '24px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '24px' }}>
         
         <div className="card" style={{ padding: '24px' }}>
           <h3 style={{ marginBottom: '24px', fontSize: '16px', fontWeight: 600 }}>Ticket Volume</h3>

@@ -8,7 +8,7 @@ import {
 } from '@tanstack/react-table';
 import { ChevronLeft, ChevronRight, Filter, Download } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { auditService } from '../../../services/audit.service.mock';
+import { api } from '../../../services/api';
 import { AuditLog, AuditFilters } from '../../../types/audit';
 
 interface Props {
@@ -24,7 +24,21 @@ export function AuditLogsTable({ onRowClick, filters, setFilters }: Props) {
 
   const { data, isLoading } = useQuery({
     queryKey: ['audit', 'logs', page, limit, filters],
-    queryFn: () => auditService.getLogs({ page, limit, filters }),
+    queryFn: async () => {
+      const res = await api.get('/admin/audit-logs', { params: { page, limit, ...filters } });
+      const formattedLogs = res.data.data.map((log: any) => ({
+        id: log.id,
+        timestamp: log.createdAt,
+        action: log.action,
+        module: log.resource,
+        userId: log.userId,
+        userEmail: log.user?.email || log.user?.username || 'System',
+        ipAddress: log.ipAddress || 'Unknown',
+        status: log.action.includes('FAIL') ? 'FAILED' : 'SUCCESS',
+        details: { oldValues: log.oldValues, newValues: log.newValues, resourceId: log.resourceId }
+      }));
+      return { data: formattedLogs, pagination: res.data.pagination };
+    },
     placeholderData: (prev) => prev
   });
 
@@ -33,7 +47,7 @@ export function AuditLogsTable({ onRowClick, filters, setFilters }: Props) {
   const handleExport = () => {
     // Generate dummy CSV
     const csvContent = "data:text/csv;charset=utf-8,ID,Timestamp,Action,Module,User,IP\n" +
-      data?.data.map(log => `${log.id},${log.timestamp},${log.action},${log.module},${log.userEmail || ''},${log.ipAddress}`).join('\n');
+      data?.data.map((log: AuditLog) => `${log.id},${log.timestamp},${log.action},${log.module},${log.userEmail || ''},${log.ipAddress}`).join('\n');
     
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");

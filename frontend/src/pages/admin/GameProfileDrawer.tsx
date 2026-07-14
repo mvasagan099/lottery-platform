@@ -5,6 +5,8 @@ import { X, Trophy, DollarSign, Settings, Users, Percent, Shield, Activity, BarC
 import dayjs from 'dayjs'
 import toast from 'react-hot-toast'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area } from 'recharts'
+import { ScheduleDrawDrawer } from './ScheduleDrawDrawer'
+import { EditPrizeDivisionsDrawer } from './EditPrizeDivisionsDrawer'
 
 interface Props {
   gameId: string | null
@@ -14,6 +16,8 @@ interface Props {
 export function GameProfileDrawer({ gameId, onClose }: Props) {
   const queryClient = useQueryClient()
   const [activeTab, setActiveTab] = useState<'OVERVIEW' | 'DRAWS' | 'DIVISIONS' | 'ANALYTICS' | 'SETTINGS'>('OVERVIEW')
+  const [isScheduleOpen, setIsScheduleOpen] = useState(false)
+  const [isEditDivisionsOpen, setIsEditDivisionsOpen] = useState(false)
 
   const { data: record, isLoading } = useQuery({
     queryKey: ['admin', 'games', gameId],
@@ -50,7 +54,7 @@ export function GameProfileDrawer({ gameId, onClose }: Props) {
     <>
       <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1000 }} onClick={onClose} />
       
-      <div style={{ position: 'fixed', right: 0, top: 0, bottom: 0, width: '100%', maxWidth: '900px', backgroundColor: 'var(--bg-primary)', zIndex: 1001, boxShadow: '-4px 0 24px rgba(0,0,0,0.1)', display: 'flex', flexDirection: 'column', animation: 'slideInRight 0.3s ease-out' }}>
+      <div style={{ position: 'fixed', right: 0, top: 0, bottom: 0, width: '100%', maxWidth: '900px', backgroundColor: 'var(--bg-primary)', zIndex: 1001, boxShadow: '-4px 0 24px rgba(0,0,0,0.1)', display: 'flex', flexDirection: 'column', overflowY: 'auto', animation: 'slideInRight 0.3s ease-out' }}>
         
         {/* Header */}
         <div style={{ padding: 'var(--space-xl)', borderBottom: '1px solid var(--border-color)', backgroundColor: 'var(--bg-secondary)', position: 'relative' }}>
@@ -60,8 +64,8 @@ export function GameProfileDrawer({ gameId, onClose }: Props) {
             <div style={{ width: 80, height: 80, borderRadius: '12px', background: 'linear-gradient(135deg, var(--primary-color), var(--color-accent))', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '2rem', color: 'white', fontWeight: 600 }}>
               {record?.name?.charAt(0).toUpperCase()}
             </div>
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div style={{ paddingRight: 40 }}>
+              <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '12px' }}>
                 <h1 style={{ margin: 0, fontSize: '1.8rem' }}>{record?.name}</h1>
                 <span style={{ padding: '4px 12px', borderRadius: '16px', fontSize: '0.8rem', fontWeight: 600, backgroundColor: isSuspended ? 'rgba(239,68,68,0.1)' : 'rgba(16,185,129,0.1)', color: isSuspended ? '#ef4444' : '#10b981' }}>
                   {isSuspended ? 'Disabled' : 'Active'}
@@ -77,7 +81,7 @@ export function GameProfileDrawer({ gameId, onClose }: Props) {
           </div>
 
           {/* Quick Stats */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 'var(--space-md)' }}>
+          <div className="grid-4" style={{ gap: 'var(--space-md)' }}>
             <div className="card" style={{ padding: 'var(--space-md)' }}>
               <div style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: 4 }}>Jackpot</div>
               <div style={{ fontSize: '1.2rem', fontWeight: 600, color: '#f59e0b' }}>🪙{Number(record?.jackpotAmount || 0).toLocaleString()}</div>
@@ -98,7 +102,7 @@ export function GameProfileDrawer({ gameId, onClose }: Props) {
         </div>
 
         {/* Navigation Tabs */}
-        <div style={{ display: 'flex', borderBottom: '1px solid var(--border-color)', padding: '0 var(--space-xl)', overflowX: 'auto' }}>
+        <div style={{ display: 'flex', flexShrink: 0, borderBottom: '1px solid var(--border-color)', padding: '0 var(--space-xl)', overflowX: 'auto', position: 'sticky', top: 0, backgroundColor: 'var(--bg-primary)', zIndex: 10 }}>
           {['OVERVIEW', 'DRAWS', 'DIVISIONS', 'ANALYTICS', 'SETTINGS'].map(tab => (
             <button key={tab} className={`tab-btn ${activeTab === tab ? 'active' : ''}`} onClick={() => setActiveTab(tab as any)} style={{ padding: '16px 24px', background: 'none', border: 'none', borderBottom: activeTab === tab ? '2px solid var(--primary-color)' : '2px solid transparent', color: activeTab === tab ? 'var(--primary-color)' : 'var(--text-secondary)', fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}>
               {tab === 'DIVISIONS' ? 'Prize Divisions' : tab.charAt(0) + tab.slice(1).toLowerCase()}
@@ -107,7 +111,7 @@ export function GameProfileDrawer({ gameId, onClose }: Props) {
         </div>
 
         {/* Scrollable Content */}
-        <div style={{ flex: 1, overflowY: 'auto', padding: 'var(--space-xl)' }}>
+        <div style={{ padding: 'var(--space-xl)' }}>
           {isLoading ? (
             <div className="loading-spinner" style={{ margin: '40px auto' }}></div>
           ) : (
@@ -202,9 +206,9 @@ export function GameProfileDrawer({ gameId, onClose }: Props) {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-lg)' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <h3 style={{ margin: 0 }}>Prize Distribution Table</h3>
-                    <button className="btn btn-outline btn-sm">Edit Table</button>
+                    <button className="btn btn-outline btn-sm" onClick={() => setIsEditDivisionsOpen(true)}>Edit Table</button>
                   </div>
-                  <div className="card" style={{ overflow: 'hidden' }}>
+                  <div className="card" style={{ overflowX: 'auto' }}>
                     <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
                       <thead style={{ backgroundColor: 'var(--bg-secondary)', borderBottom: '1px solid var(--border-color)' }}>
                         <tr>
@@ -239,9 +243,9 @@ export function GameProfileDrawer({ gameId, onClose }: Props) {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-lg)' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <h3 style={{ margin: 0 }}>Recent & Upcoming Draws</h3>
-                    <button className="btn btn-primary btn-sm">Schedule Draw</button>
+                    <button className="btn btn-primary btn-sm" onClick={() => setIsScheduleOpen(true)}>Schedule Draw</button>
                   </div>
-                  <div className="card" style={{ overflow: 'hidden' }}>
+                  <div className="card" style={{ overflowX: 'auto' }}>
                     <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
                       <thead style={{ backgroundColor: 'var(--bg-secondary)', borderBottom: '1px solid var(--border-color)' }}>
                         <tr>
@@ -284,7 +288,7 @@ export function GameProfileDrawer({ gameId, onClose }: Props) {
                   <section>
                     <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><DollarSign size={18}/> Financial Settings</h3>
                     <div className="card" style={{ padding: 'var(--space-lg)' }}>
-                      <div style={{ display: 'flex', gap: 'var(--space-lg)' }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: 'var(--space-lg)' }}>
                         <div style={{ flex: 1 }}>
                           <label style={{ display: 'block', marginBottom: '8px', color: 'var(--text-secondary)' }}>Ticket Price</label>
                           <div style={{ display: 'flex', gap: '12px' }}>
@@ -313,7 +317,7 @@ export function GameProfileDrawer({ gameId, onClose }: Props) {
                   <section>
                     <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><Settings size={18}/> Game State</h3>
                     <div className="card" style={{ padding: 'var(--space-lg)', border: '1px solid rgba(239, 68, 68, 0.3)' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-md)', justifyContent: 'space-between', alignItems: 'center' }}>
                         <div>
                           <div style={{ fontWeight: 600 }}>{isSuspended ? 'Enable Game' : 'Disable Game'}</div>
                           <div style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginTop: '4px' }}>
@@ -336,6 +340,8 @@ export function GameProfileDrawer({ gameId, onClose }: Props) {
           )}
         </div>
       </div>
+      <ScheduleDrawDrawer isOpen={isScheduleOpen} onClose={() => setIsScheduleOpen(false)} defaultGameId={record?.id} />
+      <EditPrizeDivisionsDrawer isOpen={isEditDivisionsOpen} onClose={() => setIsEditDivisionsOpen(false)} gameId={record?.id} initialDivisions={record?.prizeDivisions || []} />
     </>
   )
 }

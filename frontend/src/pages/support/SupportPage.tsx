@@ -3,6 +3,7 @@ import { useQuery, useMutation } from '@tanstack/react-query'
 import { supportService } from '@/services/index'
 import { Plus, MessageCircle, Clock, CheckCircle } from 'lucide-react'
 import Modal from '@/components/UI/Modal'
+import SupportTicketModal from './SupportTicketModal'
 import toast from 'react-hot-toast'
 import { Link } from 'react-router-dom'
 
@@ -11,6 +12,7 @@ export default function SupportPage() {
   const [subject, setSubject] = useState('')
   const [category, setCategory] = useState('GENERAL')
   const [message, setMessage] = useState('')
+  const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null)
 
   const { data: tickets, refetch } = useQuery({
     queryKey: ['support-tickets'],
@@ -53,7 +55,7 @@ export default function SupportPage() {
                   <tr><td colSpan={4} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>No support tickets found.</td></tr>
                 ) : (
                   tickets?.map((t: any) => (
-                    <tr key={t.id} style={{ cursor: 'pointer' }} onClick={() => { /* Navigate to detail */ }}>
+                    <tr key={t.id} style={{ cursor: 'pointer' }} onClick={() => setSelectedTicketId(t.id)}>
                       <td style={{ fontWeight: 600 }}>{t.subject}</td>
                       <td>{t.category}</td>
                       <td>
@@ -99,6 +101,11 @@ export default function SupportPage() {
           </button>
         </div>
       </Modal>
+      
+      <SupportTicketModal 
+        ticketId={selectedTicketId} 
+        onClose={() => setSelectedTicketId(null)} 
+      />
     </div>
   )
 }
