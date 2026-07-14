@@ -66,7 +66,7 @@ export class SupportTicketController {
     try {
       const data = replyTicketSchema.parse(request.body);
       const user = (request as any).user;
-      const senderId = user.id; // Either user or agent id
+      const senderId = user.userId; // JWT contains userId
       const senderType = user.role === 'USER' ? 'USER' : 'AGENT';
       
       const message = await SupportTicketService.replyToTicket(request.params.id, senderId, senderType, data.message, data.isInternal);
