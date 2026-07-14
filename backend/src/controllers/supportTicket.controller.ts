@@ -80,7 +80,7 @@ export class SupportTicketController {
     try {
       const data = assignTicketSchema.parse(request.body);
       const user = (request as any).user; // The person assigning
-      const ticket = await SupportTicketService.assignTicket(request.params.id, data.agentId, user?.id);
+      const ticket = await SupportTicketService.assignTicket(request.params.id, data.agentId, user?.userId);
       return reply.send({ success: true, data: ticket });
     } catch (error: any) {
       return reply.status(400).send({ success: false, error: error.message || error });
