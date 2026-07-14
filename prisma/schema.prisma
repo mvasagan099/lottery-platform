@@ -78,9 +78,13 @@ enum NotificationType {
 
 enum SupportTicketStatus {
   OPEN
+  PENDING
+  WAITING_FOR_CUSTOMER
+  ASSIGNED
   IN_PROGRESS
   RESOLVED
   CLOSED
+  ESCALATED
 }
 
 enum UserRole {
@@ -94,34 +98,34 @@ enum UserRole {
 // ============ MODELS ============
 
 model User {
-  id                String   @id @default(cuid())
-  email             String   @unique
-  username          String   @unique
-  passwordHash      String
-  firstName         String
-  lastName          String
-  dateOfBirth       DateTime?
-  phone             String?
-  role              UserRole @default(USER)
-  status            UserStatus @default(PENDING_VERIFICATION)
-  emailVerified     Boolean  @default(false)
-  emailVerifiedAt   DateTime?
-  twoFactorEnabled  Boolean  @default(false)
-  twoFactorSecret   String?
-  referralCode      String   @unique @default(cuid())
-  referredById      String?
-  referredBy        User?    @relation("Referrals", fields: [referredById], references: [id])
-  referrals         User[]   @relation("Referrals")
-  kycStatus         KYCStatus @default(NOT_SUBMITTED)
-  country           String?
-  state             String?
-  city              String?
-  address           String?
-  postcode          String?
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
-  lastLoginAt       DateTime?
-  lastLoginIp       String?
+  id               String     @id @default(cuid())
+  email            String     @unique
+  username         String     @unique
+  passwordHash     String
+  firstName        String
+  lastName         String
+  dateOfBirth      DateTime?
+  phone            String?
+  role             UserRole   @default(USER)
+  status           UserStatus @default(PENDING_VERIFICATION)
+  emailVerified    Boolean    @default(false)
+  emailVerifiedAt  DateTime?
+  twoFactorEnabled Boolean    @default(false)
+  twoFactorSecret  String?
+  referralCode     String     @unique @default(cuid())
+  referredById     String?
+  referredBy       User?      @relation("Referrals", fields: [referredById], references: [id])
+  referrals        User[]     @relation("Referrals")
+  kycStatus        KYCStatus  @default(NOT_SUBMITTED)
+  country          String?
+  state            String?
+  city             String?
+  address          String?
+  postcode         String?
+  createdAt        DateTime   @default(now())
+  updatedAt        DateTime   @updatedAt
+  lastLoginAt      DateTime?
+  lastLoginIp      String?
 
   wallet            Wallet?
   sessions          Session[]
@@ -135,6 +139,8 @@ model User {
   devices           DeviceHistory[]
   notificationPrefs NotificationPreference?
   couponsUsed       Coupon[]
+  SupportAgent      SupportAgent?
+  roles             UserRoleMapping[]
 
   @@map("users")
 }
@@ -157,15 +163,15 @@ model Session {
 }
 
 model DeviceHistory {
-  id          String   @id @default(cuid())
-  userId      String
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  deviceName  String
-  ipAddress   String
-  userAgent   String
-  location    String?
-  lastSeenAt  DateTime @default(now())
-  trusted     Boolean  @default(false)
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deviceName String
+  ipAddress  String
+  userAgent  String
+  location   String?
+  lastSeenAt DateTime @default(now())
+  trusted    Boolean  @default(false)
 
   @@map("device_history")
 }
@@ -187,80 +193,80 @@ model KYCRecord {
 }
 
 model Wallet {
-  id                String        @id @default(cuid())
-  userId            String        @unique
-  user              User          @relation(fields: [userId], references: [id])
-  balance           Decimal       @default(0) @db.Decimal(18, 2)
-  bonusBalance      Decimal       @default(0) @db.Decimal(18, 2)
-  pendingBalance    Decimal       @default(0) @db.Decimal(18, 2)
-  currency          String        @default("AUD")
-  totalDeposited    Decimal       @default(0) @db.Decimal(18, 2)
-  totalWithdrawn    Decimal       @default(0) @db.Decimal(18, 2)
-  totalWon          Decimal       @default(0) @db.Decimal(18, 2)
-  totalSpent        Decimal       @default(0) @db.Decimal(18, 2)
-  createdAt         DateTime      @default(now())
-  updatedAt         DateTime      @updatedAt
-  transactions      Transaction[]
-  deposits          Deposit[]
-  withdrawals       Withdrawal[]
+  id             String        @id @default(cuid())
+  userId         String        @unique
+  user           User          @relation(fields: [userId], references: [id])
+  balance        Decimal       @default(0) @db.Decimal(18, 2)
+  bonusBalance   Decimal       @default(0) @db.Decimal(18, 2)
+  pendingBalance Decimal       @default(0) @db.Decimal(18, 2)
+  currency       String        @default("AUD")
+  totalDeposited Decimal       @default(0) @db.Decimal(18, 2)
+  totalWithdrawn Decimal       @default(0) @db.Decimal(18, 2)
+  totalWon       Decimal       @default(0) @db.Decimal(18, 2)
+  totalSpent     Decimal       @default(0) @db.Decimal(18, 2)
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  transactions   Transaction[]
+  deposits       Deposit[]
+  withdrawals    Withdrawal[]
 
   @@map("wallets")
 }
 
 model Transaction {
-  id              String            @id @default(cuid())
-  userId          String
-  user            User              @relation(fields: [userId], references: [id])
-  walletId        String
-  wallet          Wallet            @relation(fields: [walletId], references: [id])
-  type            TransactionType
-  status          TransactionStatus @default(PENDING)
-  amount          Decimal           @db.Decimal(18, 2)
-  balanceBefore   Decimal           @db.Decimal(18, 2)
-  balanceAfter    Decimal           @db.Decimal(18, 2)
-  currency        String            @default("AUD")
-  reference       String            @unique
-  description     String?
-  metadata        Json?
-  ticketId        String?
-  drawId          String?
-  createdAt       DateTime          @default(now())
-  updatedAt       DateTime          @updatedAt
+  id            String            @id @default(cuid())
+  userId        String
+  user          User              @relation(fields: [userId], references: [id])
+  walletId      String
+  wallet        Wallet            @relation(fields: [walletId], references: [id])
+  type          TransactionType
+  status        TransactionStatus @default(PENDING)
+  amount        Decimal           @db.Decimal(18, 2)
+  balanceBefore Decimal           @db.Decimal(18, 2)
+  balanceAfter  Decimal           @db.Decimal(18, 2)
+  currency      String            @default("AUD")
+  reference     String            @unique
+  description   String?
+  metadata      Json?
+  ticketId      String?
+  drawId        String?
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
 
   @@map("transactions")
 }
 
 model Deposit {
-  id              String            @id @default(cuid())
-  walletId        String
-  wallet          Wallet            @relation(fields: [walletId], references: [id])
-  amount          Decimal           @db.Decimal(18, 2)
-  currency        String            @default("AUD")
-  gateway         PaymentGateway
-  gatewayRef      String?
-  status          TransactionStatus @default(PENDING)
-  metadata        Json?
-  processedAt     DateTime?
-  createdAt       DateTime          @default(now())
-  updatedAt       DateTime          @updatedAt
+  id          String            @id @default(cuid())
+  walletId    String
+  wallet      Wallet            @relation(fields: [walletId], references: [id])
+  amount      Decimal           @db.Decimal(18, 2)
+  currency    String            @default("AUD")
+  gateway     PaymentGateway
+  gatewayRef  String?
+  status      TransactionStatus @default(PENDING)
+  metadata    Json?
+  processedAt DateTime?
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
 
   @@map("deposits")
 }
 
 model Withdrawal {
-  id              String            @id @default(cuid())
-  walletId        String
-  wallet          Wallet            @relation(fields: [walletId], references: [id])
-  amount          Decimal           @db.Decimal(18, 2)
-  currency        String            @default("AUD")
-  gateway         PaymentGateway
-  accountDetails  Json
-  status          TransactionStatus @default(PENDING)
-  reviewedById    String?
-  reviewNotes     String?
-  processedAt     DateTime?
-  createdAt       DateTime          @default(now())
-  updatedAt       DateTime          @updatedAt
+  id             String            @id @default(cuid())
+  walletId       String
+  wallet         Wallet            @relation(fields: [walletId], references: [id])
+  amount         Decimal           @db.Decimal(18, 2)
+  currency       String            @default("AUD")
+  gateway        PaymentGateway
+  accountDetails Json
+  status         TransactionStatus @default(PENDING)
+  reviewedById   String?
+  reviewNotes    String?
+  processedAt    DateTime?
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
 
   @@map("withdrawals")
 }
@@ -272,7 +278,7 @@ model Game {
   description      String
   shortDescription String?
   rulesJson        Json
-  drawSchedule     String   // cron expression
+  drawSchedule     String // cron expression
   jackpotAmount    Decimal  @db.Decimal(18, 2)
   minJackpot       Decimal  @db.Decimal(18, 2)
   ticketPrice      Decimal  @db.Decimal(18, 2)
@@ -293,9 +299,9 @@ model Game {
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
-  draws            Draw[]
-  tickets          Ticket[]
-  prizeDivisions   PrizeDivision[]
+  draws          Draw[]
+  tickets        Ticket[]
+  prizeDivisions PrizeDivision[]
 
   @@map("games")
 }
@@ -318,85 +324,85 @@ model PrizeDivision {
 }
 
 model Draw {
-  id              String     @id @default(cuid())
-  gameId          String
-  game            Game       @relation(fields: [gameId], references: [id])
-  drawNumber      Int
-  scheduledAt     DateTime
-  drawnAt         DateTime?
-  status          DrawStatus @default(SCHEDULED)
-  jackpotAmount   Decimal    @db.Decimal(18, 2)
-  totalSales      Decimal    @default(0) @db.Decimal(18, 2)
-  totalPrizes     Decimal    @default(0) @db.Decimal(18, 2)
-  winningNumbers  Json?
-  supplementary   Json?
-  powerball       Int?
-  isVerified      Boolean    @default(false)
-  verifiedById    String?
-  publishedAt     DateTime?
-  notes           String?
-  createdAt       DateTime   @default(now())
-  updatedAt       DateTime   @updatedAt
+  id             String     @id @default(cuid())
+  gameId         String
+  game           Game       @relation(fields: [gameId], references: [id])
+  drawNumber     Int
+  scheduledAt    DateTime
+  drawnAt        DateTime?
+  status         DrawStatus @default(SCHEDULED)
+  jackpotAmount  Decimal    @db.Decimal(18, 2)
+  totalSales     Decimal    @default(0) @db.Decimal(18, 2)
+  totalPrizes    Decimal    @default(0) @db.Decimal(18, 2)
+  winningNumbers Json?
+  supplementary  Json?
+  powerball      Int?
+  isVerified     Boolean    @default(false)
+  verifiedById   String?
+  publishedAt    DateTime?
+  notes          String?
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
 
-  tickets         Ticket[]
-  winningEntries  WinningEntry[]
+  tickets        Ticket[]
+  winningEntries WinningEntry[]
 
   @@map("draws")
 }
 
 model Ticket {
-  id              String       @id @default(cuid())
-  userId          String
-  user            User         @relation(fields: [userId], references: [id])
-  gameId          String
-  game            Game         @relation(fields: [gameId], references: [id])
-  drawId          String?
-  draw            Draw?        @relation(fields: [drawId], references: [id])
-  ticketNumber    String       @unique
-  qrCode          String?
-  status          TicketStatus @default(ACTIVE)
-  isQuickPick     Boolean      @default(false)
-  isSystemEntry   Boolean      @default(false)
-  isSyndicate     Boolean      @default(false)
-  syndicateId     String?
-  draws           Int          @default(1)
-  totalCost       Decimal      @db.Decimal(18, 2)
-  prizeAmount     Decimal?     @db.Decimal(18, 2)
-  prizeDivision   String?
-  claimedAt       DateTime?
-  purchasedAt     DateTime     @default(now())
-  validUntil      DateTime?
-  metadata        Json?
+  id            String       @id @default(cuid())
+  userId        String
+  user          User         @relation(fields: [userId], references: [id])
+  gameId        String
+  game          Game         @relation(fields: [gameId], references: [id])
+  drawId        String?
+  draw          Draw?        @relation(fields: [drawId], references: [id])
+  ticketNumber  String       @unique
+  qrCode        String?
+  status        TicketStatus @default(ACTIVE)
+  isQuickPick   Boolean      @default(false)
+  isSystemEntry Boolean      @default(false)
+  isSyndicate   Boolean      @default(false)
+  syndicateId   String?
+  draws         Int          @default(1)
+  totalCost     Decimal      @db.Decimal(18, 2)
+  prizeAmount   Decimal?     @db.Decimal(18, 2)
+  prizeDivision String?
+  claimedAt     DateTime?
+  purchasedAt   DateTime     @default(now())
+  validUntil    DateTime?
+  metadata      Json?
 
-  numbers         TicketNumber[]
-  winningEntries  WinningEntry[]
+  numbers        TicketNumber[]
+  winningEntries WinningEntry[]
 
   @@map("tickets")
 }
 
 model TicketNumber {
-  id         String  @id @default(cuid())
-  ticketId   String
-  ticket     Ticket  @relation(fields: [ticketId], references: [id])
-  lineIndex  Int
-  numbers    Json    // array of selected numbers
+  id            String @id @default(cuid())
+  ticketId      String
+  ticket        Ticket @relation(fields: [ticketId], references: [id])
+  lineIndex     Int
+  numbers       Json // array of selected numbers
   supplementary Json? // supplementary numbers if applicable
-  powerball  Int?
+  powerball     Int?
 
   @@map("ticket_numbers")
 }
 
 model WinningEntry {
-  id            String   @id @default(cuid())
-  ticketId      String
-  ticket        Ticket   @relation(fields: [ticketId], references: [id])
-  drawId        String
-  draw          Draw     @relation(fields: [drawId], references: [id])
-  divisionName  String
-  prizeAmount   Decimal  @db.Decimal(18, 2)
-  isPaid        Boolean  @default(false)
-  paidAt        DateTime?
-  createdAt     DateTime @default(now())
+  id           String    @id @default(cuid())
+  ticketId     String
+  ticket       Ticket    @relation(fields: [ticketId], references: [id])
+  drawId       String
+  draw         Draw      @relation(fields: [drawId], references: [id])
+  divisionName String
+  prizeAmount  Decimal   @db.Decimal(18, 2)
+  isPaid       Boolean   @default(false)
+  paidAt       DateTime?
+  createdAt    DateTime  @default(now())
 
   @@map("winning_entries")
 }
@@ -418,125 +424,138 @@ model Syndicate {
 }
 
 model Bonus {
-  id             String    @id @default(cuid())
-  name           String
-  description    String
-  type           String    // WELCOME, DEPOSIT, REFERRAL, PROMOTIONAL
-  amount         Decimal?  @db.Decimal(18, 2)
-  percentage     Decimal?  @db.Decimal(5, 2)
-  maxAmount      Decimal?  @db.Decimal(18, 2)
-  minDeposit     Decimal?  @db.Decimal(18, 2)
-  wageringReq    Decimal?  @db.Decimal(5, 2)
-  expiresAt      DateTime?
-  isActive       Boolean   @default(true)
-  usageLimit     Int?
-  usageCount     Int       @default(0)
-  createdAt      DateTime  @default(now())
+  id          String    @id @default(cuid())
+  name        String
+  description String
+  type        String // WELCOME, DEPOSIT, REFERRAL, PROMOTIONAL
+  amount      Decimal?  @db.Decimal(18, 2)
+  percentage  Decimal?  @db.Decimal(5, 2)
+  maxAmount   Decimal?  @db.Decimal(18, 2)
+  minDeposit  Decimal?  @db.Decimal(18, 2)
+  wageringReq Decimal?  @db.Decimal(5, 2)
+  expiresAt   DateTime?
+  isActive    Boolean   @default(true)
+  usageLimit  Int?
+  usageCount  Int       @default(0)
+  createdAt   DateTime  @default(now())
 
   @@map("bonuses")
 }
 
 model Promotion {
-  id          String    @id @default(cuid())
+  id          String   @id @default(cuid())
   title       String
   description String
   imageUrl    String?
   startDate   DateTime
   endDate     DateTime
-  isActive    Boolean   @default(true)
-  priority    Int       @default(0)
+  isActive    Boolean  @default(true)
+  priority    Int      @default(0)
   gameId      String?
   bonusId     String?
-  createdAt   DateTime  @default(now())
+  createdAt   DateTime @default(now())
 
   @@map("promotions")
 }
 
 model AffiliateAccount {
-  id                String   @id @default(cuid())
-  userId            String   @unique
-  user              User     @relation(fields: [userId], references: [id])
-  affiliateCode     String   @unique
-  commissionRate    Decimal  @default(10) @db.Decimal(5, 2)
-  totalEarned       Decimal  @default(0) @db.Decimal(18, 2)
-  totalPaid         Decimal  @default(0) @db.Decimal(18, 2)
-  pendingAmount     Decimal  @default(0) @db.Decimal(18, 2)
-  totalClicks       Int      @default(0)
-  totalSignups      Int      @default(0)
-  totalDeposits     Int      @default(0)
-  isActive          Boolean  @default(true)
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  id             String   @id @default(cuid())
+  userId         String   @unique
+  user           User     @relation(fields: [userId], references: [id])
+  affiliateCode  String   @unique
+  commissionRate Decimal  @default(10) @db.Decimal(5, 2)
+  totalEarned    Decimal  @default(0) @db.Decimal(18, 2)
+  totalPaid      Decimal  @default(0) @db.Decimal(18, 2)
+  pendingAmount  Decimal  @default(0) @db.Decimal(18, 2)
+  totalClicks    Int      @default(0)
+  totalSignups   Int      @default(0)
+  totalDeposits  Int      @default(0)
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
-  commissions       AffiliateCommission[]
+  commissions AffiliateCommission[]
 
   @@map("affiliate_accounts")
 }
 
 model AffiliateCommission {
-  id               String   @id @default(cuid())
-  affiliateId      String
-  affiliate        AffiliateAccount @relation(fields: [affiliateId], references: [id])
-  referredUserId   String
-  type             String   // SIGNUP, DEPOSIT, TICKET
-  amount           Decimal  @db.Decimal(18, 2)
-  isPaid           Boolean  @default(false)
-  paidAt           DateTime?
-  createdAt        DateTime @default(now())
+  id             String           @id @default(cuid())
+  affiliateId    String
+  affiliate      AffiliateAccount @relation(fields: [affiliateId], references: [id])
+  referredUserId String
+  type           String // SIGNUP, DEPOSIT, TICKET
+  amount         Decimal          @db.Decimal(18, 2)
+  isPaid         Boolean          @default(false)
+  paidAt         DateTime?
+  createdAt      DateTime         @default(now())
 
   @@map("affiliate_commissions")
 }
 
 model Notification {
-  id         String           @id @default(cuid())
-  userId     String
-  user       User             @relation(fields: [userId], references: [id])
-  type       NotificationType @default(IN_APP)
-  title      String
-  message    String
-  data       Json?
-  isRead     Boolean          @default(false)
-  readAt     DateTime?
-  sentAt     DateTime?
-  createdAt  DateTime         @default(now())
+  id        String           @id @default(cuid())
+  userId    String
+  user      User             @relation(fields: [userId], references: [id])
+  type      NotificationType @default(IN_APP)
+  title     String
+  message   String
+  data      Json?
+  isRead    Boolean          @default(false)
+  readAt    DateTime?
+  sentAt    DateTime?
+  createdAt DateTime         @default(now())
 
   @@map("notifications")
 }
 
 model NotificationPreference {
-  id                String   @id @default(cuid())
-  userId            String   @unique
-  user              User     @relation(fields: [userId], references: [id])
-  emailDeposit      Boolean  @default(true)
-  emailWithdrawal   Boolean  @default(true)
-  emailTicket       Boolean  @default(true)
-  emailDraw         Boolean  @default(true)
-  emailWinning      Boolean  @default(true)
-  emailPromo        Boolean  @default(false)
-  inAppDeposit      Boolean  @default(true)
-  inAppWithdrawal   Boolean  @default(true)
-  inAppTicket       Boolean  @default(true)
-  inAppDraw         Boolean  @default(true)
-  inAppWinning      Boolean  @default(true)
-  inAppPromo        Boolean  @default(true)
+  id              String  @id @default(cuid())
+  userId          String  @unique
+  user            User    @relation(fields: [userId], references: [id])
+  emailDeposit    Boolean @default(true)
+  emailWithdrawal Boolean @default(true)
+  emailTicket     Boolean @default(true)
+  emailDraw       Boolean @default(true)
+  emailWinning    Boolean @default(true)
+  emailPromo      Boolean @default(false)
+  inAppDeposit    Boolean @default(true)
+  inAppWithdrawal Boolean @default(true)
+  inAppTicket     Boolean @default(true)
+  inAppDraw       Boolean @default(true)
+  inAppWinning    Boolean @default(true)
+  inAppPromo      Boolean @default(true)
 
   @@map("notification_preferences")
 }
 
 model SupportTicket {
-  id           String              @id @default(cuid())
-  userId       String
-  user         User                @relation(fields: [userId], references: [id])
-  subject      String
-  category     String
-  status       SupportTicketStatus @default(OPEN)
-  priority     String              @default("MEDIUM")
-  assignedToId String?
-  resolvedAt   DateTime?
-  createdAt    DateTime            @default(now())
-  updatedAt    DateTime            @updatedAt
+  id                String               @id @default(cuid())
+  userId            String?
+  user              User?                @relation(fields: [userId], references: [id])
+  ticketNumber      String               @unique @default(cuid())
+  subject           String
+  description       String?
+  categoryId        String?
+  category          TicketCategoryModel? @relation(fields: [categoryId], references: [id])
+  status            SupportTicketStatus  @default(OPEN)
+  priority          TicketPriority       @default(MEDIUM)
+  departmentId      String?
+  department        SupportDepartment?   @relation(fields: [departmentId], references: [id])
+  assignedToId      String?
+  assignedTo        SupportAgent?        @relation(fields: [assignedToId], references: [id])
+  firstResponseTime DateTime?
+  resolvedAt        DateTime?
+  closedAt          DateTime?
+  slaDeadline       DateTime?
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
 
-  messages     SupportMessage[]
+  messages      SupportMessage[]
+  attachments   TicketAttachment[]
+  assignments   TicketAssignment[]
+  statusHistory TicketStatusHistory[]
+  tags          TicketTag[]           @relation("TicketToTag")
 
   @@map("support_tickets")
 }
@@ -545,41 +564,45 @@ model SupportMessage {
   id         String        @id @default(cuid())
   ticketId   String
   ticket     SupportTicket @relation(fields: [ticketId], references: [id])
-  senderId   String
+  senderId   String // Can be UserId or AgentId
+  senderType String        @default("USER") // "USER" or "AGENT"
   message    String
   isInternal Boolean       @default(false)
-  attachments Json?
+  readAt     DateTime?
   createdAt  DateTime      @default(now())
+
+  attachments TicketAttachment[]
 
   @@map("support_messages")
 }
 
 model FAQ {
-  id         String   @id @default(cuid())
-  question   String
-  answer     String
-  category   String
-  sortOrder  Int      @default(0)
-  isActive   Boolean  @default(true)
-  createdAt  DateTime @default(now())
+  id        String   @id @default(cuid())
+  question  String
+  answer    String
+  category  String
+  sortOrder Int      @default(0)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
 
   @@map("faqs")
 }
 
 model Banner {
-  id          String    @id @default(cuid())
-  title       String
-  description String?
-  imageUrl    String
-  mobileUrl   String?
-  linkUrl     String?
-  position    String    @default("HOME")
-  isActive    Boolean   @default(true)
-  startDate   DateTime?
-  endDate     DateTime?
-  sortOrder   Int       @default(0)
-  metadata    Json?
-  createdAt   DateTime  @default(now())
+  id              String    @id @default(cuid())
+  title           String
+  description     String?
+  imageUrl        String
+  mobileUrl       String?
+  linkUrl         String?
+  backgroundColor String?
+  position        String    @default("HOME")
+  isActive        Boolean   @default(true)
+  startDate       DateTime?
+  endDate         DateTime?
+  sortOrder       Int       @default(0)
+  metadata        Json?
+  createdAt       DateTime  @default(now())
 
   @@map("banners")
 }
@@ -599,17 +622,17 @@ model CmsPage {
 }
 
 model AuditLog {
-  id        String   @id @default(cuid())
-  userId    String?
-  user      User?    @relation(fields: [userId], references: [id])
-  action    String
-  resource  String
+  id         String   @id @default(cuid())
+  userId     String?
+  user       User?    @relation(fields: [userId], references: [id])
+  action     String
+  resource   String
   resourceId String?
-  oldValues Json?
-  newValues Json?
-  ipAddress String?
-  userAgent String?
-  createdAt DateTime @default(now())
+  oldValues  Json?
+  newValues  Json?
+  ipAddress  String?
+  userAgent  String?
+  createdAt  DateTime @default(now())
 
   @@map("audit_logs")
 }
@@ -627,16 +650,16 @@ model Setting {
 }
 
 model PaymentMethod {
-  id          String   @id @default(cuid())
+  id          String         @id @default(cuid())
   gateway     PaymentGateway
   name        String
   description String?
-  isActive    Boolean  @default(true)
+  isActive    Boolean        @default(true)
   config      Json
-  minAmount   Decimal  @db.Decimal(18, 2)
-  maxAmount   Decimal  @db.Decimal(18, 2)
-  fees        Decimal  @default(0) @db.Decimal(5, 2)
-  createdAt   DateTime @default(now())
+  minAmount   Decimal        @db.Decimal(18, 2)
+  maxAmount   Decimal        @db.Decimal(18, 2)
+  fees        Decimal        @default(0) @db.Decimal(5, 2)
+  createdAt   DateTime       @default(now())
 
   @@map("payment_methods")
 }
@@ -655,14 +678,310 @@ model ApiKey {
 }
 
 model Coupon {
-  id        String   @id @default(cuid())
-  code      String   @unique
-  amount    Decimal  @db.Decimal(10, 2)
-  isUsed    Boolean  @default(false)
+  id        String    @id @default(cuid())
+  code      String    @unique
+  amount    Decimal   @db.Decimal(10, 2)
+  isUsed    Boolean   @default(false)
   usedById  String?
-  usedBy    User?    @relation(fields: [usedById], references: [id])
-  createdAt DateTime @default(now())
+  usedBy    User?     @relation(fields: [usedById], references: [id])
+  createdAt DateTime  @default(now())
   usedAt    DateTime?
 
   @@map("coupons")
+}
+
+// ============ SUPPORT CENTER ENUMS ============
+enum SupportAgentStatus {
+  ONLINE
+  OFFLINE
+  BUSY
+  AWAY
+  ON_BREAK
+}
+
+enum SupportAgentRole {
+  SUPPORT_AGENT
+  SENIOR_AGENT
+  TEAM_LEAD
+  SUPPORT_MANAGER
+  COMPLIANCE_OFFICER
+  SUPER_ADMIN
+}
+
+enum TicketPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+  CRITICAL
+}
+
+enum AttachmentType {
+  IMAGE
+  PDF
+  VIDEO
+  DOCUMENT
+}
+
+// ============ SUPPORT CENTER MODELS ============
+
+model SupportAgent {
+  id           String             @id @default(cuid())
+  userId       String             @unique
+  user         User               @relation(fields: [userId], references: [id])
+  employeeId   String             @unique
+  departmentId String?
+  department   SupportDepartment? @relation(fields: [departmentId], references: [id])
+  team         String?
+  designation  String?
+  role         SupportAgentRole   @default(SUPPORT_AGENT)
+  status       SupportAgentStatus @default(OFFLINE)
+  workingHours Json?
+  timeZone     String             @default("UTC")
+  languages    String[]
+  skills       String[]
+  experience   String?
+  notes        String?
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+
+  assignedTickets SupportTicket[]
+  activityLogs    AgentActivity[]
+  performance     AgentPerformance?
+  assignments     TicketAssignment[]
+
+  @@map("support_agents")
+}
+
+model SupportDepartment {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  agents  SupportAgent[]
+  tickets SupportTicket[]
+
+  @@map("support_departments")
+}
+
+model SystemSetting {
+  id        String   @id @default(cuid())
+  category  String   @unique
+  data      Json
+  updatedAt DateTime @updatedAt
+  updatedBy String?
+
+  @@map("system_settings")
+}
+
+// ============ RBAC MODELS ============
+
+model Role {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String?
+  department  String?
+  priority    Int      @default(0)
+  isSystem    Boolean  @default(false)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  createdBy   String?
+
+  permissions   RolePermission[]
+  users         UserRoleMapping[]
+  history       RoleHistory[]
+
+  @@map("roles")
+}
+
+model Permission {
+  id          String   @id @default(cuid())
+  module      String
+  action      String
+  description String?
+  createdAt   DateTime @default(now())
+
+  roles RolePermission[]
+
+  @@unique([module, action])
+  @@map("permissions")
+}
+
+model RolePermission {
+  id           String   @id @default(cuid())
+  roleId       String
+  permissionId String
+  createdAt    DateTime @default(now())
+
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@unique([roleId, permissionId])
+  @@map("role_permissions")
+}
+
+model UserRoleMapping {
+  id        String    @id @default(cuid())
+  userId    String
+  roleId    String
+  expiresAt DateTime?
+  createdAt DateTime  @default(now())
+  grantedBy String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, roleId])
+  @@map("user_roles")
+}
+
+model RoleHistory {
+  id        String   @id @default(cuid())
+  roleId    String
+  action    String
+  changes   Json
+  changedBy String
+  createdAt DateTime @default(now())
+
+  role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@map("role_history")
+}
+
+model TicketAttachment {
+  id        String          @id @default(cuid())
+  ticketId  String?
+  ticket    SupportTicket?  @relation(fields: [ticketId], references: [id])
+  messageId String?
+  message   SupportMessage? @relation(fields: [messageId], references: [id])
+  fileName  String
+  fileUrl   String
+  fileType  AttachmentType
+  fileSize  Int
+  createdAt DateTime        @default(now())
+
+  @@map("ticket_attachments")
+}
+
+model TicketTag {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  createdAt DateTime @default(now())
+
+  tickets SupportTicket[] @relation("TicketToTag")
+
+  @@map("ticket_tags")
+}
+
+model TicketCategoryModel {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  tickets SupportTicket[]
+
+  @@map("ticket_categories")
+}
+
+model TicketAssignment {
+  id           String        @id @default(cuid())
+  ticketId     String
+  ticket       SupportTicket @relation(fields: [ticketId], references: [id])
+  agentId      String
+  agent        SupportAgent  @relation(fields: [agentId], references: [id])
+  assignedBy   String?
+  assignedAt   DateTime      @default(now())
+  unassignedAt DateTime?
+
+  @@map("ticket_assignments")
+}
+
+model TicketStatusHistory {
+  id        String              @id @default(cuid())
+  ticketId  String
+  ticket    SupportTicket       @relation(fields: [ticketId], references: [id])
+  status    SupportTicketStatus
+  changedBy String?
+  changedAt DateTime            @default(now())
+  reason    String?
+
+  @@map("ticket_status_history")
+}
+
+model AgentActivity {
+  id        String       @id @default(cuid())
+  agentId   String
+  agent     SupportAgent @relation(fields: [agentId], references: [id])
+  action    String
+  details   Json?
+  createdAt DateTime     @default(now())
+
+  @@map("agent_activity")
+}
+
+model AgentPerformance {
+  id                  String       @id @default(cuid())
+  agentId             String       @unique
+  agent               SupportAgent @relation(fields: [agentId], references: [id])
+  ticketsAssigned     Int          @default(0)
+  ticketsSolved       Int          @default(0)
+  openTickets         Int          @default(0)
+  pendingTickets      Int          @default(0)
+  avgResponseTime     Int          @default(0) // in seconds
+  avgResolutionTime   Int          @default(0) // in seconds
+  csatScore           Decimal      @default(0) @db.Decimal(5, 2)
+  rating              Decimal      @default(0) @db.Decimal(5, 2)
+  escalatedTickets    Int          @default(0)
+  firstResponseSlaMet Int          @default(0)
+  updatedAt           DateTime     @updatedAt
+
+  @@map("agent_performance")
+}
+
+model KnowledgeBaseCategory {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  articles KnowledgeBaseArticle[]
+
+  @@map("kb_categories")
+}
+
+model KnowledgeBaseArticle {
+  id          String                @id @default(cuid())
+  categoryId  String
+  category    KnowledgeBaseCategory @relation(fields: [categoryId], references: [id])
+  title       String
+  content     String
+  tags        String[]
+  views       Int                   @default(0)
+  isPublished Boolean               @default(false)
+  authorId    String?
+  createdAt   DateTime              @default(now())
+  updatedAt   DateTime              @updatedAt
+
+  @@map("kb_articles")
+}
+
+model SLARule {
+  id                String         @id @default(cuid())
+  priority          TicketPriority
+  firstResponseTime Int // in minutes
+  resolutionTime    Int // in minutes
+  escalationTime    Int // in minutes
+  isActive          Boolean        @default(true)
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+
+  @@map("sla_rules")
 }

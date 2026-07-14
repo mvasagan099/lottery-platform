@@ -25,6 +25,9 @@ export default function SupportPage() {
       setShowNew(false)
       setSubject(''); setMessage('');
       refetch()
+    },
+    onError: (err: any) => {
+      toast.error(err.response?.data?.error || err.response?.data?.message || 'Failed to submit ticket');
     }
   })
 
@@ -87,7 +90,11 @@ export default function SupportPage() {
             <label className="form-label">Message</label>
             <textarea className="form-input" rows={5} value={message} onChange={(e) => setMessage(e.target.value)} placeholder="Provide as much detail as possible..." />
           </div>
-          <button className="btn btn-primary btn-full" onClick={() => mutation.mutate()} disabled={!subject || !message || mutation.isPending}>
+          <button className="btn btn-primary btn-full" onClick={() => {
+            if (subject.length < 5) return toast.error('Subject must be at least 5 characters');
+            if (message.length < 10) return toast.error('Message must be at least 10 characters');
+            mutation.mutate();
+          }} disabled={!subject || !message || mutation.isPending}>
             {mutation.isPending ? 'Submitting...' : 'Submit Request'}
           </button>
         </div>

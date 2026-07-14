@@ -1503,6 +1503,37 @@ input:checked + .switch-track::after { transform: translateY(-50%) translateX(20
 .truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border-width: 0; }
 
+/* ── Admin Tabs ────────────────────────────────────────────── */
+.admin-tabs {
+  display: flex;
+  gap: var(--space-sm);
+  margin-top: var(--space-lg);
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 0;
+}
+
+.admin-tab {
+  padding: 10px 20px;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--text-secondary);
+  font-weight: 600;
+  font-size: var(--text-sm);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  margin-bottom: -1px; /* Overlap border */
+}
+
+.admin-tab:hover {
+  color: var(--text-brand);
+}
+
+.admin-tab.active {
+  color: var(--text-brand);
+  border-bottom-color: var(--color-primary);
+}
+
 /* ── Responsive ──────────────────────────────────────────── */
 @media (max-width: 1024px) {
   .grid-4 { grid-template-columns: repeat(2, 1fr); }

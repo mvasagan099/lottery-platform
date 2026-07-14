@@ -34,6 +34,7 @@ export interface User {
   createdAt: string
   lastLoginAt?: string
   wallet?: WalletSummary
+  roles?: any[]
 }
 
 export interface AuthState {
@@ -281,6 +282,7 @@ export interface Banner {
   imageUrl: string
   mobileUrl?: string
   linkUrl?: string
+  backgroundColor?: string
   position: string
   isActive: boolean
   sortOrder: number

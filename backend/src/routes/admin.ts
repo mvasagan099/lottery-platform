@@ -9,6 +9,7 @@ import { z } from 'zod'
 import { prisma } from '../server'
 import { authenticate, requireAdmin, auditLog } from '../middleware/auth'
 import cmsRoutes from './cms'
+import adminSupportRoutes from './adminSupport'
 
 export default async function adminRoutes(app: FastifyInstance) {
 
@@ -18,6 +19,7 @@ export default async function adminRoutes(app: FastifyInstance) {
 
   // Register Sub-routers
   app.register(cmsRoutes, { prefix: '/cms' })
+  app.register(adminSupportRoutes, { prefix: '/support' })
 
   // ── Dashboard Stats ───────────────────────────────────────────────────────
 
@@ -100,6 +102,7 @@ export default async function adminRoutes(app: FastifyInstance) {
           createdAt: true,
           lastLoginAt: true,
           wallet: { select: { balance: true, totalDeposited: true } },
+          roles: { include: { role: { select: { name: true } } } },
         },
       }),
       prisma.user.count({ where }),
@@ -133,6 +136,9 @@ export default async function adminRoutes(app: FastifyInstance) {
           where: { isActive: true },
           select: { id: true, ipAddress: true, lastUsedAt: true, userAgent: true },
         },
+        roles: {
+          include: { role: true }
+        }
       },
     })
 
@@ -141,6 +147,7 @@ export default async function adminRoutes(app: FastifyInstance) {
     const { passwordHash, twoFactorSecret, ...safeUser } = user
     return reply.send({ success: true, data: safeUser })
   })
+
 
   app.patch('/users/:id/status', async (request, reply) => {
     const { id } = request.params as { id: string }

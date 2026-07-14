@@ -6,6 +6,7 @@ import Header from '@/components/Layout/Header'
 import Footer from '@/components/Layout/Footer'
 import ProtectedRoute from '@/components/Layout/ProtectedRoute'
 import AdminRoute from '@/components/Layout/AdminRoute'
+import MaintenanceGuard from '@/components/Layout/MaintenanceGuard'
 import Spinner from '@/components/UI/Spinner'
 
 // ── Lazy-loaded pages ─────────────────────────────────────────────────────────
@@ -86,8 +87,9 @@ export default function App() {
   return (
     <div className="app-root">
       <Header />
-      <Suspense fallback={<PageLoader />}>
-        <Routes>
+      <MaintenanceGuard>
+        <Suspense fallback={<PageLoader />}>
+          <Routes>
           {/* Public */}
           <Route path="/" element={<HomePage />} />
           <Route path="/games" element={<GamesPage />} />
@@ -140,13 +142,14 @@ export default function App() {
             <Route path="/admin/cms" element={<AdminCmsPage />} />
             <Route path="/admin/support" element={<AdminSupportPage />} />
             <Route path="/admin/audit" element={<AdminAuditPage />} />
-            <Route path="/admin/settings" element={<AdminSettingsPage />} />
+            <Route path="/admin/settings/*" element={<AdminSettingsPage />} />
             <Route path="/admin/affiliates" element={<AdminAffiliatesPage />} />
           </Route>
 
           <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </Suspense>
+          </Routes>
+        </Suspense>
+      </MaintenanceGuard>
       <Footer />
     </div>
   )

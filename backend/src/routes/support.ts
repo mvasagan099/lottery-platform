@@ -65,17 +65,23 @@ export default async function supportRoutes(app: FastifyInstance) {
   // POST /support/tickets - Submit a support ticket
   app.post('/tickets', {
     preHandler: authenticate,
-    config: { rateLimit: { max: 5, timeWindow: '1 hour' } },
+    config: { rateLimit: { max: 50, timeWindow: '1 hour' } },
   }, async (request, reply) => {
     const body = createTicketSchema.parse(request.body)
     const userId = request.user.userId
 
     const ticket = await prisma.$transaction(async (tx) => {
+      // Find or create the category
+      let categoryRecord = await tx.ticketCategoryModel.findUnique({ where: { name: body.category } });
+      if (!categoryRecord) {
+        categoryRecord = await tx.ticketCategoryModel.create({ data: { name: body.category } });
+      }
+
       const t = await tx.supportTicket.create({
         data: {
           userId,
           subject: body.subject,
-          category: body.category,
+          categoryId: categoryRecord.id,
           priority: body.priority,
         },
       })
@@ -166,7 +172,7 @@ export default async function supportRoutes(app: FastifyInstance) {
       // Notify user
       await prisma.notification.create({
         data: {
-          userId: ticket.userId,
+          userId: ticket.userId!,
           title: 'Support reply received',
           message: `Your support ticket "${ticket.subject}" has been updated.`,
           data: { ticketId: id },

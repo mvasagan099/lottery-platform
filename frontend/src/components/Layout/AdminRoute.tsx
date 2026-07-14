@@ -5,8 +5,11 @@ import AdminSidebar from './AdminSidebar'
 export default function AdminRoute() {
   const { isAuthenticated, user } = useAuthStore()
 
+  const hasLegacyRole = user && ['SUPER_ADMIN', 'ADMIN', 'SUPPORT', 'AFFILIATE_MANAGER'].includes(user.role);
+  const hasCustomRole = user?.roles && user.roles.length > 0;
+
   if (!isAuthenticated) return <Navigate to="/login" replace />
-  if (!user || !['SUPER_ADMIN', 'ADMIN', 'SUPPORT', 'AFFILIATE_MANAGER'].includes(user.role)) {
+  if (!user || (!hasLegacyRole && !hasCustomRole)) {
     return <Navigate to="/" replace />
   }
 

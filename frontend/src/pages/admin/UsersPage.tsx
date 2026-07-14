@@ -120,6 +120,17 @@ export default function UsersPage() {
     {
       accessorKey: 'role',
       header: 'Role',
+      cell: (info: any) => {
+        const user = info.row.original;
+        if (user.roles && user.roles.length > 0) {
+          return (
+            <span style={{ fontWeight: 600, color: 'var(--color-primary)' }}>
+              {user.roles.map((r: any) => r.role?.name).join(', ')}
+            </span>
+          );
+        }
+        return <span>{info.getValue()}</span>;
+      }
     },
     {
       accessorKey: 'status',

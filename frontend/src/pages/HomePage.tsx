@@ -57,7 +57,15 @@ export default function HomePage() {
     <div className="page-wrapper">
 
       {/* ── Hero ─────────────────────────────────────────────────── */}
-      <section className="hero" style={heroBanner?.imageUrl ? { backgroundImage: `url(${heroBanner.imageUrl})`, backgroundSize: 'cover', backgroundPosition: 'center', backgroundBlendMode: 'overlay', backgroundColor: 'rgba(0,0,0,0.6)' } : {}}>
+      <section className="hero" style={{
+        ...(heroBanner?.imageUrl ? { 
+          backgroundImage: `url(${heroBanner.imageUrl})`, 
+          backgroundSize: 'cover', 
+          backgroundPosition: 'center', 
+          backgroundBlendMode: 'overlay', 
+          backgroundColor: heroBanner?.backgroundColor || 'rgba(0,0,0,0.6)' 
+        } : heroBanner?.backgroundColor ? { backgroundColor: heroBanner.backgroundColor } : {})
+      }}>
         <div className="container">
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '48px', alignItems: 'center' }}>
             <div className="hero-content animate-fade-in-up">

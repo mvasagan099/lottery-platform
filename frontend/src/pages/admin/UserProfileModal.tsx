@@ -5,6 +5,9 @@ import { X, ShieldAlert, CheckCircle, Ban, AlertTriangle, Key, DollarSign, Histo
 import dayjs from 'dayjs'
 import relativeTime from 'dayjs/plugin/relativeTime'
 import toast from 'react-hot-toast'
+import { useRoles } from '../../hooks/useRBAC'
+import { useAuthStore } from '../../store/authStore'
+import { hasPermission } from '../../utils/rbac'
 
 dayjs.extend(relativeTime)
 
@@ -17,6 +20,8 @@ export function UserProfileModal({ userId, onClose }: Props) {
   const queryClient = useQueryClient()
   const [activeTab, setActiveTab] = useState<'INFO' | 'WALLET' | 'SECURITY' | 'KYC'>('INFO')
   const [viewerDoc, setViewerDoc] = useState<string | null>(null)
+  const { data: roles } = useRoles()
+  const { user: currentUser } = useAuthStore()
 
   const { data: user, isLoading } = useQuery({
     queryKey: ['admin', 'users', userId],
@@ -189,6 +194,65 @@ export function UserProfileModal({ userId, onClose }: Props) {
                     ))}
                     {(!user?.sessions || user.sessions.length === 0) && <p style={{ color: 'var(--text-secondary)' }}>No active sessions.</p>}
                   </div>
+
+                  {hasPermission(currentUser, 'Users', 'Assign') && (
+                    <>
+                      <h3 style={{ marginTop: '32px' }}>Role Assignment (RBAC)</h3>
+                      {user?.roles && user.roles.length > 0 && (
+                        <div style={{ marginBottom: '16px', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <span style={{ color: 'var(--text-secondary)' }}>Currently Assigned:</span>{' '}
+                          <span style={{ fontWeight: 600, color: 'var(--color-primary)' }}>
+                            {user.roles.map((r: any) => r.role?.name).join(', ')}
+                          </span>
+                          <button
+                            className="btn btn-outline"
+                            style={{ padding: '2px 8px', fontSize: '0.75rem', marginLeft: '8px', border: '1px solid var(--danger-color)', color: 'var(--danger-color)' }}
+                            onClick={async () => {
+                              try {
+                                const roleId = user.roles[0].roleId;
+                                await api.delete(`/rbac/users/${userId}/roles/${roleId}`);
+                                toast.success('Role removed');
+                                queryClient.invalidateQueries({ queryKey: ['admin', 'users', userId] });
+                              } catch (err) {
+                                toast.error('Failed to remove role');
+                              }
+                            }}
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      )}
+                      <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '16px' }}>
+                        <select 
+                          id="roleSelect" 
+                          className="input" 
+                          defaultValue={user?.roles?.[0]?.roleId || ''}
+                          style={{ flex: 1, padding: '8px 12px', borderRadius: '6px', border: '1px solid var(--border-color)', background: 'var(--bg-primary)', color: 'var(--text-primary)' }}
+                        >
+                          <option value="">Select a custom role...</option>
+                          {roles?.map(r => (
+                            <option key={r.id} value={r.id}>{r.name} ({r.department || 'General'})</option>
+                          ))}
+                        </select>
+                        <button 
+                          className="btn btn-primary" 
+                          onClick={async () => {
+                            const roleId = (document.getElementById('roleSelect') as HTMLSelectElement).value;
+                            if (!roleId) return toast.error('Please select a role');
+                            try {
+                              await api.post(`/rbac/users/${userId}/roles`, { roleId });
+                              toast.success('Role assigned successfully!');
+                              queryClient.invalidateQueries({ queryKey: ['admin', 'users', userId] })
+                            } catch (err: any) {
+                              toast.error('Failed to assign role');
+                            }
+                          }}
+                        >
+                          Assign Role
+                        </button>
+                      </div>
+                    </>
+                  )}
                 </div>
               )}
 

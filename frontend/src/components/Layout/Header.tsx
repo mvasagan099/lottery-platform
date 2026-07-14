@@ -7,7 +7,7 @@ import { notificationsService } from '@/services/index'
 import { useQuery } from '@tanstack/react-query'
 import {
   Sun, Moon, Bell, Wallet, LogOut, User, ChevronDown,
-  Trophy, Ticket, Settings, Menu, X, LayoutDashboard, Zap
+  Trophy, Ticket, Settings, Menu, X, LayoutDashboard, Zap, MessageCircle
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 
@@ -148,7 +148,8 @@ export default function Header() {
                         { icon: <User size={15} />, label: 'Profile', href: '/profile' },
                         { icon: <Ticket size={15} />, label: 'My Tickets', href: '/tickets' },
                         { icon: <Trophy size={15} />, label: 'Affiliate', href: '/affiliate' },
-                        ...(user?.role !== 'USER' ? [{ icon: <LayoutDashboard size={15} />, label: 'Admin Panel', href: '/admin' }] : []),
+                        { icon: <MessageCircle size={15} />, label: 'Support', href: '/support' },
+                        ...(user?.role !== 'USER' || (user?.roles && user.roles.length > 0) ? [{ icon: <LayoutDashboard size={15} />, label: 'Admin Panel', href: '/admin' }] : []),
                         { icon: <Settings size={15} />, label: 'Settings', href: '/profile/security' },
                       ].map((item) => (
                         <Link

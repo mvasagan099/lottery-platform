@@ -18,6 +18,7 @@ export function BannerEditorDrawer({ bannerId, onClose }: Props) {
     imageUrl: '',
     mobileUrl: '',
     linkUrl: '',
+    backgroundColor: '',
     position: 'HOME',
     isActive: true,
     sortOrder: 0,
@@ -44,6 +45,7 @@ export function BannerEditorDrawer({ bannerId, onClose }: Props) {
         imageUrl: data.imageUrl || '',
         mobileUrl: data.mobileUrl || '',
         linkUrl: data.linkUrl || '',
+        backgroundColor: data.backgroundColor || '',
         position: data.position,
         isActive: data.isActive,
         sortOrder: data.sortOrder,
@@ -140,9 +142,13 @@ export function BannerEditorDrawer({ bannerId, onClose }: Props) {
                   <label className="form-label">Mobile Image URL (Optional)</label>
                   <input type="text" className="form-input" placeholder="https://cdn.example.com/mobile.jpg" value={formData.mobileUrl} onChange={e => setFormData(p => ({...p, mobileUrl: e.target.value}))} />
                 </div>
+                <div className="form-group">
+                  <label className="form-label">Background Color (Fallback)</label>
+                  <input type="color" className="form-input" style={{ padding: '0', height: '44px' }} value={formData.backgroundColor || '#000000'} onChange={e => setFormData(p => ({...p, backgroundColor: e.target.value}))} />
+                </div>
                 
                 {formData.imageUrl && (
-                  <div style={{ marginTop: '8px', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', overflow: 'hidden', backgroundColor: 'var(--bg-overlay)', padding: '16px', display: 'flex', justifyContent: 'center' }}>
+                  <div style={{ marginTop: '8px', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', overflow: 'hidden', backgroundColor: formData.backgroundColor || 'var(--bg-overlay)', padding: '16px', display: 'flex', justifyContent: 'center' }}>
                     <img src={formData.imageUrl} alt="Preview" style={{ maxWidth: '100%', maxHeight: '150px', objectFit: 'contain' }} onError={(e) => (e.currentTarget.style.display = 'none')} />
                   </div>
                 )}

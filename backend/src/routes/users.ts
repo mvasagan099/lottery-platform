@@ -18,6 +18,15 @@ export default async function userRoutes(app: FastifyInstance) {
         address: true, postcode: true, createdAt: true, lastLoginAt: true,
         wallet: { select: { balance: true, bonusBalance: true, pendingBalance: true } },
         notificationPrefs: true,
+        roles: { 
+          include: { 
+            role: { 
+              include: { 
+                permissions: { include: { permission: true } } 
+              } 
+            } 
+          } 
+        },
       },
     })
     if (!user) return reply.status(404).send({ success: false, error: 'User not found' })

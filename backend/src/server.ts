@@ -12,6 +12,7 @@ import helmet from '@fastify/helmet'
 import rateLimit from '@fastify/rate-limit'
 import jwt from '@fastify/jwt'
 import multipart from '@fastify/multipart'
+import websocket from '@fastify/websocket'
 import swagger from '@fastify/swagger'
 import swaggerUi from '@fastify/swagger-ui'
 import { PrismaClient } from '@prisma/client'
@@ -31,6 +32,8 @@ import supportRoutes from './routes/support'
 import publicCmsRoutes from './routes/publicCms'
 import reportRoutes from './routes/reports'
 import paymentRoutes from './routes/payments'
+import settingsRoutes from './routes/settings'
+import rbacRoutes from './routes/rbac'
 
 // Initialize Prisma
 export const prisma = new PrismaClient({
@@ -89,6 +92,9 @@ async function buildApp() {
     limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
   })
 
+  // ── WebSockets ────────────────────────────────────────
+  await app.register(websocket)
+
   // ── API Documentation ────────────────────────────────
   await app.register(swagger, {
     openapi: {
@@ -141,6 +147,8 @@ async function buildApp() {
   await app.register(publicCmsRoutes, { prefix: '/cms' })
   await app.register(reportRoutes, { prefix: '/reports' })
   await app.register(paymentRoutes, { prefix: '/payments' })
+  await app.register(settingsRoutes, { prefix: '/settings' })
+  await app.register(rbacRoutes, { prefix: '/rbac' })
 
   // ── Global error handler ──────────────────────────────
   app.setErrorHandler(async (error, request, reply) => {

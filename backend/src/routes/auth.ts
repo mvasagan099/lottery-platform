@@ -183,7 +183,18 @@ export default async function authRoutes(app: FastifyInstance) {
 
     const user = await prisma.user.findUnique({
       where: { email: body.email },
-      include: { wallet: { select: { balance: true, bonusBalance: true } } },
+      include: { 
+        wallet: { select: { balance: true, bonusBalance: true } },
+        roles: { 
+          include: { 
+            role: { 
+              include: { 
+                permissions: { include: { permission: true } } 
+              } 
+            } 
+          } 
+        }
+      },
     })
 
     if (!user) {
@@ -283,6 +294,7 @@ export default async function authRoutes(app: FastifyInstance) {
           twoFactorEnabled: user.twoFactorEnabled,
           kycStatus: user.kycStatus,
           wallet: user.wallet,
+          roles: user.roles,
         },
       },
     })
