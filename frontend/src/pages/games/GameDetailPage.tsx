@@ -15,7 +15,7 @@ export default function GameDetailPage() {
   const navigate = useNavigate()
   const { isAuthenticated } = useAuthStore()
 
-  const [lines, setLines] = useState<number[][]>([[]])
+  const [lines, setLines] = useState<{ numbers: number[], powerball?: number }[]>([{ numbers: [] }])
   const [activeLine, setActiveLine] = useState(0)
   const [numDraws, setNumDraws] = useState(1)
   const [activeTab, setActiveTab] = useState<'play' | 'prizes' | 'how'>('play')
@@ -31,7 +31,7 @@ export default function GameDetailPage() {
     mutationFn: (numLines: number) => gamesService.quickPick(game!.id, numLines),
     onSuccess: (r) => {
       const picked = r.data?.data || []
-      setLines(picked.map((p: any) => p.numbers))
+      setLines(picked.map((p: any) => ({ numbers: p.numbers, powerball: p.powerball })))
       toast.success(`${picked.length} line(s) quick-picked!`)
     },
   })
@@ -39,7 +39,7 @@ export default function GameDetailPage() {
   const purchaseMutation = useMutation({
     mutationFn: () => gamesService.purchase({
       gameId: game!.id,
-      lines: lines.map((nums) => ({ numbers: nums })),
+      lines: lines.map((l) => ({ numbers: l.numbers, powerball: l.powerball })),
       isQuickPick: false,
       draws: numDraws,
     }),
@@ -52,23 +52,35 @@ export default function GameDetailPage() {
     },
   })
 
-  const toggleNumber = (lineIdx: number, num: number) => {
+  const toggleNumber = (lineIdx: number, num: number, isPowerball = false) => {
     if (!game) return
     setLines((prev) => {
       const updated = [...prev]
-      const current = [...(updated[lineIdx] || [])]
-      if (current.includes(num)) {
-        updated[lineIdx] = current.filter((n) => n !== num)
-      } else if (current.length < game.minNumbers) {
-        updated[lineIdx] = [...current, num].sort((a, b) => a - b)
+      const currentLine = { ...updated[lineIdx] }
+      
+      if (isPowerball) {
+        if (currentLine.powerball === num) {
+          delete currentLine.powerball
+        } else {
+          currentLine.powerball = num
+        }
+      } else {
+        const currentNums = [...(currentLine.numbers || [])]
+        if (currentNums.includes(num)) {
+          currentLine.numbers = currentNums.filter((n) => n !== num)
+        } else if (currentNums.length < game.minNumbers) {
+          currentLine.numbers = [...currentNums, num].sort((a, b) => a - b)
+        }
       }
+      
+      updated[lineIdx] = currentLine
       return updated
     })
   }
 
   const addLine = () => {
     if (lines.length >= 10) { toast.error('Maximum 10 lines per ticket'); return }
-    setLines((prev) => [...prev, []])
+    setLines((prev) => [...prev, { numbers: [] }])
     setActiveLine(lines.length)
   }
 
@@ -79,7 +91,7 @@ export default function GameDetailPage() {
   }
 
   const totalCost = game ? lines.length * game.ticketPrice * numDraws : 0
-  const currentLineComplete = game && (lines[activeLine]?.length ?? 0) >= game.minNumbers
+  const currentLineComplete = game && (lines[activeLine]?.numbers.length ?? 0) >= game.minNumbers && (!game.hasPowerball || !!lines[activeLine]?.powerball)
 
   if (isLoading) return (
     <div className="page-wrapper" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '70vh' }}>
@@ -169,7 +181,7 @@ export default function GameDetailPage() {
                     onClick={() => setActiveLine(i)}
                   >
                     Line {i + 1}
-                    {line.length >= (game.minNumbers || 0) && <span style={{ color: '#10b981', marginLeft: '4px' }}>✓</span>}
+                    {line.numbers.length >= (game.minNumbers || 0) && (!game.hasPowerball || line.powerball) && <span style={{ color: '#10b981', marginLeft: '4px' }}>✓</span>}
                     {lines.length > 1 && (
                       <span
                         style={{ marginLeft: '6px', color: 'var(--text-muted)', fontWeight: 400 }}
@@ -195,23 +207,56 @@ export default function GameDetailPage() {
                 {/* Number Grid */}
                 <div style={{ marginBottom: '16px' }}>
                   <div style={{ fontSize: '12px', fontWeight: 700, letterSpacing: '0.05em', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '8px' }}>
-                    Main Numbers ({lines[activeLine]?.length ?? 0}/{game.minNumbers})
+                    Main Numbers ({lines[activeLine]?.numbers.length ?? 0}/{game.minNumbers})
                   </div>
-                  <div className="number-grid">
-                    {Array.from({ length: game.numberPool }, (_, i) => i + 1).map((num) => {
-                      const selected = lines[activeLine]?.includes(num)
-                      const maxReached = !selected && (lines[activeLine]?.length ?? 0) >= game.minNumbers
-                      return (
-                        <NumberBall
-                          key={num}
-                          number={num}
-                          variant={selected ? 'selected' : maxReached ? 'disabled' : 'default'}
-                          size="sm"
-                          onClick={maxReached ? undefined : () => toggleNumber(activeLine, num)}
-                        />
-                      )
-                    })}
-                  </div>
+                  {game.numberPool > 100 ? (
+                    <div style={{ padding: '20px', background: 'var(--bg-secondary)', borderRadius: '12px' }}>
+                      <input 
+                        type="number" 
+                        className="form-control" 
+                        placeholder={`Enter a number (1 - ${game.numberPool})`}
+                        value={lines[activeLine]?.numbers[0] || ''}
+                        min={1}
+                        max={game.numberPool}
+                        onChange={(e) => {
+                          const val = parseInt(e.target.value);
+                          if (!isNaN(val) && val >= 1 && val <= game.numberPool) {
+                            setLines(prev => {
+                              const updated = [...prev];
+                              updated[activeLine] = { ...updated[activeLine], numbers: [val] };
+                              return updated;
+                            });
+                          } else if (e.target.value === '') {
+                            setLines(prev => {
+                              const updated = [...prev];
+                              updated[activeLine] = { ...updated[activeLine], numbers: [] };
+                              return updated;
+                            });
+                          }
+                        }}
+                        style={{ width: '100%', padding: '12px', fontSize: '16px', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-primary)', color: 'var(--text-primary)' }}
+                      />
+                      <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '8px' }}>
+                        Type your ticket number or use Quick Pick.
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="number-grid">
+                      {Array.from({ length: game.numberPool }, (_, i) => i + 1).map((num) => {
+                        const selected = lines[activeLine]?.numbers.includes(num)
+                        const maxReached = !selected && (lines[activeLine]?.numbers.length ?? 0) >= game.minNumbers
+                        return (
+                          <NumberBall
+                            key={num}
+                            number={num}
+                            variant={selected ? 'selected' : maxReached ? 'disabled' : 'default'}
+                            size="sm"
+                            onClick={maxReached ? undefined : () => toggleNumber(activeLine, num)}
+                          />
+                        )
+                      })}
+                    </div>
+                  )}
                 </div>
 
                 {/* Powerball picker */}
@@ -220,9 +265,15 @@ export default function GameDetailPage() {
                     <div style={{ fontSize: '12px', fontWeight: 700, letterSpacing: '0.05em', color: '#ef4444', textTransform: 'uppercase', marginBottom: '8px' }}>
                       Powerball (1–{game.powerballPool})
                     </div>
-                    <div className="number-grid" style={{ gridTemplateColumns: `repeat(${game.powerballPool}, minmax(36px, 1fr))` }}>
+                    <div className="number-grid">
                       {Array.from({ length: game.powerballPool || 20 }, (_, i) => i + 1).map((num) => (
-                        <NumberBall key={num} number={num} variant="powerball" size="sm" />
+                        <NumberBall
+                          key={num}
+                          number={num}
+                          variant={lines[activeLine]?.powerball === num ? 'selected' : 'powerball'}
+                          size="sm"
+                          onClick={() => toggleNumber(activeLine, num, true)}
+                        />
                       ))}
                     </div>
                   </div>
@@ -245,9 +296,14 @@ export default function GameDetailPage() {
                   }} onClick={() => setActiveLine(i)}>
                     <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '6px' }}>Line {i + 1}</div>
                     <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
-                      {line.length > 0 ? line.map((n) => (
-                        <div key={n} className="number-ball sm selected">{n}</div>
-                      )) : (
+                      {line.numbers.length > 0 || line.powerball ? (
+                        <>
+                          {line.numbers.map((n) => (
+                            <div key={n} className="number-ball sm selected">{n}</div>
+                          ))}
+                          {line.powerball && <div className="number-ball sm" style={{ background: '#ef4444', color: 'white', borderColor: '#ef4444' }}>{line.powerball}</div>}
+                        </>
+                      ) : (
                         <span style={{ fontSize: '12px', color: 'var(--text-muted)', fontStyle: 'italic' }}>No numbers selected</span>
                       )}
                     </div>
@@ -284,7 +340,7 @@ export default function GameDetailPage() {
                 <button
                   className="btn btn-gold btn-lg btn-full"
                   onClick={() => purchaseMutation.mutate()}
-                  disabled={purchaseMutation.isPending || lines.every((l) => l.length < (game.minNumbers || 0))}
+                  disabled={purchaseMutation.isPending || lines.every((l) => l.numbers.length < (game.minNumbers || 0))}
                 >
                   {purchaseMutation.isPending ? (
                     <><div className="btn-spinner" /> Processing...</>

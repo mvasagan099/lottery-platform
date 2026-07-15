@@ -8,6 +8,7 @@ import ProtectedRoute from '@/components/Layout/ProtectedRoute'
 import AdminRoute from '@/components/Layout/AdminRoute'
 import MaintenanceGuard from '@/components/Layout/MaintenanceGuard'
 import Spinner from '@/components/UI/Spinner'
+import { GlobalErrorBoundary } from '@/components/GlobalErrorBoundary'
 
 // ── Lazy-loaded pages ─────────────────────────────────────────────────────────
 const HomePage = lazy(() => import('@/pages/HomePage'))
@@ -88,67 +89,69 @@ export default function App() {
     <div className="app-root">
       <Header />
       <MaintenanceGuard>
-        <Suspense fallback={<PageLoader />}>
-          <Routes>
-          {/* Public */}
-          <Route path="/" element={<HomePage />} />
-          <Route path="/games" element={<GamesPage />} />
-          <Route path="/games/:slug" element={<GameDetailPage />} />
-          <Route path="/results" element={<ResultsPage />} />
-          <Route path="/jackpots" element={<JackpotsPage />} />
-          <Route path="/promotions" element={<PromotionsPage />} />
+        <GlobalErrorBoundary>
+          <Suspense fallback={<PageLoader />}>
+            <Routes>
+            {/* Public */}
+            <Route path="/" element={<HomePage />} />
+            <Route path="/games" element={<GamesPage />} />
+            <Route path="/games/:slug" element={<GameDetailPage />} />
+            <Route path="/results" element={<ResultsPage />} />
+            <Route path="/jackpots" element={<JackpotsPage />} />
+            <Route path="/promotions" element={<PromotionsPage />} />
 
-          {/* Auth */}
-          <Route path="/login" element={<LoginPage />} />
-          <Route path="/register" element={<RegisterPage />} />
-          <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-          <Route path="/reset-password" element={<ResetPasswordPage />} />
-          <Route path="/verify-email" element={<VerifyEmailPage />} />
+            {/* Auth */}
+            <Route path="/login" element={<LoginPage />} />
+            <Route path="/register" element={<RegisterPage />} />
+            <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+            <Route path="/reset-password" element={<ResetPasswordPage />} />
+            <Route path="/verify-email" element={<VerifyEmailPage />} />
 
-          {/* CMS */}
-          <Route path="/faq" element={<FAQPage />} />
-          <Route path="/contact" element={<ContactPage />} />
-          <Route path="/terms" element={<TermsPage />} />
-          <Route path="/privacy" element={<PrivacyPage />} />
-          <Route path="/responsible-gaming" element={<ResponsibleGamingPage />} />
+            {/* CMS */}
+            <Route path="/faq" element={<FAQPage />} />
+            <Route path="/contact" element={<ContactPage />} />
+            <Route path="/terms" element={<TermsPage />} />
+            <Route path="/privacy" element={<PrivacyPage />} />
+            <Route path="/responsible-gaming" element={<ResponsibleGamingPage />} />
 
-          {/* Protected - User */}
-          <Route element={<ProtectedRoute />}>
-            <Route path="/wallet" element={<WalletDashboard />} />
-            <Route path="/wallet/deposit" element={<DepositPage />} />
-            <Route path="/wallet/withdraw" element={<WithdrawPage />} />
-            <Route path="/wallet/transactions" element={<TransactionHistoryPage />} />
-            <Route path="/tickets" element={<MyTicketsPage />} />
-            <Route path="/tickets/:id" element={<TicketDetailPage />} />
-            <Route path="/profile" element={<ProfilePage />} />
-            <Route path="/profile/security" element={<SecurityPage />} />
-            <Route path="/profile/kyc" element={<KYCPage />} />
-            <Route path="/profile/notifications" element={<NotificationSettingsPage />} />
-            <Route path="/notifications" element={<NotificationsPage />} />
-            <Route path="/affiliate" element={<AffiliateDashboard />} />
-            <Route path="/support" element={<SupportPage />} />
-          </Route>
+            {/* Protected - User */}
+            <Route element={<ProtectedRoute />}>
+              <Route path="/wallet" element={<WalletDashboard />} />
+              <Route path="/wallet/deposit" element={<DepositPage />} />
+              <Route path="/wallet/withdraw" element={<WithdrawPage />} />
+              <Route path="/wallet/transactions" element={<TransactionHistoryPage />} />
+              <Route path="/tickets" element={<MyTicketsPage />} />
+              <Route path="/tickets/:id" element={<TicketDetailPage />} />
+              <Route path="/profile" element={<ProfilePage />} />
+              <Route path="/profile/security" element={<SecurityPage />} />
+              <Route path="/profile/kyc" element={<KYCPage />} />
+              <Route path="/profile/notifications" element={<NotificationSettingsPage />} />
+              <Route path="/notifications" element={<NotificationsPage />} />
+              <Route path="/affiliate" element={<AffiliateDashboard />} />
+              <Route path="/support" element={<SupportPage />} />
+            </Route>
 
-          {/* Protected - Admin */}
-          <Route element={<AdminRoute />}>
-            <Route path="/admin" element={<AdminDashboard />} />
-            <Route path="/admin/users" element={<AdminUsersPage />} />
-            <Route path="/admin/kyc" element={<AdminKYCPage />} />
-            <Route path="/admin/draws" element={<AdminDrawsPage />} />
-            <Route path="/admin/games" element={<AdminGamesPage />} />
-            <Route path="/admin/wallet" element={<AdminWalletPage />} />
-            <Route path="/admin/withdrawals" element={<AdminWithdrawalsPage />} />
-            <Route path="/admin/reports" element={<AdminReportsPage />} />
-            <Route path="/admin/cms" element={<AdminCmsPage />} />
-            <Route path="/admin/support" element={<AdminSupportPage />} />
-            <Route path="/admin/audit" element={<AdminAuditPage />} />
-            <Route path="/admin/settings/*" element={<AdminSettingsPage />} />
-            <Route path="/admin/affiliates" element={<AdminAffiliatesPage />} />
-          </Route>
+            {/* Protected - Admin */}
+            <Route element={<AdminRoute />}>
+              <Route path="/admin" element={<AdminDashboard />} />
+              <Route path="/admin/users" element={<AdminUsersPage />} />
+              <Route path="/admin/kyc" element={<AdminKYCPage />} />
+              <Route path="/admin/draws" element={<AdminDrawsPage />} />
+              <Route path="/admin/games" element={<AdminGamesPage />} />
+              <Route path="/admin/wallet" element={<AdminWalletPage />} />
+              <Route path="/admin/withdrawals" element={<AdminWithdrawalsPage />} />
+              <Route path="/admin/reports" element={<AdminReportsPage />} />
+              <Route path="/admin/cms" element={<AdminCmsPage />} />
+              <Route path="/admin/support" element={<AdminSupportPage />} />
+              <Route path="/admin/audit" element={<AdminAuditPage />} />
+              <Route path="/admin/settings/*" element={<AdminSettingsPage />} />
+              <Route path="/admin/affiliates" element={<AdminAffiliatesPage />} />
+            </Route>
 
-          <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
-        </Suspense>
+            <Route path="*" element={<Navigate to="/" replace />} />
+            </Routes>
+          </Suspense>
+        </GlobalErrorBoundary>
       </MaintenanceGuard>
       <Footer />
     </div>
