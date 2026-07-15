@@ -35,6 +35,8 @@ import paymentRoutes from './routes/payments'
 import settingsRoutes from './routes/settings'
 import rbacRoutes from './routes/rbac'
 
+import { initCronJobs } from './jobs/cron'
+
 // Initialize Prisma
 export const prisma = new PrismaClient({
   log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error'],
@@ -193,6 +195,11 @@ async function start() {
   } catch (err) {
     app.log.error(err)
     process.exit(1)
+  }
+
+  // ── Initialize Background Jobs ──────────────────────
+  if (process.env.NODE_ENV !== 'test') {
+    initCronJobs()
   }
 
   // Graceful shutdown

@@ -4,6 +4,7 @@ import { useAuthStore } from '@/store/authStore'
 import { useThemeStore } from '@/store/themeStore'
 import { authService } from '@/services/auth.service'
 import { notificationsService } from '@/services/index'
+import { walletService } from '@/services/wallet.service'
 import { useQuery } from '@tanstack/react-query'
 import {
   Sun, Moon, Bell, Wallet, LogOut, User, ChevronDown,
@@ -27,6 +28,13 @@ export default function Header() {
     enabled: isAuthenticated,
     refetchInterval: 30000,
     select: (r) => r.data?.data?.count ?? 0,
+  })
+
+  const { data: walletData } = useQuery({
+    queryKey: ['wallet'],
+    queryFn: () => walletService.get(),
+    enabled: isAuthenticated,
+    select: (r) => r.data?.data,
   })
 
   useEffect(() => {
@@ -58,7 +66,7 @@ export default function Header() {
     { href: '/promotions', label: 'Promotions' },
   ]
 
-  const balance = (user?.wallet?.balance ?? 0)
+  const balance = (walletData?.balance ?? user?.wallet?.balance ?? 0)
 
   return (
     <>

@@ -788,12 +788,91 @@ export default async function adminRoutes(app: FastifyInstance) {
   app.patch('/draws/:id/publish', async (request, reply) => {
     const { id } = request.params as { id: string }
     
-    const draw = await prisma.draw.update({
+    // 1. Fetch draw with tickets
+    const draw = await prisma.draw.findUnique({
       where: { id },
-      data: {
-        publishedAt: new Date()
+      include: {
+        game: {
+          include: { prizeDivisions: { orderBy: { divisionOrder: 'asc' } } }
+        },
+        tickets: {
+          include: { numbers: true }
+        }
       }
-    })
+    });
+
+    if (!draw) return reply.status(404).send({ success: false, error: 'Draw not found' });
+    if (draw.publishedAt) return reply.status(400).send({ success: false, error: 'Already published' });
+
+    // 2. Process tickets
+    const winningNums = draw.winningNumbers as number[] || [];
+    const pb = draw.powerball;
+
+    for (const ticket of draw.tickets) {
+      if (ticket.status !== 'ACTIVE') continue;
+
+      let bestDivision: any = null;
+      let bestPrize = 0;
+
+      for (const line of ticket.numbers) {
+        const nums = line.numbers as number[];
+        const matched = nums.filter(n => winningNums.includes(n)).length;
+        const pbMatched = pb && line.powerball === pb;
+
+        for (const div of draw.game.prizeDivisions) {
+          const numMatch = div.matchNumbers === matched;
+          const pbMatch = !div.matchPB || pbMatched;
+
+          if (numMatch && pbMatch) {
+            const prizeAmt = Number(div.fixedPrize || draw.jackpotAmount);
+            if (prizeAmt > bestPrize) {
+              bestPrize = prizeAmt;
+              bestDivision = div;
+            }
+            break;
+          }
+        }
+      }
+
+      if (bestDivision && bestPrize > 0) {
+        await prisma.ticket.update({
+          where: { id: ticket.id },
+          data: { status: 'WON', prizeAmount: bestPrize, prizeDivision: bestDivision.divisionName }
+        });
+
+        const wallet = await prisma.wallet.findUnique({ where: { userId: ticket.userId } });
+        if (wallet) {
+          await prisma.wallet.update({
+            where: { id: wallet.id },
+            data: { balance: { increment: bestPrize }, totalWon: { increment: bestPrize } }
+          });
+          await prisma.transaction.create({
+            data: {
+              userId: ticket.userId,
+              walletId: wallet.id,
+              type: 'PRIZE_CREDIT',
+              amount: bestPrize,
+              balanceBefore: wallet.balance,
+              balanceAfter: Number(wallet.balance) + bestPrize,
+              reference: 'admin-pub-' + draw.id + '-' + ticket.id,
+              description: 'Winnings from Draw #' + draw.drawNumber,
+              status: 'COMPLETED'
+            }
+          });
+        }
+      } else {
+        await prisma.ticket.update({
+          where: { id: ticket.id },
+          data: { status: 'LOST' }
+        });
+      }
+    }
+
+    // 3. Mark as published
+    const updatedDraw = await prisma.draw.update({
+      where: { id },
+      data: { publishedAt: new Date() }
+    });
 
     await auditLog(request.user.userId, 'DRAW_PUBLISHED', 'Draw', id, undefined, {}, request)
     return reply.send({ success: true, message: 'Draw results published securely' })

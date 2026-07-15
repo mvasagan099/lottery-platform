@@ -365,60 +365,107 @@ export default async function walletRoutes(app: FastifyInstance) {
 
     const codeUpper = body.code.trim().toUpperCase()
 
-    // Needs to use raw query because Prisma Client might not have Coupon types generated locally due to EPERM
-    const coupons: any[] = await prisma.$queryRaw`SELECT * FROM "coupons" WHERE "code" = ${codeUpper} LIMIT 1`
-    const coupon = coupons[0]
-
-    if (!coupon) {
-      return reply.status(404).send({ success: false, error: 'Invalid coupon code' })
-    }
-    if (coupon.isUsed) {
-      return reply.status(400).send({ success: false, error: 'Coupon code has already been redeemed' })
-    }
-
-    await prisma.$transaction(async (tx) => {
-      // Mark used
-      await tx.$executeRaw`UPDATE "coupons" SET "isUsed" = true, "usedById" = ${userId}, "usedAt" = NOW() WHERE "id" = ${coupon.id}`
-
-      const amount = Number(coupon.amount)
-      const balBefore = Number(wallet.balance)
-
-      // Credit wallet
-      await tx.wallet.update({
-        where: { id: wallet.id },
-        data: {
-          balance: { increment: amount },
-          totalDeposited: { increment: amount },
-        },
+    // 1. Verify coupon via external API
+    const verifyUrl = `${process.env.COUPON_API_URL}/coupons/verify`
+    const verifyRes = await fetch(verifyUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': process.env.COUPON_API_KEY || ''
+      },
+      body: JSON.stringify({
+        couponCode: codeUpper,
+        userId: userId,
+        gameId: 'lottery-platform'
       })
+    })
+    
+    const verifyData = await verifyRes.json()
 
-      // Log transaction
-      await tx.transaction.create({
-        data: {
-          userId,
-          walletId: wallet.id,
-          type: 'DEPOSIT',
-          status: 'COMPLETED',
-          amount,
-          balanceBefore: balBefore,
-          balanceAfter: balBefore + amount,
-          reference: `CPN-${coupon.code}`,
-          description: 'Coupon Redemption',
-        },
+    if (!verifyRes.ok || !verifyData.success) {
+      return reply.status(verifyRes.status === 404 ? 404 : 400).send({
+        success: false,
+        code: verifyData.code || 'INVALID_COUPON',
+        error: verifyData.message || 'Failed to verify coupon'
+      })
+    }
+
+    const amount = Number(verifyData.amount)
+    const couponId = verifyData.couponId
+
+    // 2. Credit Wallet
+    let walletTransactionId = '';
+    try {
+      await prisma.$transaction(async (tx) => {
+        const balBefore = Number(wallet.balance)
+
+        // Credit wallet
+        await tx.wallet.update({
+          where: { id: wallet.id },
+          data: {
+            balance: { increment: amount },
+            totalDeposited: { increment: amount },
+          },
+        })
+
+        // Log transaction
+        const txn = await tx.transaction.create({
+          data: {
+            userId,
+            walletId: wallet.id,
+            type: 'DEPOSIT',
+            status: 'COMPLETED',
+            amount,
+            balanceBefore: balBefore,
+            balanceAfter: balBefore + amount,
+            reference: `CPN-${codeUpper}-${Date.now()}`,
+            description: 'Coupon Redemption',
+          },
+        })
+        walletTransactionId = txn.id;
+      })
+    } catch (err) {
+      return reply.status(500).send({ success: false, error: 'Failed to credit wallet' })
+    }
+
+    // 3. Redeem Coupon on Coupon Service
+    const redeemUrl = `${process.env.COUPON_API_URL}/coupons/redeem`
+    const redeemRes = await fetch(redeemUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': process.env.COUPON_API_KEY || ''
+      },
+      body: JSON.stringify({
+        couponId,
+        userId,
+        gameId: 'lottery-platform',
+        walletTransactionId
       })
     })
 
-    await auditLog(userId, 'COUPON_REDEEMED', 'Deposit', undefined, undefined, { code: codeUpper, amount: Number(coupon.amount) }, request)
+    const redeemData = await redeemRes.json()
+
+    if (!redeemRes.ok || !redeemData.success) {
+      // In a robust system, we would queue a compensation transaction here to reverse the wallet credit.
+      // For now, log critically.
+      console.error('CRITICAL: Wallet credited but coupon redemption failed on Coupon Service', {
+        userId, couponId, walletTransactionId, error: redeemData
+      })
+      return reply.status(500).send({ success: false, error: 'Redemption failed during finalization. Contact support.' })
+    }
+
+    await auditLog(userId, 'COUPON_REDEEMED', 'Deposit', undefined, undefined, { code: codeUpper, amount }, request)
 
     // Notify user
     await prisma.notification.create({
       data: {
         userId,
         title: 'Coupon Redeemed',
-        message: `${Number(coupon.amount).toFixed(2)} Coins have been added to your wallet.`,
+        message: `${amount.toFixed(2)} Coins have been added to your wallet.`,
       },
     })
 
-    return reply.send({ success: true, message: 'Coupon redeemed successfully', data: { amount: Number(coupon.amount) } })
+    return reply.send({ success: true, message: 'Coupon redeemed successfully', data: { amount } })
   })
 }

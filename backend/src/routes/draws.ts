@@ -34,12 +34,14 @@ export default async function drawRoutes(app: FastifyInstance) {
     if (status) where.status = status
     else where.status = { in: ['SCHEDULED', 'COMPLETED'] }
 
+    const orderBy: any = status === 'COMPLETED' ? { drawnAt: 'desc' } : { scheduledAt: 'desc' }
+
     const [draws, total] = await Promise.all([
       prisma.draw.findMany({
         where,
         skip,
         take: Number(limit),
-        orderBy: { scheduledAt: 'desc' },
+        orderBy,
         include: {
           game: { select: { name: true, slug: true, imageUrl: true } },
         },

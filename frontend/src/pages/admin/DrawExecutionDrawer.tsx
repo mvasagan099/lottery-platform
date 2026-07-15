@@ -270,7 +270,7 @@ export function DrawExecutionDrawer({ drawId, onClose }: Props) {
                         <div style={{ display: 'flex', gap: '16px', alignItems: 'flex-end' }}>
                           <div style={{ flex: 1 }}>
                             <label className="form-label">Primary Numbers (comma separated)</label>
-                            <input type="text" className="form-input" placeholder="e.g. 5, 12, 23, 34, 41, 45" value={manualNumbers} onChange={e => setManualNumbers(e.target.value)} />
+                            <input type="text" className="form-input" placeholder={record?.game?.minNumbers === 1 ? "e.g. 45" : "e.g. 5, 12, 23, 34, 41, 45"} value={manualNumbers} onChange={e => setManualNumbers(e.target.value)} />
                           </div>
                           {record?.game?.hasPowerball && (
                             <div style={{ width: '150px' }}>

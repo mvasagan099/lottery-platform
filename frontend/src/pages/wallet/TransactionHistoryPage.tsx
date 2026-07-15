@@ -63,7 +63,7 @@ export default function TransactionHistoryPage() {
                       <td style={{ fontWeight: 600 }}>{tx.type.replace(/_/g, ' ')}</td>
                       <td style={{ color: 'var(--text-secondary)' }}>{tx.description || '-'}</td>
                       <td style={{ textAlign: 'right', fontWeight: 700, color: tx.amount > 0 ? '#10b981' : '#ef4444' }}>
-                        {tx.amount > 0 ? '+' : ''}${Math.abs(tx.amount).toFixed(2)} {tx.currency}
+                        {tx.amount > 0 ? '+' : ''}{Math.abs(tx.amount).toFixed(2)} Coins
                       </td>
                       <td>
                         <span className={`badge badge-${tx.status === 'COMPLETED' ? 'success' : tx.status === 'PENDING' ? 'warning' : 'danger'}`}>
