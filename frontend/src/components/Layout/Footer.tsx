@@ -45,7 +45,7 @@ export default function Footer() {
               Mega<span>Draw</span>
             </div>
             <p className="footer-desc">
-              Australia's premier online lottery platform. Play MegaDraw, Powerball, Saturday Lotto and more — safely and securely.
+              World's premier online lottery platform. Play MegaDraw, Powerball, Saturday Lotto and more — safely and securely.
             </p>
             <div className="responsible-gaming-banner">
               <Shield size={14} />

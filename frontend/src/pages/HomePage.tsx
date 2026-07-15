@@ -71,10 +71,10 @@ export default function HomePage() {
             <div className="hero-content animate-fade-in-up">
               <div className="hero-badge">
                 <Star size={14} fill="currentColor" />
-                Australia's #1 Online Lottery Platform
+                World's #1 Online Lottery Platform
               </div>
 
-              <h1 className="hero-title" dangerouslySetInnerHTML={{ __html: heroBanner?.title || `Win Big with<br /><span class="jackpot-text">Australia's Biggest</span><br />Jackpots` }}></h1>
+              <h1 className="hero-title" dangerouslySetInnerHTML={{ __html: heroBanner?.title || `Win Big with<br /><span class="jackpot-text">World's Biggest</span><br />Jackpots` }}></h1>
 
               <p className="hero-subtitle">
                 {heroBanner?.description || 'Play MegaDraw, Powerball, Saturday Lotto and 6 more games — all in one place. Safe, secure, and 100% Australian.'}
@@ -152,7 +152,7 @@ export default function HomePage() {
           <div className="section-header">
             <div>
               <h2 className="section-title">Featured Games</h2>
-              <div className="section-subtitle">Australia's favourite lotteries, online and easy</div>
+              <div className="section-subtitle">World's favourite lotteries, online and easy</div>
             </div>
             <Link to="/games" className="btn btn-outline btn-sm">
               View All <ChevronRight size={14} />

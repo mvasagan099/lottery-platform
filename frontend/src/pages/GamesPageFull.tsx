@@ -27,7 +27,7 @@ export default function GamesPageFull() {
             All <span style={{ background: 'var(--gradient-gold)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>Lottery</span> Games
           </h1>
           <p style={{ fontSize: '18px', opacity: 0.7, maxWidth: '500px' }}>
-            Australia's biggest jackpots across 9 games. Pick your lucky numbers today.
+            World's biggest jackpots across 9 games. Pick your lucky numbers today.
           </p>
         </div>
       </div>
