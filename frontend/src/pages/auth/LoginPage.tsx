@@ -50,7 +50,7 @@ export default function LoginPage() {
     },
   })
 
-  const onSubmit = (data: FormData) => mutation.mutate(data)
+  const onSubmit = (data: FormData) => mutation.mutate(data as any)
 
   return (
     <div style={{
