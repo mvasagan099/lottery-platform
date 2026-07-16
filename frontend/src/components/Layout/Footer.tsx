@@ -40,10 +40,9 @@ export default function Footer() {
         <div className="footer-grid">
           {/* Brand Column */}
           <div>
-            <div className="footer-logo">
-              <Zap size={20} style={{ display: 'inline', color: 'var(--color-secondary)', marginRight: '6px' }} />
-              Mega<span>Draw</span>
-            </div>
+            <Link to="/" className="footer-logo">
+              <img src="/logo.png" alt="MegaDraw" style={{ height: '32px' }} />
+            </Link>
             <p className="footer-desc">
               World's premier online lottery platform. Play MegaDraw, Powerball, Saturday Lotto and more — safely and securely.
             </p>

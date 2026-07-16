@@ -207,7 +207,7 @@ export default async function walletRoutes(app: FastifyInstance) {
       data: {
         userId,
         title: 'Deposit confirmed',
-        message: `$${deposit.amount} AUD has been added to your wallet.`,
+        message: `$${deposit.amount} USD has been added to your wallet.`,
       },
     })
 
@@ -279,7 +279,7 @@ export default async function walletRoutes(app: FastifyInstance) {
       data: {
         userId,
         title: 'Withdrawal request received',
-        message: `Your withdrawal of $${body.amount} AUD is being processed.`,
+        message: `Your withdrawal of $${body.amount} USD is being processed.`,
       },
     })
 

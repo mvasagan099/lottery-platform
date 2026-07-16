@@ -5,7 +5,7 @@ import { SupportTicket, TicketMessage, TicketStatus, TicketPriority, TicketCateg
 const generateMockTickets = (count: number): SupportTicket[] => {
   const statuses: TicketStatus[] = ['OPEN', 'PENDING', 'RESOLVED', 'CLOSED'];
   const priorities: TicketPriority[] = ['LOW', 'MEDIUM', 'HIGH', 'URGENT'];
-  const categories: TicketCategory[] = ['TECHNICAL', 'DEPOSITS', 'WITHDRAWALS', 'LOTTERY', 'AFFILIATE', 'KYC', 'FRAUD', 'OTHER'];
+  const categories: TicketCategory[] = ['TECHNICAL', 'DEPOSITS', 'WITHDRAWALS', 'LOTTERY', 'AFFILIATE', 'KYC', 'FRUSD', 'OTHER'];
   const agents = ['Agent Smith', 'Agent Johnson', 'Agent Davis', undefined];
 
   const tickets: SupportTicket[] = [];

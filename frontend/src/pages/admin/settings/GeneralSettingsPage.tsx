@@ -87,7 +87,7 @@ export function GeneralSettingsPage() {
           <div className="form-group">
             <label className="form-label">Currency</label>
             <select {...register('currency')} className="form-input">
-              <option value="USD">USD ($)</option>
+              <option value="Coins">Coins (🪙)</option>
               <option value="EUR">EUR (€)</option>
               <option value="GBP">GBP (£)</option>
             </select>

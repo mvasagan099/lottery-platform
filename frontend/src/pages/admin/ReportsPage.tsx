@@ -79,7 +79,7 @@ export function ReportsPage() {
     toast.success('CSV downloaded successfully!')
   }
 
-  const formatCurrency = (val: number | undefined) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(val || 0)
+  const formatCurrency = (val: number | undefined) => `🪙${new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(val || 0)}`
 
   return (
     <div className="section" style={{ padding: 'var(--space-md) var(--space-lg)' }}>

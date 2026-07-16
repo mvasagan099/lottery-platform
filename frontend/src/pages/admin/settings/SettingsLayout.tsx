@@ -28,9 +28,6 @@ const SETTINGS_CATEGORIES = [
   { path: '/admin/settings/security', label: 'Security', icon: Shield },
 
 
-  { path: '/admin/settings/storage', label: 'File Storage', icon: HardDrive },
-  { path: '/admin/settings/backup', label: 'Backups', icon: DatabaseBackup },
-  { path: '/admin/settings/fraud', label: 'Fraud rules', icon: AlertTriangle },
   { path: '/admin/settings/roles', label: 'Roles & Permissions', icon: UserPlus },
 ];
 

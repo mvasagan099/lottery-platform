@@ -62,7 +62,7 @@ const templates: Record<string, (data: any) => string> = {
         <p>Hi ${d.name}, your ${d.gameName} ticket has been purchased.</p>
         <p><strong>Ticket #:</strong> ${d.ticketNumber}</p>
         <p><strong>Draw Date:</strong> ${d.drawDate}</p>
-        <p><strong>Amount:</strong> $${d.amount} AUD</p>
+        <p><strong>Amount:</strong> $${d.amount} USD</p>
         <p>Good luck!</p>
       </div>
     </div>
@@ -75,7 +75,7 @@ const templates: Record<string, (data: any) => string> = {
       <div style="padding: 40px; background: #ffffff;">
         <h2>Congratulations ${d.name}!</h2>
         <p>Your ticket <strong>#${d.ticketNumber}</strong> has won <strong>${d.division}</strong>!</p>
-        <p style="font-size: 36px; color: #f4b942; font-weight: bold;">$${d.amount} AUD</p>
+        <p style="font-size: 36px; color: #f4b942; font-weight: bold;">$${d.amount} USD</p>
         <p>Your prize will be credited to your wallet within 24 hours.</p>
       </div>
     </div>

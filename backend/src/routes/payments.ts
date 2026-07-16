@@ -119,7 +119,7 @@ export default async function paymentRoutes(app: FastifyInstance) {
               data: {
                 userId: deposit.wallet.userId,
                 title: 'Deposit confirmed',
-                message: `$${deposit.amount} AUD has been added to your wallet.`,
+                message: `$${deposit.amount} USD has been added to your wallet.`,
               },
             })
           }
@@ -281,7 +281,7 @@ export default async function paymentRoutes(app: FastifyInstance) {
       data: {
         userId: withdrawal.wallet.userId,
         title: 'Withdrawal processed',
-        message: `Your withdrawal of $${withdrawal.amount} AUD has been processed.`,
+        message: `Your withdrawal of $${withdrawal.amount} USD has been processed.`,
       },
     })
 
@@ -328,7 +328,7 @@ export default async function paymentRoutes(app: FastifyInstance) {
       data: {
         userId: withdrawal.wallet.userId,
         title: 'Withdrawal rejected',
-        message: `Your withdrawal of $${withdrawal.amount} AUD was rejected. Funds have been returned to your wallet. Reason: ${reason}`,
+        message: `Your withdrawal of $${withdrawal.amount} USD was rejected. Funds have been returned to your wallet. Reason: ${reason}`,
       },
     })
 

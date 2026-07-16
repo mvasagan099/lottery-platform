@@ -145,7 +145,7 @@ export default function ProfilePage() {
                 </div>
                 <div className="form-group">
                   <label className="form-label">Country</label>
-                  <input {...register('country')} className="form-input" disabled={!isEditing} placeholder="Australia" />
+                  <input {...register('country')} className="form-input" disabled={!isEditing} placeholder="global" />
                 </div>
 
                 {isEditing && (

@@ -199,7 +199,7 @@ model Wallet {
   balance        Decimal       @default(0) @db.Decimal(18, 2)
   bonusBalance   Decimal       @default(0) @db.Decimal(18, 2)
   pendingBalance Decimal       @default(0) @db.Decimal(18, 2)
-  currency       String        @default("AUD")
+  currency       String        @default("USD")
   totalDeposited Decimal       @default(0) @db.Decimal(18, 2)
   totalWithdrawn Decimal       @default(0) @db.Decimal(18, 2)
   totalWon       Decimal       @default(0) @db.Decimal(18, 2)
@@ -224,7 +224,7 @@ model Transaction {
   amount        Decimal           @db.Decimal(18, 2)
   balanceBefore Decimal           @db.Decimal(18, 2)
   balanceAfter  Decimal           @db.Decimal(18, 2)
-  currency      String            @default("AUD")
+  currency      String            @default("USD")
   reference     String            @unique
   description   String?
   metadata      Json?
@@ -241,7 +241,7 @@ model Deposit {
   walletId    String
   wallet      Wallet            @relation(fields: [walletId], references: [id])
   amount      Decimal           @db.Decimal(18, 2)
-  currency    String            @default("AUD")
+  currency    String            @default("USD")
   gateway     PaymentGateway
   gatewayRef  String?
   status      TransactionStatus @default(PENDING)
@@ -258,7 +258,7 @@ model Withdrawal {
   walletId       String
   wallet         Wallet            @relation(fields: [walletId], references: [id])
   amount         Decimal           @db.Decimal(18, 2)
-  currency       String            @default("AUD")
+  currency       String            @default("USD")
   gateway        PaymentGateway
   accountDetails Json
   status         TransactionStatus @default(PENDING)

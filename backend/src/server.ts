@@ -102,7 +102,7 @@ async function buildApp() {
     openapi: {
       info: {
         title: 'MegaDraw API',
-        description: 'Production-ready Australian Lottery Platform API',
+        description: 'Production-ready global Lottery Platform API',
         version: '1.0.0',
       },
       tags: [

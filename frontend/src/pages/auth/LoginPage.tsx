@@ -65,8 +65,7 @@ export default function LoginPage() {
         {/* Logo */}
         <div style={{ textAlign: 'center', marginBottom: '32px' }}>
           <Link to="/" style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', color: 'white', fontFamily: 'var(--font-display)', fontSize: '28px', fontWeight: 900 }}>
-            <Zap size={24} style={{ color: 'var(--color-secondary)' }} />
-            Mega<span style={{ color: 'var(--color-secondary)' }}>Draw</span>
+            <img src="/logo.png" alt="MegaDraw" style={{ height: '48px' }} />
           </Link>
           <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: '14px', marginTop: '6px' }}>
             Sign in to your account

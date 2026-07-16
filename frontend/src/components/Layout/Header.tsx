@@ -86,8 +86,7 @@ export default function Header() {
 
             {/* Logo */}
             <Link to="/" className="logo">
-              <Zap size={22} style={{ color: 'var(--color-secondary)' }} />
-              Mega<span>Draw</span>
+              <img src="/logo.png" alt="MegaDraw" style={{ height: '40px' }} />
             </Link>
           </div>
 

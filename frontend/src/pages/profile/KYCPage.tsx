@@ -114,7 +114,7 @@ export default function KYCPage() {
                 {isUploading ? <><div className="btn-spinner" /> Uploading...</> : 'Submit Documents'}
               </button>
               <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '16px', textAlign: 'center' }}>
-                Your data is encrypted and securely stored in compliance with Australian privacy laws.
+                Your data is encrypted and securely stored in compliance with global privacy laws.
               </p>
             </div>
           </div>

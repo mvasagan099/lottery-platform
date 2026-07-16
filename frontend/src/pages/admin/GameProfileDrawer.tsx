@@ -155,7 +155,7 @@ export function GameProfileDrawer({ gameId, onClose }: Props) {
                           <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 500 }}><input type="checkbox" checked readOnly/> Requires 18+ Verification</label>
                         </div>
                         <div>
-                          <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 500 }}><input type="checkbox" checked readOnly/> Geofenced to Australia Only</label>
+                          <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 500 }}><input type="checkbox" checked readOnly/> Geofenced to global Only</label>
                         </div>
                       </div>
                     </div>

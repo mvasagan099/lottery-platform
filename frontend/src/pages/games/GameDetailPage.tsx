@@ -391,9 +391,12 @@ export default function GameDetailPage() {
                       <td style={{ color: 'var(--text-secondary)' }}>{div.description}</td>
                       <td>
                         {div.isJackpot ? (
-                          <span style={{ fontWeight: 800, fontSize: '16px', background: 'var(--gradient-gold)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>
-                            🪙{(Number(game.jackpotAmount) / 1_000_000).toFixed(1)}M+
-                          </span>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <span>🪙</span>
+                            <span style={{ fontWeight: 800, fontSize: '16px', background: 'var(--gradient-gold)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>
+                              {(Number(game.jackpotAmount) / 1_000_000).toFixed(1)}M+
+                            </span>
+                          </div>
                         ) : div.fixedPrize ? (
                           <span style={{ fontWeight: 700, color: 'var(--color-accent-dark)' }}>
                             🪙{Number(div.fixedPrize).toFixed(2)}

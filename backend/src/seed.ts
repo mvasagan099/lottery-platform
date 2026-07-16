@@ -1,6 +1,6 @@
 /**
  * Database Seed Script
- * Seeds all 9 Australian lottery games with rules, prize divisions,
+ * Seeds all 9 global lottery games with rules, prize divisions,
  * upcoming draws, admin user, settings, FAQs, and CMS pages
  */
 
@@ -48,7 +48,7 @@ async function main() {
     {
       slug: 'megadraw',
       name: 'MegaDraw',
-      description: 'Australia\'s biggest national Tuesday night lottery. Pick 7 numbers from 1–47.',
+      description: 'The world\'s biggest national Tuesday night lottery. Pick 7 numbers from 1–47.',
       shortDescription: 'Pick 7 numbers for a chance to win Tuesday\'s jackpot!',
       drawSchedule: '0 20 * * 2', // Tuesday 8pm
       jackpotAmount: 5_000_000,
@@ -84,7 +84,7 @@ async function main() {
     {
       slug: 'powerball',
       name: 'Powerball',
-      description: 'Australia\'s most popular lottery! Pick 7 numbers from 1–35 and a Powerball from 1–20.',
+      description: 'The world\'s most popular lottery! Pick 7 numbers from 1–35 and a Powerball from 1–20.',
       shortDescription: 'Match 7 + Powerball to win Thursday\'s massive jackpot!',
       drawSchedule: '0 20 * * 4', // Thursday 8pm
       jackpotAmount: 20_000_000,
@@ -121,8 +121,8 @@ async function main() {
     {
       slug: 'saturday-lotto',
       name: 'Saturday Lotto',
-      description: 'The original Australian lottery. Pick 6 numbers from 1–45 on Saturday night.',
-      shortDescription: 'Australia\'s classic Saturday night lottery!',
+      description: 'The original global lottery. Pick 6 numbers from 1–45 on Saturday night.',
+      shortDescription: 'The world\'s classic Saturday night lottery!',
       drawSchedule: '0 19 * * 6', // Saturday 7pm
       jackpotAmount: 4_000_000,
       minJackpot: 4_000_000,
@@ -398,18 +398,18 @@ async function main() {
   // ── Settings ────────────────────────────────────────────────────────────────
   const settings = [
     { key: 'site_name', value: 'MegaDraw', group: 'GENERAL', label: 'Site Name', isPublic: true },
-    { key: 'site_tagline', value: 'Australia\'s Online Lottery Platform', group: 'GENERAL', label: 'Tagline', isPublic: true },
+    { key: 'site_tagline', value: 'The world\'s Online Lottery Platform', group: 'GENERAL', label: 'Tagline', isPublic: true },
     { key: 'contact_email', value: 'support@MegaDraw.com', group: 'GENERAL', label: 'Contact Email', isPublic: true },
     { key: 'contact_phone', value: '1800 MegaDraw', group: 'GENERAL', label: 'Contact Phone', isPublic: true },
-    { key: 'min_deposit', value: '10', group: 'PAYMENTS', label: 'Minimum Deposit (AUD)', isPublic: true },
-    { key: 'max_deposit', value: '10000', group: 'PAYMENTS', label: 'Maximum Deposit (AUD)', isPublic: true },
-    { key: 'min_withdrawal', value: '20', group: 'PAYMENTS', label: 'Minimum Withdrawal (AUD)', isPublic: true },
-    { key: 'max_withdrawal', value: '50000', group: 'PAYMENTS', label: 'Maximum Withdrawal (AUD)', isPublic: true },
+    { key: 'min_deposit', value: '10', group: 'PAYMENTS', label: 'Minimum Deposit (USD)', isPublic: true },
+    { key: 'max_deposit', value: '10000', group: 'PAYMENTS', label: 'Maximum Deposit (USD)', isPublic: true },
+    { key: 'min_withdrawal', value: '20', group: 'PAYMENTS', label: 'Minimum Withdrawal (USD)', isPublic: true },
+    { key: 'max_withdrawal', value: '50000', group: 'PAYMENTS', label: 'Maximum Withdrawal (USD)', isPublic: true },
     { key: 'maintenance_mode', value: 'false', group: 'SYSTEM', label: 'Maintenance Mode', isPublic: false },
     { key: 'registration_enabled', value: 'true', group: 'SYSTEM', label: 'Registration Enabled', isPublic: true },
     { key: 'kyc_required_withdrawal', value: 'true', group: 'COMPLIANCE', label: 'KYC Required for Withdrawal', isPublic: true },
     { key: 'min_age', value: '18', group: 'COMPLIANCE', label: 'Minimum Age', isPublic: true },
-    { key: 'default_currency', value: 'AUD', group: 'GENERAL', label: 'Default Currency', isPublic: true },
+    { key: 'default_currency', value: 'USD', group: 'GENERAL', label: 'Default Currency', isPublic: true },
     { key: 'referral_bonus_amount', value: '10', group: 'AFFILIATE', label: 'Referral Bonus Amount', isPublic: false },
     { key: 'affiliate_commission_rate', value: '10', group: 'AFFILIATE', label: 'Default Commission Rate (%)', isPublic: false },
   ]
@@ -474,7 +474,7 @@ async function main() {
     { question: 'What is Quick Pick?', answer: 'Quick Pick automatically selects random numbers for you, making it faster to purchase tickets.', category: 'Playing', sortOrder: 1 },
     { question: 'What are System Entries?', answer: 'System entries allow you to select more numbers than a standard game requires, covering multiple combinations and increasing your chances of winning.', category: 'Playing', sortOrder: 2 },
     { question: 'How are prizes paid?', answer: 'Prizes are automatically credited to your wallet after a draw is completed. You can then withdraw to your bank account.', category: 'Prizes', sortOrder: 1 },
-    { question: 'Is my information secure?', answer: 'Yes. We use industry-standard encryption (SSL/TLS), two-factor authentication, and are fully compliant with Australian privacy laws.', category: 'Security', sortOrder: 1 },
+    { question: 'Is my information secure?', answer: 'Yes. We use industry-standard encryption (SSL/TLS), two-factor authentication, and are fully compliant with global privacy laws.', category: 'Security', sortOrder: 1 },
   ]
 
   await prisma.fAQ.createMany({ data: faqs, skipDuplicates: true })
@@ -506,9 +506,9 @@ async function main() {
     {
       slug: 'about-us',
       title: 'About MegaDraw',
-      content: '# About MegaDraw\n\nMegaDraw is Australia\'s premier online lottery platform, offering all major Australian lottery games in one convenient place.\n\n## Our Mission\n\nTo provide Australians with a safe, fair, and entertaining lottery experience online.\n\n## Licensed & Regulated\n\nMegaDraw operates under appropriate gambling licenses and adheres to all relevant Australian regulations.',
+      content: '# About MegaDraw\n\nMegaDraw is The world\'s premier online lottery platform, offering all major global lottery games in one convenient place.\n\n## Our Mission\n\nTo provide globals with a safe, fair, and entertaining lottery experience online.\n\n## Licensed & Regulated\n\nMegaDraw operates under appropriate gambling licenses and adheres to all relevant global regulations.',
       metaTitle: 'About Us | MegaDraw',
-      metaDesc: 'Learn about MegaDraw - Australia\'s trusted online lottery platform.',
+      metaDesc: 'Learn about MegaDraw - The world\'s trusted online lottery platform.',
     },
   ]
 

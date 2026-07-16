@@ -31,16 +31,16 @@ export default function HomePage() {
     return acc
   }, {}) || {}
 
-  const featuredGames = gamesData?.filter((g: any) => g.isFeatured).slice(0, 4) || []
+  const featuredGames = gamesData?.filter((g: any) => g.isFeatured).slice(0, 3) || []
   const allGames = gamesData || []
 
   const totalJackpot = allGames.reduce((sum: number, g: any) => sum + Number(g.jackpotAmount || 0), 0)
 
   const features = [
-    { icon: <Shield size={28} />, title: 'Safe & Secure', desc: 'Bank-grade SSL encryption and licensed by Australian authorities.', color: '#10b981' },
+    { icon: <Shield size={28} />, title: 'Safe & Secure', desc: 'Bank-grade SSL encryption and licensed by global authorities.', color: '#10b981' },
     { icon: <Zap size={28} />, title: 'Instant Prizes', desc: 'Prizes automatically credited to your wallet after each draw.', color: '#f5a623' },
-    { icon: <Users size={28} />, title: '100K+ Members', desc: 'Join hundreds of thousands of Australians playing online.', color: '#6366f1' },
-    { icon: <Trophy size={28} />, title: '🪙50M+ Paid Out', desc: 'Verified winners from every major Australian lottery.', color: '#3b82f6' },
+    { icon: <Users size={28} />, title: '100K+ Members', desc: 'Join hundreds of thousands of globals playing online.', color: '#6366f1' },
+    { icon: <Trophy size={28} />, title: '🪙50M+ Paid Out', desc: 'Verified winners from every major global lottery.', color: '#3b82f6' },
   ]
 
   const gameCategories = [
@@ -53,97 +53,81 @@ export default function HomePage() {
 
   const heroBanner = banners?.[0]
 
+  const topGame = featuredGames[0] || allGames[0]
+  const topGameJackpot = topGame ? Number(topGame.jackpotAmount) / 1_000_000 : 0
+  const isTopGameMillion = topGameJackpot >= 1
+  const topGameJackpotStr = topGameJackpot >= 1 ? `${parseFloat(topGameJackpot.toFixed(topGameJackpot >= 10 ? 0 : 1))}` : `${(Number(topGame?.jackpotAmount || 0) / 1_000).toFixed(0)}K`
+
   return (
-    <div className="page-wrapper">
-
+    <div className="page-wrapper page-wrapper-light">
       {/* ── Hero ─────────────────────────────────────────────────── */}
-      <section className="hero" style={{
-        ...(heroBanner?.imageUrl ? { 
-          backgroundImage: `url(${heroBanner.imageUrl})`, 
-          backgroundSize: 'cover', 
-          backgroundPosition: 'center', 
-          backgroundBlendMode: 'overlay', 
-          backgroundColor: heroBanner?.backgroundColor || 'rgba(0,0,0,0.6)' 
-        } : heroBanner?.backgroundColor ? { backgroundColor: heroBanner.backgroundColor } : {})
-      }}>
+      <section className="hero" style={{ background: 'transparent', padding: '0', overflow: 'hidden' }}>
         <div className="container">
-          <div className="grid-2" style={{ gap: '48px', alignItems: 'center' }}>
-            <div className="hero-content animate-fade-in-up">
-              <div className="hero-badge">
-                <Star size={14} fill="currentColor" />
-                World's #1 Online Lottery Platform
-              </div>
-
-              <h1 className="hero-title" dangerouslySetInnerHTML={{ __html: heroBanner?.title || `Win Big with<br /><span class="jackpot-text">World's Biggest</span><br />Jackpots` }}></h1>
-
-              <p className="hero-subtitle">
-                {heroBanner?.description || 'Play MegaDraw, Powerball, Saturday Lotto and 6 more games — all in one place. Safe, secure, and 100% Australian.'}
-              </p>
-
-              <div className="flex gap-md flex-wrap">
-                <Link to={heroBanner?.linkUrl || "/games"} className="btn btn-gold btn-xl">
-                  <Play size={18} fill="currentColor" />
-                  Play Now
-                </Link>
-                <Link to="/results" className="btn btn-outline btn-xl" style={{ color: 'rgba(255,255,255,0.8)', borderColor: 'rgba(255,255,255,0.25)' }}>
-                  View Results
-                </Link>
-              </div>
-
-              <div className="flex gap-xl" style={{ marginTop: '40px', flexWrap: 'wrap' }}>
-                {[
-                  { value: settings?.HERO_STATS_GAMES || '9', label: 'Lottery Games' },
-                  { value: settings?.HERO_STATS_MEMBERS || '100K+', label: 'Members' },
-                  { value: settings?.HERO_STATS_PAID || '🪙50M+', label: 'Prizes Paid' },
-                ].map((s) => (
-                  <div key={s.label}>
-                    <div style={{ fontSize: '28px', fontWeight: 900, fontFamily: 'var(--font-display)', color: 'white', letterSpacing: '-0.03em' }}>{s.value}</div>
-                    <div style={{ fontSize: '13px', color: 'rgba(255,255,255,0.55)', fontWeight: 500, marginTop: '2px' }}>{s.label}</div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Hero Card */}
-            <div className="animate-float" style={{ display: 'flex', justifyContent: 'center' }}>
-              <div className="card-glass" style={{
-                borderRadius: '28px', padding: '32px', maxWidth: '380px', width: '100%',
-              }}>
-                <div style={{ textAlign: 'center', marginBottom: '20px' }}>
-                  <div style={{ fontSize: '13px', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.5)', marginBottom: '8px' }}>
-                    {settings?.HERO_JACKPOT_TITLE || 'COMBINED JACKPOT'}
-                  </div>
-                  <div style={{ fontSize: '56px', fontWeight: 900, fontFamily: 'var(--font-display)', letterSpacing: '-0.04em', lineHeight: 1 }}>
-                    <span style={{ background: 'linear-gradient(135deg, #f5a623, #f7b84b)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>
-                      🪙{(totalJackpot / 1_000_000).toFixed(0)}M
-                    </span>
-                  </div>
-                  <div style={{ fontSize: '13px', color: 'rgba(255,255,255,0.5)', marginTop: '4px' }}>
-                    {settings?.HERO_JACKPOT_SUBTITLE || 'Across all 9 games this week'}
-                  </div>
+          {topGame && (
+            <div className="oz-hero-card">
+              <div className="oz-hero-left">
+                <div style={{ display: 'flex', alignItems: 'center' }}>
+                  <img src={`/${topGame.slug}-logo.png`} alt={topGame.name} style={{ height: '80px', objectFit: 'contain', marginBottom: '24px' }} 
+                       onError={(e) => {
+                         e.currentTarget.style.display = 'none';
+                         const span = document.createElement('span');
+                         span.textContent = topGame.name;
+                         span.style.fontSize = '32px';
+                         span.style.fontWeight = '900';
+                         span.style.fontFamily = 'var(--font-display)';
+                         e.currentTarget.parentElement?.appendChild(span);
+                       }} />
                 </div>
-
-                {/* Next draw countdown */}
-                {featuredGames[0]?.nextDraw && (
-                  <div style={{ background: 'rgba(0,0,0,0.2)', borderRadius: '16px', padding: '16px', textAlign: 'center' }}>
-                    <div style={{ fontSize: '12px', color: 'rgba(255,255,255,0.5)', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: '8px' }}>
-                      Next Draw: {featuredGames[0].name}
+                
+                {topGame.nextDraw && (
+                  <>
+                    <div style={{ fontSize: '28px', fontWeight: 700, marginBottom: '8px' }}>
+                      {new Date(topGame.nextDraw.scheduledAt).toDateString() === new Date().toDateString() ? 'Today' : new Date(topGame.nextDraw.scheduledAt).toLocaleDateString('en-US', { weekday: 'short' })} {new Date(topGame.nextDraw.scheduledAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
                     </div>
-                    <CountdownTimer targetDate={featuredGames[0].nextDraw.scheduledAt} size="sm" />
-                  </div>
+                    <div style={{ fontSize: '14px', marginBottom: '32px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span>Entries Close:</span>
+                      <CountdownTimer targetDate={topGame.nextDraw.scheduledAt} size="sm" />
+                    </div>
+                  </>
                 )}
 
-                <Link to="/games" className="btn btn-gold btn-full" style={{ marginTop: '20px' }}>
-                  View All Games <ArrowRight size={16} />
-                </Link>
+                <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', justifyContent: 'center' }}>
+                  <Link to={`/games/${topGame.slug}`} className="oz-btn-yellow">Buy Tickets</Link>
+                  <Link to={`/games/${topGame.slug}?quickpick=true`} className="oz-btn-white">QuickPick</Link>
+                </div>
+              </div>
+
+              <div className="oz-hero-right" style={{ flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <span className="animate-coin-flip" style={{ 
+                    fontSize: 'clamp(60px, 15vw, 120px)', fontWeight: 900, lineHeight: 1, marginRight: 'clamp(8px, 2vw, 16px)',
+                    filter: 'drop-shadow(0 4px 10px rgba(0,0,0,0.2))'
+                  }}>🪙</span>
+                  <span style={{ 
+                    fontSize: 'clamp(80px, 22vw, 160px)', fontWeight: 900, lineHeight: 0.85, fontFamily: 'var(--font-display)', letterSpacing: '-0.02em',
+                    background: 'linear-gradient(to bottom, #ffe885, #f5a623)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text',
+                    filter: 'drop-shadow(0 4px 12px rgba(245, 166, 35, 0.4))'
+                  }}>
+                    {topGameJackpotStr}
+                  </span>
+                </div>
+                {isTopGameMillion && (
+                  <div style={{ 
+                    fontSize: 'clamp(36px, 10vw, 72px)', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '2px', fontFamily: 'var(--font-display)', lineHeight: 1, marginTop: '12px',
+                    background: 'linear-gradient(to bottom, #ffe885, #f5a623)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text',
+                    filter: 'drop-shadow(0 4px 12px rgba(245, 166, 35, 0.4))'
+                  }}>
+                    MILLION
+                  </div>
+                )}
               </div>
             </div>
+          )}
+
+          <div style={{ textAlign: 'center', marginTop: '60px', marginBottom: '20px' }}>
+            <h2 style={{ fontSize: '24px', fontWeight: 800, color: 'var(--text-primary)' }}>MegaDraw is World's favourite way to play lotto online</h2>
           </div>
         </div>
-
-        {/* Animated orbs */}
-        <div style={{ position: 'absolute', top: '-100px', right: '-100px', width: '400px', height: '400px', borderRadius: '50%', background: 'rgba(245,166,35,0.04)', pointerEvents: 'none' }} />
-        <div style={{ position: 'absolute', bottom: '-80px', left: '20%', width: '300px', height: '300px', borderRadius: '50%', background: 'rgba(16,185,129,0.04)', pointerEvents: 'none' }} />
       </section>
 
       {/* ── Featured Games ────────────────────────────────────────── */}
@@ -159,11 +143,11 @@ export default function HomePage() {
             </Link>
           </div>
 
-          <div className="grid-4" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))' }}>
+          <div className="grid-3">
             {featuredGames.length > 0 ? featuredGames.map((game: any, i: number) => (
               <GameCard key={game.id} game={game} index={i} />
             )) : (
-              Array.from({ length: 4 }).map((_, i) => (
+              Array.from({ length: 3 }).map((_, i) => (
                 <div key={i} className="card" style={{ height: '320px' }}>
                   <div className="skeleton" style={{ height: '130px' }} />
                   <div style={{ padding: '20px' }}>
@@ -183,9 +167,9 @@ export default function HomePage() {
         <div className="container">
           <div style={{ textAlign: 'center', marginBottom: '40px' }}>
             <h2 className="section-title">Why MegaDraw?</h2>
-            <div className="section-subtitle">Trusted by Australians for safe and fair online lottery</div>
+            <div className="section-subtitle">Trusted by globals for safe and fair online lottery</div>
           </div>
-          <div className="grid-4" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))' }}>
+          <div className="grid-4" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', justifyContent: 'center' }}>
             {features.map((f) => (
               <div key={f.title} className="card card-body" style={{ textAlign: 'center' }}>
                 <div style={{
@@ -211,7 +195,7 @@ export default function HomePage() {
             <h2 className="section-title">How It Works</h2>
             <div className="section-subtitle">Three simple steps to win big</div>
           </div>
-          <div className="grid-3" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))' }}>
+          <div className="grid-3" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', justifyContent: 'center' }}>
             {[
               { step: '01', title: 'Create Account', desc: 'Sign up for free in 2 minutes. Verify your email and you\'re ready to play.', icon: '👤' },
               { step: '02', title: 'Choose Numbers', desc: 'Pick your lucky numbers or use Quick Pick for a random selection.', icon: '🎯' },
@@ -278,8 +262,11 @@ export default function HomePage() {
                       <span style={{ fontSize: '14px', color: 'var(--text-muted)', fontStyle: 'italic' }}>Draw not yet held</span>
                     )}
                   </div>
-                  <div style={{ fontFamily: 'var(--font-display)', fontWeight: 900, background: 'var(--gradient-gold)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text', fontSize: '22px', whiteSpace: 'nowrap' }}>
-                    🪙{(Number(game.jackpotAmount) / 1_000_000).toFixed(0)}M
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontFamily: 'var(--font-display)', fontWeight: 900, fontSize: '22px', whiteSpace: 'nowrap' }}>
+                    <span>🪙</span>
+                    <span style={{ background: 'var(--gradient-gold)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>
+                      {(Number(game.jackpotAmount) / 1_000_000).toFixed(0)}M
+                    </span>
                   </div>
                 </div>
               </Link>
@@ -295,7 +282,7 @@ export default function HomePage() {
             LIMITED TIME
           </div>
           <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(28px, 5vw, 52px)', fontWeight: 900, letterSpacing: '-0.03em', marginBottom: '16px' }}>
-            Get a <span style={{ background: 'var(--gradient-gold)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>🪙10 Welcome Bonus</span>
+            Get a <span>🪙</span> <span style={{ background: 'var(--gradient-gold)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>10 Welcome Bonus</span>
           </h2>
           <p style={{ fontSize: '18px', color: 'rgba(255,255,255,0.7)', marginBottom: '36px', maxWidth: '480px', margin: '0 auto 36px' }}>
             Register today and get 🪙10 free credit to start playing. No deposit required.
@@ -314,41 +301,93 @@ export default function HomePage() {
 
 // ── Game Card ────────────────────────────────────────────────────────────────
 
-function GameCard({ game, index }: { game: any; index: number }) {
-  const cardColors = [
-    'linear-gradient(135deg, #0f1e4a 0%, #1a3a8f 100%)',
-    'linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)',
-    'linear-gradient(135deg, #0d1b2a 0%, #1b2a4a 100%)',
-    'linear-gradient(135deg, #0f2560 0%, #1a3a8f 100%)',
-  ]
+function GameCard({ game }: { game: any; index: number }) {
+  const getGameStyle = (slug: string) => {
+    switch (slug) {
+      case 'saturday-lotto': return { bg: '#ff5a4d', title: 'white', prize: 'white' }
+      case 'megadraw': return { bg: '#00c853', title: 'white', prize: '#ffeb3b' }
+      case 'powerball': return { bg: '#0077b6', title: 'white', prize: '#ffeb3b' }
+      case 'weekday-windfall': return { bg: '#9b5de5', title: 'white', prize: 'white' }
+      case 'set-for-life': return { bg: '#fca311', title: 'white', prize: 'white' }
+      case 'super66': return { bg: '#c026d3', title: 'white', prize: 'white' }
+      case 'lucky-lotteries-mega-jackpot': return { bg: '#eab308', title: 'white', prize: 'white' }
+      case 'lucky-lotteries-super-jackpot': return { bg: '#14b8a6', title: 'white', prize: 'white' }
+      case 'lotto-strike': return { bg: '#6366f1', title: 'white', prize: 'white' }
+      default: return { bg: '#3b82f6', title: 'white', prize: 'white' }
+    }
+  }
+
+  const style = getGameStyle(game.slug)
+  const jackpot = Number(game.jackpotAmount) / 1_000_000
+  const jackpotStr = jackpot >= 1 ? `${parseFloat(jackpot.toFixed(jackpot >= 10 ? 0 : 1))}` : `${(Number(game.jackpotAmount) / 1_000).toFixed(0)}K`
+  const isMillion = jackpot >= 1
+
+  const getNextDrawText = (dateStr: string) => {
+    if (!dateStr) return 'Coming Soon'
+    const date = new Date(dateStr)
+    const today = new Date()
+    const tomorrow = new Date(today)
+    tomorrow.setDate(tomorrow.getDate() + 1)
+    
+    if (date.toDateString() === today.toDateString()) {
+      return 'Today ' + date.toLocaleTimeString([], {hour: 'numeric', minute:'2-digit'})
+    }
+    if (date.toDateString() === tomorrow.toDateString()) {
+      return 'Tomorrow ' + date.toLocaleTimeString([], {hour: 'numeric', minute:'2-digit'})
+    }
+    
+    const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+    const diffTime = Math.abs(date.getTime() - today.getTime())
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+    if (diffDays < 7) return 'This ' + days[date.getDay()]
+    return date.toLocaleDateString()
+  }
 
   return (
-    <Link to={`/games/${game.slug}`} className="game-card" style={{ textDecoration: 'none' }}>
-      <div className="game-card-header" style={{ background: cardColors[index % cardColors.length] }}>
-        <div className="game-card-badge">{game.badgeText || 'PLAY NOW'}</div>
-        <div className="game-card-name">{game.name}</div>
+    <Link to={`/games/${game.slug}`} className="game-card-new" style={{ 
+      textDecoration: 'none', 
+      background: style.bg, 
+      borderRadius: '24px', 
+      padding: '32px 20px', 
+      display: 'flex', 
+      flexDirection: 'column', 
+      alignItems: 'center', 
+      justifyContent: 'center',
+      textAlign: 'center',
+      minHeight: '280px',
+      boxShadow: '0 8px 24px rgba(0,0,0,0.1)',
+      transition: 'transform 0.2s ease, box-shadow 0.2s ease',
+      color: 'white',
+      border: 'none'
+    }}>
+      <div style={{ fontFamily: 'var(--font-display)', fontSize: '32px', fontStyle: 'italic', fontWeight: 900, marginBottom: '12px', color: style.title, display: 'flex', justifyContent: 'center' }}>
+        <img 
+          src={`/${game.slug}-logo.png`} 
+          alt={game.name} 
+          style={{ height: '130px', objectFit: 'contain', filter: 'drop-shadow(0 4px 6px rgba(0,0,0,0.3))' }}
+          onError={(e) => {
+            e.currentTarget.style.display = 'none';
+            if (e.currentTarget.nextElementSibling) {
+              (e.currentTarget.nextElementSibling as HTMLElement).style.display = 'block';
+            }
+          }}
+        />
+        <span style={{ display: 'none' }}>{game.name}</span>
       </div>
-
-      <div className="game-card-body">
-        <div className="jackpot-label">JACKPOT</div>
-        <div className="game-jackpot">
-          🪙{(Number(game.jackpotAmount) / 1_000_000).toFixed(game.jackpotAmount >= 10_000_000 ? 0 : 1)}M
+      
+      <div style={{ fontSize: '16px', fontWeight: 700, marginBottom: '24px', opacity: 0.9, color: 'white' }}>
+        {game.nextDraw ? getNextDrawText(game.nextDraw.scheduledAt) : 'Coming Soon'}
+      </div>
+      
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', color: style.prize, textShadow: style.prize === '#ffeb3b' ? '0 2px 10px rgba(0,0,0,0.1)' : 'none' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+          <span className="animate-coin-flip" style={{ fontSize: 'clamp(40px, 8vw, 50px)', fontWeight: 800 }}>🪙</span>
+          <span className="animated-jackpot" style={{ fontSize: 'clamp(48px, 12vw, 64px)', fontWeight: 900, lineHeight: 1, fontFamily: 'var(--font-display)', letterSpacing: '-0.02em' }}>
+            {jackpotStr}
+          </span>
         </div>
-
-        <p style={{ fontSize: '13px', color: 'var(--text-muted)', margin: '8px 0 12px', lineHeight: 1.5 }}>
-          {game.shortDescription}
-        </p>
-
-        {game.nextDraw && (
-          <div style={{ marginBottom: '12px' }}>
-            <CountdownTimer targetDate={game.nextDraw.scheduledAt} size="sm" />
-          </div>
-        )}
-
-        <div className="game-card-actions mt-auto">
-          <div className="btn btn-primary btn-sm btn-full" style={{ pointerEvents: 'none' }}>
-            Play Now <ChevronRight size={14} />
-          </div>
+        <div style={{ fontSize: '24px', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '1px', marginTop: '2px', fontFamily: 'var(--font-display)' }}>
+          {isMillion ? 'Million' : ''}
         </div>
       </div>
     </Link>

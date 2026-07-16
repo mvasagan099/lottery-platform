@@ -10,15 +10,15 @@ interface JackpotCounterProps {
 function formatJackpot(amount: number): string {
   if (amount >= 1_000_000) {
     const m = amount / 1_000_000
-    return `🪙${m % 1 === 0 ? m.toFixed(0) : m.toFixed(1)} Million`
+    return `${m % 1 === 0 ? m.toFixed(0) : m.toFixed(1)} Million`
   }
   if (amount >= 1_000) {
-    return `🪙${(amount / 1000).toFixed(0)}K`
+    return `${(amount / 1000).toFixed(0)}K`
   }
-  return `🪙${amount.toLocaleString()}`
+  return `${amount.toLocaleString()}`
 }
 
-export default function JackpotCounter({ amount, currency = 'AUD', className, size = 'md' }: JackpotCounterProps) {
+export default function JackpotCounter({ amount, currency = 'USD', className, size = 'md' }: JackpotCounterProps) {
   const [displayed, setDisplayed] = useState(0)
   const animRef = useRef<ReturnType<typeof requestAnimationFrame>>()
   const startRef = useRef(0)
@@ -48,12 +48,15 @@ export default function JackpotCounter({ amount, currency = 'AUD', className, si
 
   return (
     <div className={className}>
-      <div className="jackpot-label">{currency} JACKPOT</div>
-      <div
-        className="jackpot-display animate-jackpot"
-        style={{ fontSize: fontSizes[size] }}
-      >
-        {formatJackpot(displayed)}
+      <div className="jackpot-label">JACKPOT</div>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+        <span style={{ fontSize: `calc(${fontSizes[size]} * 0.8)`, filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.1))' }}>🪙</span>
+        <div
+          className="jackpot-display animate-jackpot"
+          style={{ fontSize: fontSizes[size] }}
+        >
+          {formatJackpot(displayed)}
+        </div>
       </div>
     </div>
   )

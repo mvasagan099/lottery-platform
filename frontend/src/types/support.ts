@@ -1,6 +1,6 @@
 export type TicketStatus = 'OPEN' | 'PENDING' | 'RESOLVED' | 'CLOSED';
 export type TicketPriority = 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
-export type TicketCategory = 'TECHNICAL' | 'DEPOSITS' | 'WITHDRAWALS' | 'LOTTERY' | 'AFFILIATE' | 'KYC' | 'FRAUD' | 'OTHER';
+export type TicketCategory = 'TECHNICAL' | 'DEPOSITS' | 'WITHDRAWALS' | 'LOTTERY' | 'AFFILIATE' | 'KYC' | 'FRUSD' | 'OTHER';
 
 export interface TicketMessage {
   id: string;

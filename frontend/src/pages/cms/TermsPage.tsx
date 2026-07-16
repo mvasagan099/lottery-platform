@@ -9,7 +9,7 @@ export function TermsPage() {
           <h2>1. Introduction</h2>
           <p>Welcome to MegaDraw. By accessing our platform, you agree to these terms.</p>
           <h2>2. Eligibility</h2>
-          <p>You must be 18 years or older and a resident of Australia to play.</p>
+          <p>You must be 18 years or older and a resident of global to play.</p>
           <h2>3. Account Registration</h2>
           <p>You must provide accurate information. Identity verification (KYC) is required for withdrawals.</p>
         </div>
@@ -27,7 +27,7 @@ export function PrivacyPage() {
           <h2>1. Data Collection</h2>
           <p>We collect personal information necessary to provide our services and comply with AML/CTF laws.</p>
           <h2>2. Data Security</h2>
-          <p>All data is encrypted and securely stored in Australia.</p>
+          <p>All data is encrypted and securely stored in global.</p>
         </div>
       </div>
     </div>

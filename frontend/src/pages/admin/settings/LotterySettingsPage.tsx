@@ -48,12 +48,12 @@ export function LotterySettingsPage() {
         <h3 style={{ fontSize: '18px', fontWeight: 600, marginBottom: '24px', borderBottom: '1px solid var(--border-color)', paddingBottom: '12px' }}>Ticket Configuration</h3>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
           <div className="form-group">
-            <label className="form-label">Minimum Ticket Price ($)</label>
+            <label className="form-label">Minimum Ticket Price (🪙)</label>
             <input type="number" step="0.01" {...register('minTicketPrice', { valueAsNumber: true })} className={`form-input ${errors.minTicketPrice ? 'error' : ''}`} />
             {errors.minTicketPrice && <span style={{ color: 'var(--color-danger)', fontSize: '12px' }}>{errors.minTicketPrice.message}</span>}
           </div>
           <div className="form-group">
-            <label className="form-label">Maximum Ticket Price ($)</label>
+            <label className="form-label">Maximum Ticket Price (🪙)</label>
             <input type="number" step="0.01" {...register('maxTicketPrice', { valueAsNumber: true })} className="form-input" />
           </div>
           <div className="form-group">
