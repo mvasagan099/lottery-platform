@@ -41,7 +41,7 @@ export default function RegisterPage() {
   })
 
   const mutation = useMutation({
-    mutationFn: (data: Omit<FormData, 'confirmPassword' | 'terms'>) => authService.register(data),
+    mutationFn: (data: Omit<FormData, 'confirmPassword' | 'terms'>) => authService.register(data as any),
     onSuccess: () => {
       toast.success('Account created! Please check your email to verify.')
       navigate('/login')
