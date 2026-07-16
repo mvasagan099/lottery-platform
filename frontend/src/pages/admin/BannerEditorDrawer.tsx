@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import api from '../../services/api'
+import SupabaseImageUpload from '../../components/UI/SupabaseImageUpload'
 import { X, Save, Image as ImageIcon, Link, LayoutTemplate, MapPin, Calendar, Clock, Crosshair } from 'lucide-react'
 import toast from 'react-hot-toast'
 
@@ -136,11 +137,19 @@ export function BannerEditorDrawer({ bannerId, onClose }: Props) {
                 
                 <div className="form-group">
                   <label className="form-label">Desktop Image URL</label>
-                  <input type="text" className="form-input" placeholder="https://cdn.example.com/desktop.jpg" value={formData.imageUrl} onChange={e => setFormData(p => ({...p, imageUrl: e.target.value}))} />
+                  <SupabaseImageUpload 
+                    value={formData.imageUrl} 
+                    onChange={url => setFormData(p => ({...p, imageUrl: url}))} 
+                    folderPath="banners"
+                  />
                 </div>
                 <div className="form-group">
                   <label className="form-label">Mobile Image URL (Optional)</label>
-                  <input type="text" className="form-input" placeholder="https://cdn.example.com/mobile.jpg" value={formData.mobileUrl} onChange={e => setFormData(p => ({...p, mobileUrl: e.target.value}))} />
+                  <SupabaseImageUpload 
+                    value={formData.mobileUrl} 
+                    onChange={url => setFormData(p => ({...p, mobileUrl: url}))} 
+                    folderPath="banners"
+                  />
                 </div>
                 <div className="form-group">
                   <label className="form-label">Background Color (Fallback)</label>

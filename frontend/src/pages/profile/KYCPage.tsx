@@ -2,6 +2,8 @@ import { useState } from 'react'
 import { useAuthStore } from '@/store/authStore'
 import { ShieldCheck, UploadCloud, FileText, CheckCircle, AlertTriangle } from 'lucide-react'
 import toast from 'react-hot-toast'
+import { supabase } from '@/lib/supabase'
+import imageCompression from 'browser-image-compression'
 
 export default function KYCPage() {
   const { user } = useAuthStore()
@@ -16,14 +18,40 @@ export default function KYCPage() {
       return
     }
 
+    if ((docType === 'DRIVERS_LICENSE' || docType === 'NATIONAL_ID') && !backFile) {
+      toast.error('Please upload both the front and back of your document')
+      return
+    }
+
     setIsUploading(true)
     try {
+      const bucketName = import.meta.env.VITE_SUPABASE_BUCKET_NAME || 'kyc'
+      const compressionOptions = { maxSizeMB: 0.5, maxWidthOrHeight: 1920, useWebWorker: true }
+      
+      // Compress and upload front file
+      const compressedFront = await imageCompression(frontFile, compressionOptions)
+      const frontName = `${user?.id}/${Date.now()}_front_${compressedFront.name}`
+      const { error: frontError } = await supabase.storage.from(bucketName).upload(frontName, compressedFront)
+      if (frontError) throw frontError
+      const { data: { publicUrl: frontUrl } } = supabase.storage.from(bucketName).getPublicUrl(frontName)
+
+      // Compress and upload back file (if applicable)
+      let backUrl = ''
+      if (backFile) {
+        const compressedBack = await imageCompression(backFile, compressionOptions)
+        const backName = `${user?.id}/${Date.now()}_back_${compressedBack.name}`
+        const { error: backError } = await supabase.storage.from(bucketName).upload(backName, compressedBack)
+        if (backError) throw backError
+        const { data: { publicUrl: bUrl } } = supabase.storage.from(bucketName).getPublicUrl(backName)
+        backUrl = bUrl
+      }
+
       // Import api inside component or ensure it's imported at top
       const { api } = await import('@/services/api')
       await api.post('/users/me/kyc', {
         documentType: docType,
-        documentUrl: frontFile.name, // Mocking URL with filename for now
-        selfieUrl: 'selfie.jpg'
+        documentUrl: frontUrl,
+        selfieUrl: backUrl || 'selfie.jpg' // Using selfieUrl for back image as a workaround if the API doesn't support backUrl yet
       })
       
       setIsUploading(false)
@@ -33,7 +61,8 @@ export default function KYCPage() {
       useAuthStore.getState().updateUser({ ...user, kycStatus: 'PENDING' } as any)
     } catch (err: any) {
       setIsUploading(false)
-      toast.error(err.response?.data?.error || 'Failed to submit KYC documents')
+      console.error("KYC Upload Error:", err);
+      toast.error(err.response?.data?.error || err.message || 'Failed to submit KYC documents')
     }
   }
 

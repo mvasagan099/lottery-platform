@@ -57,8 +57,8 @@ export function KYCReviewModal({ recordId, onClose }: Props) {
       <div className="card" style={{ width: '100%', maxWidth: '1200px', height: '90vh', display: 'flex', flexDirection: 'column', backgroundColor: 'var(--bg-primary)' }}>
         
         {/* Header */}
-        <div style={{ padding: 'var(--space-md) var(--space-lg)', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-md)' }}>
+        <div className="kyc-modal-header">
+          <div className="kyc-modal-header-info">
             <div style={{ width: 48, height: 48, borderRadius: '50%', backgroundColor: 'var(--bg-secondary)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <Shield size={24} color="var(--primary-color)" />
             </div>
@@ -70,14 +70,14 @@ export function KYCReviewModal({ recordId, onClose }: Props) {
             {record?.status === 'PENDING' && <span style={{ padding: '2px 8px', borderRadius: '12px', fontSize: '0.75rem', backgroundColor: 'rgba(245, 158, 11, 0.1)', color: '#f59e0b' }}>Pending</span>}
             {record?.status === 'REJECTED' && <span style={{ padding: '2px 8px', borderRadius: '12px', fontSize: '0.75rem', backgroundColor: 'rgba(239, 68, 68, 0.1)', color: '#ef4444' }}>Rejected</span>}
           </div>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)' }}><X size={24} /></button>
+          <button className="close-btn" onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)' }}><X size={24} /></button>
         </div>
 
         {/* Content Area */}
-        <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
+        <div className="kyc-modal-content">
           
           {/* Left Panel: Document Viewer */}
-          <div style={{ flex: 2, display: 'flex', flexDirection: 'column', borderRight: '1px solid var(--border-color)', backgroundColor: 'var(--bg-secondary)' }}>
+          <div className="kyc-modal-panel-left">
             <div style={{ padding: '8px var(--space-md)', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: 'var(--bg-primary)' }}>
               <span style={{ fontWeight: 600 }}>{record?.documentType}</span>
               <div style={{ display: 'flex', gap: '8px' }}>
@@ -90,11 +90,13 @@ export function KYCReviewModal({ recordId, onClose }: Props) {
             <div style={{ flex: 1, overflow: 'auto', position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               {isLoading ? <div className="loading-spinner"></div> : (
                 record?.documentUrl ? (
-                  // Real Image if we had S3, Mock for now
-                  <div style={{ transform: `scale(${zoomLevel}) rotate(${rotate}deg)`, transition: 'transform 0.2s', width: '80%', height: '80%', border: '2px dashed var(--border-color)', borderRadius: '8px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'var(--text-secondary)', backgroundColor: '#1e1e1e' }}>
-                    <FileText size={64} style={{ marginBottom: 16, opacity: 0.5 }} />
-                    <h3 style={{ margin: 0, color: 'white' }}>Mock Viewer</h3>
-                    <p>{record.documentUrl}</p>
+                  // Render the actual uploaded image
+                  <div style={{ transform: `scale(${zoomLevel}) rotate(${rotate}deg)`, transition: 'transform 0.2s', width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <img 
+                      src={record.documentUrl} 
+                      alt="KYC Document" 
+                      style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', boxShadow: '0 4px 12px rgba(0,0,0,0.5)', borderRadius: '8px' }} 
+                    />
                     <div style={{ position: 'absolute', inset: 0, backgroundImage: 'url("data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' opacity=\'0.05\'><text x=\'20\' y=\'50\' font-size=\'40\' transform=\'rotate(-45)\'>CONFIDENTIAL</text></svg>")', pointerEvents: 'none' }}></div>
                   </div>
                 ) : (
@@ -105,7 +107,7 @@ export function KYCReviewModal({ recordId, onClose }: Props) {
           </div>
 
           {/* Right Panel: Analysis & Actions */}
-          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflowY: 'auto' }}>
+          <div className="kyc-modal-panel-right">
             <div style={{ padding: 'var(--space-lg)', flex: 1 }}>
               
               {/* Simulated Fraud Engine */}
