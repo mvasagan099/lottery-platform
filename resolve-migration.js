@@ -11,4 +11,5 @@ function resolveMigration(name) {
 }
 
 resolveMigration('20260717130000_sync_missing_tables');
+resolveMigration('20260717130001_update_enum');
 resolveMigration('20260717130002_sync_missing_tables');
