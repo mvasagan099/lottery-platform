@@ -1,0 +1,4 @@
+ALTER TYPE "SupportTicketStatus" ADD VALUE 'PENDING';
+ALTER TYPE "SupportTicketStatus" ADD VALUE 'WAITING_FOR_CUSTOMER';
+ALTER TYPE "SupportTicketStatus" ADD VALUE 'ASSIGNED';
+ALTER TYPE "SupportTicketStatus" ADD VALUE 'ESCALATED';

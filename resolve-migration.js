@@ -1,8 +1,14 @@
 const { execSync } = require('child_process');
-try {
-  console.log('Resolving failed migration...');
-  execSync('npx prisma migrate resolve --rolled-back 20260717130000_sync_missing_tables', { stdio: 'inherit' });
-  console.log('Migration resolved successfully!');
-} catch (e) {
-  console.log('Resolve command failed, continuing anyway...');
+
+function resolveMigration(name) {
+  try {
+    console.log(`Resolving failed migration: ${name}...`);
+    execSync(`npx prisma migrate resolve --rolled-back ${name}`, { stdio: 'inherit' });
+    console.log(`Migration ${name} resolved successfully!`);
+  } catch (e) {
+    console.log(`Resolve command for ${name} failed, it may be already resolved.`);
+  }
 }
+
+resolveMigration('20260717130000_sync_missing_tables');
+resolveMigration('20260717130002_sync_missing_tables');
