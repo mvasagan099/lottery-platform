@@ -1,24 +1,13 @@
 /**
- * Email Service using Nodemailer
+ * Email Service — uses Resend (primary) with Nodemailer/SMTP as fallback
+ *
+ * Resend is preferred because Gmail SMTP blocks connections from shared cloud IPs (Render, Railway, etc.)
+ * Set RESEND_API_KEY in your environment to enable Resend.
+ * Falls back to SMTP (nodemailer) if RESEND_API_KEY is not set.
  */
 
+import { Resend } from 'resend'
 import nodemailer from 'nodemailer'
-
-function createTransporter() {
-  return nodemailer.createTransport({
-    host: process.env.SMTP_HOST || 'smtp.gmail.com',
-    port: Number(process.env.SMTP_PORT) || 587,
-    secure: false,
-    auth: {
-      user: process.env.SMTP_USER,
-      pass: process.env.SMTP_PASS,
-    },
-    // Timeouts to avoid hanging on cold Render restarts
-    connectionTimeout: 10000,
-    greetingTimeout: 10000,
-    socketTimeout: 15000,
-  })
-}
 
 interface EmailOptions {
   to: string
@@ -88,11 +77,38 @@ const templates: Record<string, (data: any) => string> = {
   `,
 }
 
+async function sendViaResend(to: string, subject: string, html: string, from: string): Promise<void> {
+  const resend = new Resend(process.env.RESEND_API_KEY)
+  const { error } = await resend.emails.send({ from, to, subject, html })
+  if (error) throw new Error(`Resend error: ${error.message}`)
+}
+
+async function sendViaSMTP(to: string, subject: string, html: string, from: string): Promise<void> {
+  const transporter = nodemailer.createTransport({
+    host: process.env.SMTP_HOST || 'smtp.gmail.com',
+    port: Number(process.env.SMTP_PORT) || 587,
+    secure: false,
+    auth: {
+      user: process.env.SMTP_USER,
+      pass: process.env.SMTP_PASS,
+    },
+    connectionTimeout: 10000,
+    greetingTimeout: 10000,
+    socketTimeout: 15000,
+  })
+  try {
+    await transporter.sendMail({ from, to, subject, html })
+  } finally {
+    transporter.close()
+  }
+}
+
 export async function sendEmail({ to, subject, template, data }: EmailOptions): Promise<void> {
   const html = templates[template]?.(data) || `<p>${JSON.stringify(data)}</p>`
+  const from = `MegaDraw <${process.env.FROM_EMAIL || 'noreply@MegaDraw.com'}>`
 
-  // If no SMTP user is configured, just log the email contents to the terminal for local testing
-  if (!process.env.SMTP_USER) {
+  // No credentials configured — mock email for local dev
+  if (!process.env.RESEND_API_KEY && !process.env.SMTP_USER) {
     console.log('\n======================================================')
     console.log(`✉️ MOCK EMAIL SENT TO: ${to}`)
     console.log(`Subject: ${subject}`)
@@ -106,28 +122,21 @@ export async function sendEmail({ to, subject, template, data }: EmailOptions): 
   let lastError: unknown
 
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
-    // Create a fresh transporter each time to avoid stale connections after Render cold starts
-    const transporter = createTransporter()
     try {
-      await transporter.sendMail({
-        from: `MegaDraw <${process.env.FROM_EMAIL || 'noreply@MegaDraw.com'}>`,
-        to,
-        subject,
-        html,
-      })
-      transporter.close()
+      if (process.env.RESEND_API_KEY) {
+        await sendViaResend(to, subject, html, from)
+      } else {
+        await sendViaSMTP(to, subject, html, from)
+      }
       return // success
     } catch (error) {
       lastError = error
       console.error(`Email send attempt ${attempt}/${MAX_ATTEMPTS} failed:`, error)
-      transporter.close()
       if (attempt < MAX_ATTEMPTS) {
-        await new Promise((r) => setTimeout(r, 1500 * attempt)) // wait before retry
+        await new Promise((r) => setTimeout(r, 1500 * attempt))
       }
     }
   }
 
-  // All attempts failed — throw so the caller can surface it to the user
   throw new Error(`Failed to send email after ${MAX_ATTEMPTS} attempts: ${lastError}`)
 }
-
