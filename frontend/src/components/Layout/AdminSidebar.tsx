@@ -28,6 +28,7 @@ const sections = [
     links: [
       { href: '/admin/games', label: 'Games', icon: <Gamepad2 size={16} />, module: 'Games' },
       { href: '/admin/draws', label: 'Draws', icon: <Dices size={16} />, module: 'Draws' },
+      { href: '/admin/jackpot', label: 'Jackpot Management', icon: <Zap size={16} />, module: 'Jackpot' },
     ],
   },
   {

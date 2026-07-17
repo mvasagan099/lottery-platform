@@ -78,10 +78,18 @@ export default function GameDetailPage() {
     })
   }
 
-  const addLine = () => {
-    if (lines.length >= 10) { toast.error('Maximum 10 lines per ticket'); return }
-    setLines((prev) => [...prev, { numbers: [] }])
-    setActiveLine(lines.length)
+  const handleLineCountChange = (count: number) => {
+    setLines((prev) => {
+      if (count > prev.length) {
+        return [...prev, ...Array.from({ length: count - prev.length }, () => ({ numbers: [] }))]
+      } else if (count < prev.length) {
+        return prev.slice(0, count)
+      }
+      return prev
+    })
+    if (activeLine >= count) {
+      setActiveLine(Math.max(0, count - 1))
+    }
   }
 
   const removeLine = (idx: number) => {
@@ -89,6 +97,10 @@ export default function GameDetailPage() {
     setLines((prev) => prev.filter((_, i) => i !== idx))
     setActiveLine(Math.max(0, idx - 1))
   }
+
+  const lineOptions: number[] = []
+  for (let i = 1; i <= 100; i++) lineOptions.push(i)
+  for (let i = 200; i <= 1000; i += 100) lineOptions.push(i)
 
   const totalCost = game ? lines.length * game.ticketPrice * numDraws : 0
   const currentLineComplete = game && (lines[activeLine]?.numbers.length ?? 0) >= game.minNumbers && (!game.hasPowerball || !!lines[activeLine]?.powerball)
@@ -171,28 +183,35 @@ export default function GameDetailPage() {
                 </div>
               </div>
 
-              {/* Line Tabs */}
-              <div style={{ padding: '12px 20px', borderBottom: '1px solid var(--border-color)', display: 'flex', gap: '8px', flexWrap: 'wrap', overflowX: 'auto' }}>
-                {lines.map((line, i) => (
-                  <button
-                    key={i}
-                    className={`tab-trigger ${activeLine === i ? 'active' : ''}`}
-                    style={{ padding: '5px 12px', border: '1.5px solid var(--border-color)', borderRadius: '8px', marginBottom: '-2px' }}
-                    onClick={() => setActiveLine(i)}
-                  >
-                    Line {i + 1}
-                    {line.numbers.length >= (game.minNumbers || 0) && (!game.hasPowerball || line.powerball) && <span style={{ color: '#10b981', marginLeft: '4px' }}>✓</span>}
-                    {lines.length > 1 && (
-                      <span
-                        style={{ marginLeft: '6px', color: 'var(--text-muted)', fontWeight: 400 }}
-                        onClick={(e) => { e.stopPropagation(); removeLine(i) }}
-                      >×</span>
-                    )}
-                  </button>
-                ))}
-                <button className="btn btn-ghost btn-xs" onClick={addLine} style={{ padding: '5px 10px' }}>
-                  + Add Line
-                </button>
+              {/* Game Selection Dropdown */}
+              <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <style>{`
+                  .game-select-dropdown {
+                    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+                    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+                  }
+                  .game-select-dropdown:hover {
+                    transform: translateY(-2px) scale(1.02);
+                    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+                    border-color: var(--color-primary);
+                  }
+                  .game-select-dropdown:focus {
+                    transform: scale(1.01);
+                    box-shadow: 0 0 0 3px rgba(var(--color-primary-rgb), 0.3);
+                  }
+                `}</style>
+                <select 
+                  className="form-select btn-sm game-select-dropdown" 
+                  style={{ width: 'auto', padding: '6px 32px 6px 16px', height: 'auto', borderRadius: '12px', fontSize: '15px', fontWeight: 600, cursor: 'pointer', border: '2px solid var(--border-color)' }}
+                  value={lines.length}
+                  onChange={(e) => handleLineCountChange(Number(e.target.value))}
+                >
+                  {lineOptions.map(num => (
+                    <option key={num} value={num}>
+                      {num} Game{num > 1 ? 's' : ''} - 🪙{(num * game.ticketPrice).toFixed(2)}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <div className="card-body">
@@ -286,7 +305,7 @@ export default function GameDetailPage() {
               <h3 style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '20px', marginBottom: '20px' }}>Your Ticket</h3>
 
               {/* Lines summary */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '16px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '16px', maxHeight: '350px', overflowY: 'auto', paddingRight: '8px' }}>
                 {lines.map((line, i) => (
                   <div key={i} style={{
                     padding: '10px 12px',

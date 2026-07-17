@@ -37,6 +37,11 @@ export default function JackpotsPage() {
                 </div>
               </div>
               <div style={{ textAlign: 'right' }}>
+                {game.jackpotPool?.consecutiveRollovers > 0 && (
+                  <div style={{ marginBottom: '8px', fontSize: '11px', fontWeight: 800, color: 'white', background: 'var(--color-primary)', padding: '4px 10px', borderRadius: '99px', display: 'inline-block', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                    🔄 Rollover x{game.jackpotPool.consecutiveRollovers}
+                  </div>
+                )}
                 <JackpotCounter amount={Number(game.jackpotAmount)} size="sm" />
                 <div style={{ marginTop: '8px', fontSize: '13px', color: 'var(--color-primary)', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'flex-end' }}>
                   Play Now <ChevronRight size={14} />

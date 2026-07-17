@@ -10,6 +10,7 @@ import { prisma } from '../server'
 import { authenticate, requireAdmin, auditLog } from '../middleware/auth'
 import cmsRoutes from './cms'
 import adminSupportRoutes from './adminSupport'
+import jackpotRoutes from './jackpot'
 
 export default async function adminRoutes(app: FastifyInstance) {
 
@@ -20,6 +21,7 @@ export default async function adminRoutes(app: FastifyInstance) {
   // Register Sub-routers
   app.register(cmsRoutes, { prefix: '/cms' })
   app.register(adminSupportRoutes, { prefix: '/support' })
+  app.register(jackpotRoutes, { prefix: '/jackpot' })
 
   // ── Dashboard Stats ───────────────────────────────────────────────────────
 

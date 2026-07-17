@@ -8,6 +8,7 @@ import { FastifyInstance } from 'fastify'
 import { z } from 'zod'
 import { prisma } from '../server'
 import { authenticate, requireAdmin, auditLog } from '../middleware/auth'
+import { processDrawJackpot } from '../services/jackpot.service'
 
 const createDrawSchema = z.object({
   gameId: z.string(),
@@ -205,7 +206,9 @@ export default async function drawRoutes(app: FastifyInstance) {
       where: { id },
       include: {
         game: {
-          include: { prizeDivisions: { orderBy: { divisionOrder: 'asc' } } },
+          include: {
+            prizeDivisions: { orderBy: { divisionOrder: 'asc' } },
+          },
         },
         tickets: {
           include: { numbers: true },
@@ -224,89 +227,130 @@ export default async function drawRoutes(app: FastifyInstance) {
 
     let totalPrizes = 0
     const winnersSummary: Record<string, number> = {}
+    const jackpotWinnerUserIds: string[] = []
 
-    // Process each ticket
+    // Pre-process ticket results before the atomic transaction
+    type TicketResult = {
+      ticketId: string
+      userId: string
+      status: 'WON' | 'LOST'
+      bestDivision: any
+      bestPrize: number
+      isJackpotWin: boolean
+    }
+    const ticketResults: TicketResult[] = []
+
     for (const ticket of draw.tickets) {
       if (ticket.status === 'CANCELLED') continue
 
       let bestDivision: any = null
       let bestPrize = 0
+      let isJackpotWin = false
 
       for (const line of ticket.numbers) {
         const nums = line.numbers as number[]
         const matched = nums.filter((n) => winningNums.includes(n)).length
-        const matchedSupp = suppNums
-          ? nums.filter((n) => suppNums.includes(n)).length
-          : 0
+        const matchedSupp = suppNums ? nums.filter((n) => suppNums.includes(n)).length : 0
         const pbMatched = pb && line.powerball === pb
 
-        // Find best matching prize division
         for (const div of draw.game.prizeDivisions) {
           const numMatch = div.matchNumbers === matched
           const suppMatch = div.matchSupp === 0 || matchedSupp >= div.matchSupp
           const pbMatch = !div.matchPB || pbMatched
 
           if (numMatch && suppMatch && pbMatch) {
-            const prizeAmt = Number(div.fixedPrize || draw.jackpotAmount)
+            const prizeAmt = div.isJackpot ? Number(draw.jackpotAmount) : Number(div.fixedPrize || 0)
             if (prizeAmt > bestPrize) {
-              bestPrize = prizeAmt
+              bestPrize = div.isJackpot ? 0 : prizeAmt // jackpot amount handled by service
               bestDivision = div
+              isJackpotWin = div.isJackpot
             }
             break
           }
         }
       }
 
-      if (bestDivision && bestPrize > 0) {
-        // Create winning entry
-        await prisma.winningEntry.create({
-          data: {
-            ticketId: ticket.id,
-            drawId: id,
-            divisionName: bestDivision.divisionName,
-            prizeAmount: bestPrize,
-          },
-        })
-
-        // Update ticket
-        await prisma.ticket.update({
-          where: { id: ticket.id },
-          data: {
-            status: 'WON',
-            prizeAmount: bestPrize,
-            prizeDivision: bestDivision.divisionName,
-          },
-        })
-
-        // Notify winner
-        await prisma.notification.create({
-          data: {
-            userId: ticket.userId,
-            title: '🏆 You\'ve won a prize!',
-            message: `Congratulations! You won ${bestDivision.divisionName} ($${bestPrize.toFixed(2)}) in Draw #${draw.drawNumber}!`,
-            data: { ticketId: ticket.id, drawId: id },
-          },
-        })
-
-        totalPrizes += bestPrize
-        winnersSummary[bestDivision.divisionName] = (winnersSummary[bestDivision.divisionName] || 0) + 1
+      if (bestDivision) {
+        ticketResults.push({ ticketId: ticket.id, userId: ticket.userId, status: 'WON', bestDivision, bestPrize, isJackpotWin })
+        if (isJackpotWin) jackpotWinnerUserIds.push(ticket.userId)
       } else {
-        // Mark non-winning tickets
-        await prisma.ticket.update({
-          where: { id: ticket.id },
-          data: { status: 'LOST' },
-        })
+        ticketResults.push({ ticketId: ticket.id, userId: ticket.userId, status: 'LOST', bestDivision: null, bestPrize: 0, isJackpotWin: false })
       }
     }
 
-    // Update draw status
-    await prisma.draw.update({
-      where: { id },
-      data: {
-        status: 'COMPLETED',
-        totalPrizes,
-        isVerified: false,
-      },
+    const totalSales = Number(draw.totalSales)
+
+    // All writes happen atomically
+    const jackpotResult = await prisma.$transaction(async (tx) => {
+      // 1. Jackpot rollover / payout
+      const jpResult = await processDrawJackpot(
+        tx,
+        draw.game.id,
+        draw.id,
+        draw.drawNumber,
+        totalSales,
+        jackpotWinnerUserIds,
+        draw.game.minJackpot
+      )
+
+      // 2. Non-jackpot winners & losers
+      for (const result of ticketResults) {
+        if (result.status === 'WON') {
+          const prize = result.isJackpotWin ? jpResult.perWinnerAmount : result.bestPrize
+
+          await tx.winningEntry.create({
+            data: { ticketId: result.ticketId, drawId: id, divisionName: result.bestDivision.divisionName, prizeAmount: prize },
+          })
+          await tx.ticket.update({
+            where: { id: result.ticketId },
+            data: { status: 'WON', prizeAmount: prize, prizeDivision: result.bestDivision.divisionName },
+          })
+
+          if (!result.isJackpotWin && prize > 0) {
+            const wallet = await tx.wallet.findUnique({ where: { userId: result.userId } })
+            if (wallet) {
+              await tx.wallet.update({
+                where: { id: wallet.id },
+                data: { balance: { increment: prize }, totalWon: { increment: prize } },
+              })
+              await tx.transaction.create({
+                data: {
+                  userId: result.userId,
+                  walletId: wallet.id,
+                  type: 'PRIZE_CREDIT',
+                  status: 'COMPLETED',
+                  amount: prize,
+                  balanceBefore: Number(wallet.balance),
+                  balanceAfter: Number(wallet.balance) + prize,
+                  reference: `WIN-${id}-${result.ticketId}`,
+                  description: `Winnings from Draw #${draw.drawNumber} — ${result.bestDivision.divisionName}`,
+                  drawId: id,
+                },
+              })
+              await tx.notification.create({
+                data: {
+                  userId: result.userId,
+                  title: '🏆 You\'ve won a prize!',
+                  message: `Congratulations! You won ${result.bestDivision.divisionName} (🪙${prize.toFixed(2)}) in Draw #${draw.drawNumber}!`,
+                  data: { ticketId: result.ticketId, drawId: id },
+                },
+              })
+            }
+            totalPrizes += prize
+          } else if (result.isJackpotWin) {
+            totalPrizes += jpResult.perWinnerAmount
+          }
+
+          winnersSummary[result.bestDivision.divisionName] = (winnersSummary[result.bestDivision.divisionName] || 0) + 1
+        } else {
+          await tx.ticket.update({ where: { id: result.ticketId }, data: { status: 'LOST' } })
+        }
+      }
+
+      // 3. Mark draw COMPLETED
+      await tx.draw.update({ where: { id }, data: { status: 'COMPLETED', totalPrizes, isVerified: false } })
+
+      return jpResult
     })
 
     await auditLog(
@@ -315,16 +359,28 @@ export default async function drawRoutes(app: FastifyInstance) {
       'Draw',
       id,
       undefined,
-      { totalPrizes, winnersSummary },
+      { totalPrizes, winnersSummary, jackpot: jackpotResult },
       request
     )
 
     return reply.send({
       success: true,
       message: 'Prize calculation complete',
-      data: { totalPrizes, winnersSummary },
+      data: {
+        totalPrizes,
+        winnersSummary,
+        jackpot: {
+          before: jackpotResult.jackpotBefore,
+          contribution: jackpotResult.ticketContrib,
+          paid: jackpotResult.jackpotPaid,
+          after: jackpotResult.jackpotAfter,
+          isRollover: jackpotResult.isRollover,
+          winnerCount: jackpotResult.winnerCount,
+        },
+      },
     })
   })
+
 
   // POST /draws/:id/publish - Publish draw results
   app.post('/:id/publish', {

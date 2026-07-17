@@ -302,6 +302,7 @@ model Game {
   draws          Draw[]
   tickets        Ticket[]
   prizeDivisions PrizeDivision[]
+  jackpotPool    JackpotPool?
 
   @@map("games")
 }
@@ -974,3 +975,79 @@ model SLARule {
 
   @@map("sla_rules")
 }
+
+// ============ JACKPOT ROLLOVER SYSTEM ============
+
+enum JackpotTxType {
+  CONTRIBUTION
+  JACKPOT_WIN
+  JACKPOT_RESET
+  JACKPOT_ROLLOVER
+  MANUAL_ADJUSTMENT
+}
+
+/// One row per game — live jackpot pool state
+model JackpotPool {
+  id                    String   @id @default(cuid())
+  gameId                String   @unique
+  game                  Game     @relation(fields: [gameId], references: [id])
+  currentJackpot        Decimal  @default(0) @db.Decimal(18, 2)
+  baseJackpot           Decimal  @default(1000000) @db.Decimal(18, 2)
+  rolloverAmount        Decimal  @default(0) @db.Decimal(18, 2)
+  currentDrawContrib    Decimal  @default(0) @db.Decimal(18, 2)
+  consecutiveRollovers  Int      @default(0)
+  totalPaid             Decimal  @default(0) @db.Decimal(18, 2)
+  largestJackpot        Decimal  @default(0) @db.Decimal(18, 2)
+  lastWinningDrawId     String?
+  jackpotContribPct     Decimal  @default(60) @db.Decimal(5, 2)
+  updatedAt             DateTime @updatedAt
+  createdAt             DateTime @default(now())
+
+  history      JackpotHistory[]
+  transactions JackpotTransaction[]
+
+  @@map("jackpot_pools")
+}
+
+/// One row per completed draw — historical breakdown
+model JackpotHistory {
+  id               String      @id @default(cuid())
+  jackpotPoolId    String
+  jackpotPool      JackpotPool @relation(fields: [jackpotPoolId], references: [id])
+  gameId           String
+  drawId           String
+  drawNumber       Int
+  jackpotBefore    Decimal     @db.Decimal(18, 2)
+  ticketContrib    Decimal     @db.Decimal(18, 2)
+  rolloverAmount   Decimal     @db.Decimal(18, 2)
+  winnerCount      Int         @default(0)
+  jackpotPaid      Decimal     @default(0) @db.Decimal(18, 2)
+  jackpotAfter     Decimal     @db.Decimal(18, 2)
+  winnerUserIds    Json        @default("[]")
+  createdAt        DateTime    @default(now())
+
+  @@index([gameId])
+  @@index([drawId])
+  @@map("jackpot_history")
+}
+
+/// Financial audit log — every coin movement in the jackpot pool
+model JackpotTransaction {
+  id            String        @id @default(cuid())
+  jackpotPoolId String
+  jackpotPool   JackpotPool   @relation(fields: [jackpotPoolId], references: [id])
+  gameId        String
+  drawId        String?
+  type          JackpotTxType
+  amount        Decimal       @db.Decimal(18, 2)
+  balanceBefore Decimal       @db.Decimal(18, 2)
+  balanceAfter  Decimal       @db.Decimal(18, 2)
+  description   String?
+  metadata      Json?
+  createdAt     DateTime      @default(now())
+
+  @@index([gameId])
+  @@index([type])
+  @@map("jackpot_transactions")
+}
+

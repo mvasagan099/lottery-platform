@@ -27,3 +27,4 @@ export function SettingsPage() {
   return <div className="section"><div className="container"><h2>System Settings</h2><p>Configure global platform settings.</p></div></div>
 }
 export { default as AffiliatesAdminPage } from './AffiliatesPage'
+export { default as JackpotManagementPage } from './JackpotManagementPage'

@@ -1,6 +1,7 @@
 import cron from 'node-cron'
 import { prisma } from '../server'
 import crypto from 'crypto'
+import { processDrawJackpot } from '../services/jackpot.service'
 const parser = require('cron-parser')
 
 function generateNumbers(pool: number, count: number): number[] {
@@ -57,14 +58,27 @@ export function initCronJobs() {
           }
         })
 
-        let totalPrizes = 0
+        // 3. Process Tickets — collect jackpot winners separately
+        const jackpotDivision = draw.game.prizeDivisions.find(d => d.isJackpot)
+        const jackpotWinnerUserIds: string[] = []
 
-        // 3. Process Tickets
+        // We'll do ticket processing inside a transaction with the jackpot logic
+        let totalPrizes = 0
+        const ticketResults: Array<{
+          ticketId: string
+          userId: string
+          status: 'WON' | 'LOST'
+          bestDivision: any
+          bestPrize: number
+          isJackpotWin: boolean
+        }> = []
+
         for (const ticket of draw.tickets) {
           if (ticket.status === 'CANCELLED') continue
 
           let bestDivision: any = null
           let bestPrize = 0
+          let isJackpotWin = false
 
           for (const line of ticket.numbers) {
             const nums = line.numbers as number[]
@@ -76,99 +90,148 @@ export function initCronJobs() {
               const pbMatch = !div.matchPB || pbMatched
 
               if (numMatch && pbMatch) {
-                const prizeAmt = Number(div.fixedPrize || draw.jackpotAmount)
+                const prizeAmt = div.isJackpot
+                  ? Number(draw.jackpotAmount) // will be replaced by jackpot service
+                  : Number(div.fixedPrize || 0)
                 if (prizeAmt > bestPrize) {
                   bestPrize = prizeAmt
                   bestDivision = div
+                  isJackpotWin = div.isJackpot
                 }
                 break
               }
             }
           }
 
-          if (bestDivision && bestPrize > 0) {
-            // Winning ticket
-            await prisma.winningEntry.create({
-              data: {
-                ticketId: ticket.id,
-                drawId: draw.id,
-                divisionName: bestDivision.divisionName,
-                prizeAmount: bestPrize,
-              },
+          if (bestDivision && (!bestDivision.isJackpot || bestPrize > 0 || jackpotDivision)) {
+            ticketResults.push({
+              ticketId: ticket.id,
+              userId: ticket.userId,
+              status: 'WON',
+              bestDivision,
+              bestPrize: bestDivision.isJackpot ? 0 : bestPrize, // jackpot handled separately
+              isJackpotWin: bestDivision.isJackpot,
             })
-
-            await prisma.ticket.update({
-              where: { id: ticket.id },
-              data: {
-                status: 'WON',
-                prizeAmount: bestPrize,
-                prizeDivision: bestDivision.divisionName,
-              },
-            })
-
-            await prisma.notification.create({
-              data: {
-                userId: ticket.userId,
-                title: '🏆 You won a prize!',
-                message: `Congratulations! You won ${bestDivision.divisionName} ($${bestPrize.toFixed(2)}) in Draw #${draw.drawNumber}!`,
-                data: { ticketId: ticket.id, drawId: draw.id },
-              },
-            })
-
-            // Credit wallet
-            const wallet = await prisma.wallet.findUnique({ where: { userId: ticket.userId } })
-            if (wallet) {
-              await prisma.wallet.update({
-                where: { id: wallet.id },
-                data: { balance: { increment: bestPrize }, totalWon: { increment: bestPrize } }
-              })
-              await prisma.transaction.create({
-                data: {
-                  userId: ticket.userId,
-                  walletId: wallet.id,
-                  type: 'PRIZE_CREDIT',
-                  amount: bestPrize,
-                  balanceBefore: Number(wallet.balance),
-                  balanceAfter: Number(wallet.balance) + bestPrize,
-                  reference: draw.id,
-                  description: `Winnings from Draw #${draw.drawNumber}`,
-                  status: 'COMPLETED'
-                }
-              })
-            }
-
-            totalPrizes += bestPrize
-          } else {
-            // Losing ticket
-            await prisma.ticket.update({
-              where: { id: ticket.id },
-              data: { status: 'LOST' },
-            })
+            if (bestDivision.isJackpot) jackpotWinnerUserIds.push(ticket.userId)
+          } else if (!bestDivision) {
+            ticketResults.push({ ticketId: ticket.id, userId: ticket.userId, status: 'LOST', bestDivision: null, bestPrize: 0, isJackpotWin: false })
           }
         }
 
-        // 4. Update draw to COMPLETED
-        await prisma.draw.update({
-          where: { id: draw.id },
-          data: { status: 'COMPLETED' },
+        const totalSales = Number(draw.totalSales)
+
+        // 4. Execute jackpot + non-jackpot payouts in a single atomic transaction
+        await prisma.$transaction(async (tx) => {
+          // Process jackpot rollover / payout
+          const jpResult = await processDrawJackpot(
+            tx,
+            draw.game.id,
+            draw.id,
+            draw.drawNumber,
+            totalSales,
+            jackpotWinnerUserIds,
+            draw.game.minJackpot
+          )
+
+          // Process non-jackpot winners and losers
+          for (const result of ticketResults) {
+            if (result.status === 'WON') {
+              const prize = result.isJackpotWin ? jpResult.perWinnerAmount : result.bestPrize
+
+              await tx.winningEntry.create({
+                data: {
+                  ticketId: result.ticketId,
+                  drawId: draw.id,
+                  divisionName: result.bestDivision.divisionName,
+                  prizeAmount: prize,
+                },
+              })
+
+              await tx.ticket.update({
+                where: { id: result.ticketId },
+                data: {
+                  status: 'WON',
+                  prizeAmount: prize,
+                  prizeDivision: result.bestDivision.divisionName,
+                },
+              })
+
+              // Non-jackpot prize credits (jackpot credits done inside jackpot service)
+              if (!result.isJackpotWin && prize > 0) {
+                const wallet = await tx.wallet.findUnique({ where: { userId: result.userId } })
+                if (wallet) {
+                  await tx.wallet.update({
+                    where: { id: wallet.id },
+                    data: { balance: { increment: prize }, totalWon: { increment: prize } }
+                  })
+                  await tx.transaction.create({
+                    data: {
+                      userId: result.userId,
+                      walletId: wallet.id,
+                      type: 'PRIZE_CREDIT',
+                      amount: prize,
+                      balanceBefore: Number(wallet.balance),
+                      balanceAfter: Number(wallet.balance) + prize,
+                      reference: `WIN-${draw.id}-${result.ticketId}`,
+                      description: `Winnings from Draw #${draw.drawNumber} — ${result.bestDivision.divisionName}`,
+                      status: 'COMPLETED',
+                      drawId: draw.id,
+                    }
+                  })
+                  await tx.notification.create({
+                    data: {
+                      userId: result.userId,
+                      title: '🏆 You won a prize!',
+                      message: `Congratulations! You won ${result.bestDivision.divisionName} (🪙${prize.toFixed(2)}) in Draw #${draw.drawNumber}!`,
+                      data: { ticketId: result.ticketId, drawId: draw.id },
+                    },
+                  })
+                }
+                totalPrizes += prize
+              } else if (result.isJackpotWin) {
+                totalPrizes += jpResult.perWinnerAmount
+              }
+            } else {
+              await tx.ticket.update({
+                where: { id: result.ticketId },
+                data: { status: 'LOST' },
+              })
+            }
+          }
+
+          // Mark draw COMPLETED
+          await tx.draw.update({
+            where: { id: draw.id },
+            data: { status: 'COMPLETED', totalPrizes },
+          })
+
+          console.log(
+            jpResult.isRollover
+              ? `🔄 Jackpot rolled over to 🪙${jpResult.jackpotAfter.toFixed(2)} for ${draw.game.name}`
+              : `💰 Jackpot of 🪙${jpResult.jackpotPaid.toFixed(2)} paid to ${jpResult.winnerCount} winner(s). Reset to 🪙${jpResult.jackpotAfter.toFixed(2)}`
+          )
         })
 
-        // 5. Schedule Next Draw
+        // 5. Schedule Next Draw with the updated jackpot amount
         if (draw.game.drawSchedule) {
           try {
             const interval = parser.parseExpression(draw.game.drawSchedule, { currentDate: now })
             const nextDate = interval.next().toDate()
-            
+
+            // Fetch updated jackpot from the pool
+            const updatedPool = await prisma.jackpotPool.findUnique({ where: { gameId: draw.game.id } })
+            const nextJackpot = updatedPool ? Number(updatedPool.currentJackpot) : Number(draw.jackpotAmount)
+
             await prisma.draw.create({
               data: {
                 gameId: draw.game.id,
                 drawNumber: draw.drawNumber + 1,
                 scheduledAt: nextDate,
-                jackpotAmount: draw.jackpotAmount, // keep same jackpot or increment? keeping same for now
+                jackpotAmount: nextJackpot,
                 status: 'SCHEDULED'
               }
             })
-            console.log(`📅 Scheduled next draw for ${draw.game.name} on ${nextDate.toISOString()}`)
+            console.log(`📅 Scheduled next draw for ${draw.game.name} on ${nextDate.toISOString()} — jackpot: 🪙${nextJackpot.toFixed(2)}`)
           } catch (e) {
             console.error('Failed to schedule next draw:', e)
           }
@@ -179,3 +242,4 @@ export function initCronJobs() {
     }
   })
 }
+

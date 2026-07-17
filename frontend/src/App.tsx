@@ -72,6 +72,7 @@ const AdminSupportPage = lazy(() => import('@/pages/admin/SupportAdminPage'))
 const AdminAuditPage = lazy(() => import('@/pages/admin/AuditLogsPage'))
 const AdminSettingsPage = lazy(() => import('@/pages/admin/SettingsPage'))
 const AdminAffiliatesPage = lazy(() => import('@/pages/admin/AffiliatesAdminPage'))
+const AdminJackpotPage = lazy(() => import('@/pages/admin/JackpotManagementPage'))
 
 const PageLoader = () => (
   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '60vh' }}>
@@ -147,6 +148,7 @@ export default function App() {
               <Route path="/admin/audit" element={<AdminAuditPage />} />
               <Route path="/admin/settings/*" element={<AdminSettingsPage />} />
               <Route path="/admin/affiliates" element={<AdminAffiliatesPage />} />
+              <Route path="/admin/jackpot" element={<AdminJackpotPage />} />
             </Route>
 
             <Route path="*" element={<Navigate to="/" replace />} />
