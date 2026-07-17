@@ -1,0 +1,48 @@
+databases:
+  - name: lottery-db
+    plan: free
+    databaseName: lottery_db
+    user: lottery_user
+
+services:
+  - type: redis
+    name: lottery-redis
+    plan: free
+    ipAllowList: [] # Allow internal connections only
+
+  - type: web
+    name: lottery-backend
+    env: node
+    plan: free
+    buildCommand: npm install && npx prisma generate && npm run build
+    startCommand: npm run db:migrate && npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: lottery-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: lottery-redis
+          property: connectionString
+      - key: JWT_SECRET
+        generateValue: true
+      - key: FRONTEND_URL
+        sync: false
+      - key: SMTP_HOST
+        value: smtp.gmail.com
+      - key: SMTP_PORT
+        value: "587"
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASS
+        sync: false
+      - key: FROM_EMAIL
+        sync: false
+      - key: COUPON_API_URL
+        sync: false
+      - key: COUPON_API_KEY
+        sync: false
