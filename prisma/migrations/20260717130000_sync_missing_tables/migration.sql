@@ -1,4 +1,4 @@
-﻿-- CreateEnum
+-- CreateEnum
 CREATE TYPE "SupportAgentStatus" AS ENUM ('ONLINE', 'OFFLINE', 'BUSY', 'AWAY', 'ON_BREAK');
 
 -- CreateEnum
