@@ -1,2 +1,3 @@
 ALTER TABLE "banners"
-ADD COLUMN "backgroundColor" TEXT;
+ADD COLUMN IF NOT EXISTS "backgroundColor" TEXT,
+ADD COLUMN IF NOT EXISTS "metadata" JSONB;
