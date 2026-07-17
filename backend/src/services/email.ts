@@ -4,15 +4,21 @@
 
 import nodemailer from 'nodemailer'
 
-const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST || 'smtp.gmail.com',
-  port: Number(process.env.SMTP_PORT) || 587,
-  secure: false,
-  auth: {
-    user: process.env.SMTP_USER,
-    pass: process.env.SMTP_PASS,
-  },
-})
+function createTransporter() {
+  return nodemailer.createTransport({
+    host: process.env.SMTP_HOST || 'smtp.gmail.com',
+    port: Number(process.env.SMTP_PORT) || 587,
+    secure: false,
+    auth: {
+      user: process.env.SMTP_USER,
+      pass: process.env.SMTP_PASS,
+    },
+    // Timeouts to avoid hanging on cold Render restarts
+    connectionTimeout: 10000,
+    greetingTimeout: 10000,
+    socketTimeout: 15000,
+  })
+}
 
 interface EmailOptions {
   to: string
@@ -96,15 +102,32 @@ export async function sendEmail({ to, subject, template, data }: EmailOptions): 
     return
   }
 
-  try {
-    await transporter.sendMail({
-      from: `MegaDraw <${process.env.FROM_EMAIL || 'noreply@MegaDraw.com'}>`,
-      to,
-      subject,
-      html,
-    })
-  } catch (error) {
-    console.error('Email send error:', error)
-    // Don't throw - email failures shouldn't break the main flow
+  const MAX_ATTEMPTS = 2
+  let lastError: unknown
+
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    // Create a fresh transporter each time to avoid stale connections after Render cold starts
+    const transporter = createTransporter()
+    try {
+      await transporter.sendMail({
+        from: `MegaDraw <${process.env.FROM_EMAIL || 'noreply@MegaDraw.com'}>`,
+        to,
+        subject,
+        html,
+      })
+      transporter.close()
+      return // success
+    } catch (error) {
+      lastError = error
+      console.error(`Email send attempt ${attempt}/${MAX_ATTEMPTS} failed:`, error)
+      transporter.close()
+      if (attempt < MAX_ATTEMPTS) {
+        await new Promise((r) => setTimeout(r, 1500 * attempt)) // wait before retry
+      }
+    }
   }
+
+  // All attempts failed — throw so the caller can surface it to the user
+  throw new Error(`Failed to send email after ${MAX_ATTEMPTS} attempts: ${lastError}`)
 }
+

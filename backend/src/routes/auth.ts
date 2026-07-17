@@ -130,21 +130,29 @@ export default async function authRoutes(app: FastifyInstance) {
     const verifyToken = randomBytes(32).toString('hex')
     await redis.setex(`email_verify:${verifyToken}`, 86400, user.id) // 24h TTL
 
-    await sendEmail({
-      to: user.email,
-      subject: 'Verify your MegaDraw account',
-      template: 'email-verification',
-      data: {
-        name: user.firstName,
-        verifyUrl: `${process.env.FRONTEND_URL}/verify-email?token=${verifyToken}`,
-      },
-    })
+    let emailSent = true
+    try {
+      await sendEmail({
+        to: user.email,
+        subject: 'Verify your MegaDraw account',
+        template: 'email-verification',
+        data: {
+          name: user.firstName,
+          verifyUrl: `${process.env.FRONTEND_URL}/verify-email?token=${verifyToken}`,
+        },
+      })
+    } catch (emailErr) {
+      emailSent = false
+      console.error('Verification email failed after retries:', emailErr)
+    }
 
     await auditLog(user.id, 'REGISTER', 'User', user.id, undefined, { email: user.email }, request)
 
     return reply.status(201).send({
       success: true,
-      message: 'Account created. Please check your email to verify your account.',
+      message: emailSent
+        ? 'Account created. Please check your email to verify your account.'
+        : 'Account created. We had trouble sending the verification email — please use Resend Verification from your profile.',
       data: {
         id: user.id,
         email: user.email,
@@ -162,15 +170,20 @@ export default async function authRoutes(app: FastifyInstance) {
     const verifyToken = randomBytes(32).toString('hex')
     await redis.setex(`email_verify:${verifyToken}`, 86400, user.id) // 24h TTL
 
-    await sendEmail({
-      to: user.email,
-      subject: 'Verify your MegaDraw account',
-      template: 'email-verification',
-      data: {
-        name: user.firstName,
-        verifyUrl: `${process.env.FRONTEND_URL}/verify-email?token=${verifyToken}`,
-      },
-    })
+    try {
+      await sendEmail({
+        to: user.email,
+        subject: 'Verify your MegaDraw account',
+        template: 'email-verification',
+        data: {
+          name: user.firstName,
+          verifyUrl: `${process.env.FRONTEND_URL}/verify-email?token=${verifyToken}`,
+        },
+      })
+    } catch (emailErr) {
+      console.error('Resend verification email failed after retries:', emailErr)
+      return reply.status(503).send({ success: false, error: 'Failed to send email. Please try again in a moment.' })
+    }
 
     return reply.send({ success: true, message: 'Verification email resent' })
   })
