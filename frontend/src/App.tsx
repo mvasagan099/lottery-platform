@@ -9,6 +9,7 @@ import AdminRoute from '@/components/Layout/AdminRoute'
 import MaintenanceGuard from '@/components/Layout/MaintenanceGuard'
 import Spinner from '@/components/UI/Spinner'
 import { GlobalErrorBoundary } from '@/components/GlobalErrorBoundary'
+import FloatingSupport from '@/components/common/FloatingSupport'
 
 // ── Lazy-loaded pages ─────────────────────────────────────────────────────────
 const HomePage = lazy(() => import('@/pages/HomePage'))
@@ -154,6 +155,7 @@ export default function App() {
         </GlobalErrorBoundary>
       </MaintenanceGuard>
       <Footer />
+      <FloatingSupport />
     </div>
   )
 }
