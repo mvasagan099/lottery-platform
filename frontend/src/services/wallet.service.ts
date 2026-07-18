@@ -26,4 +26,6 @@ export const walletService = {
   }) => api.post<ApiResponse>('/wallet/withdraw', payload),
 
   redeemCoupon: (code: string) => api.post<ApiResponse<any>>('/wallet/redeem', { code }),
+
+  transferToCouponWallet: (amount: number) => api.post<ApiResponse<any>>('/wallet/transfer', { amount }),
 }

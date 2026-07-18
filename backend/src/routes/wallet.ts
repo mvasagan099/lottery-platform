@@ -289,6 +289,129 @@ export default async function walletRoutes(app: FastifyInstance) {
     })
   })
 
+  // POST /wallet/transfer - Transfer winnings to Coupon Wallet
+  app.post('/transfer', {
+    preHandler: [authenticate, requireVerifiedEmail],
+    config: { rateLimit: { max: 50, timeWindow: '1 hour' } },
+  }, async (request, reply) => {
+    const transferSchema = z.object({
+      amount: z.number().positive().min(1),
+    })
+    
+    const body = transferSchema.parse(request.body)
+    const userId = request.user.userId
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { email: true }
+    })
+
+    if (!user) return reply.status(404).send({ success: false, error: 'User not found' })
+
+    const wallet = await prisma.wallet.findUnique({
+      where: { userId },
+      select: { id: true, balance: true },
+    })
+
+    if (!wallet) return reply.status(404).send({ success: false, error: 'Wallet not found' })
+
+    if (Number(wallet.balance) < body.amount) {
+      return reply.status(400).send({
+        success: false,
+        error: 'Insufficient balance for transfer',
+      })
+    }
+
+    const transactionId = `TRF-${userId.substring(0, 8)}-${Date.now()}`
+
+    // 1. Send authenticated request to Coupon Platform
+    const transferUrl = `${process.env.COUPON_API_URL}/wallet/transfer`
+    const transferRes = await fetch(transferUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': process.env.COUPON_API_KEY || ''
+      },
+      body: JSON.stringify({
+        userId: userId,
+        userEmail: user.email,
+        amount: body.amount,
+        transactionId: transactionId
+      })
+    })
+
+    let transferData;
+    try {
+      transferData = await transferRes.json();
+    } catch (e) {
+      console.error('Failed to parse Coupon API response:', transferRes.status);
+      return reply.status(502).send({ success: false, error: 'Bad Gateway: Coupon API returned invalid response.' });
+    }
+
+    // Handle idempotency (409 Conflict) or failure
+    if (!transferRes.ok && transferRes.status !== 409) {
+      console.error('Transfer to Coupon Wallet failed:', transferData)
+      return reply.status(400).send({
+        success: false,
+        error: transferData.message || 'Failed to transfer to Coupon Wallet',
+        code: transferData.code || 'TRANSFER_FAILED'
+      })
+    }
+
+    // 2. Deduct from game wallet on success
+    try {
+      await prisma.$transaction(async (tx) => {
+        const balBefore = Number(wallet.balance)
+
+        // Deduct wallet
+        await tx.wallet.update({
+          where: { id: wallet.id },
+          data: {
+            balance: { decrement: body.amount },
+            totalWithdrawn: { increment: body.amount },
+          },
+        })
+
+        // Log transaction
+        await tx.transaction.create({
+          data: {
+            userId,
+            walletId: wallet.id,
+            type: 'WITHDRAWAL',
+            status: 'COMPLETED',
+            amount: body.amount,
+            balanceBefore: balBefore,
+            balanceAfter: balBefore - body.amount,
+            reference: transactionId,
+            description: 'Transfer to Coupon Wallet',
+          },
+        })
+      })
+    } catch (err) {
+      console.error('CRITICAL: Transfer credited in Coupon Wallet but failed to deduct from Game Wallet', {
+        userId, transactionId, amount: body.amount, error: err
+      })
+      return reply.status(500).send({ success: false, error: 'Transfer failed during finalization. Contact support.' })
+    }
+
+    await auditLog(userId, 'WALLET_TRANSFER', 'Withdrawal', undefined, undefined, { amount: body.amount, transactionId }, request)
+
+    // Notify user
+    await prisma.notification.create({
+      data: {
+        userId,
+        title: 'Transfer Successful',
+        message: `$${body.amount} has been transferred to your Coupon Wallet.`,
+      },
+    })
+
+    return reply.status(200).send({
+      success: true,
+      message: 'Transfer to Coupon Wallet successful.',
+      data: { transactionId, amount: body.amount }
+    })
+  })
+
   // GET /wallet/deposits - Deposit history
   app.get('/deposits', { preHandler: authenticate }, async (request, reply) => {
     const { page = '1', limit = '20' } = request.query as Record<string, string>

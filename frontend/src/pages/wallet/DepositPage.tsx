@@ -57,6 +57,17 @@ export default function DepositPage() {
           >
             {mutation.isPending ? <><div className="btn-spinner" /> Processing...</> : 'Redeem Code'}
           </button>
+          
+          <div style={{ textAlign: 'center', marginTop: '16px' }}>
+            <a 
+              href={import.meta.env.VITE_COUPON_APP_URL || 'http://localhost:5174'} 
+              target="_blank" 
+              rel="noreferrer" 
+              style={{ color: 'var(--color-primary)', fontSize: '14px', textDecoration: 'none', fontWeight: 500 }}
+            >
+              Need a coupon? Buy one here &rarr;
+            </a>
+          </div>
         </div>
       </div>
     </div>
