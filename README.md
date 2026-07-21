@@ -203,3 +203,37 @@ The platform enforces strict Role-Based Access Control (RBAC). Default roles inc
 
 ---
 *MegaDraw Platform - Engineered for scale, fairness, and reliability.*
+
+---
+
+## ☁️ Hosting & Deployment (Render)
+
+The project includes a `render.yaml` configuration file for seamless, one-click deployment to [Render.com](https://render.com/).
+
+### Deployed Services
+The blueprint provisions the following infrastructure on Render's free/standard tiers:
+1. **Database (`lottery-db`)**: A managed PostgreSQL database for all persistent application data.
+2. **Cache & Queue (`lottery-redis`)**: A managed Redis instance restricted to internal connections only.
+3. **Backend API (`lottery-backend`)**: The Fastify Node.js web service.
+
+### Deployment Steps
+1. Connect your GitHub repository to your Render account.
+2. In the Render Dashboard, click **New > Blueprint**.
+3. Select your repository. Render will automatically detect the `render.yaml` file.
+4. Fill in any required environment variables (marked as `sync: false` in the YAML), such as:
+   - `FRONTEND_URL`
+   - `SMTP_USER`, `SMTP_PASS`, `FROM_EMAIL`
+   - `COUPON_API_URL`, `COUPON_API_KEY`
+5. Click **Apply**. 
+
+Render will automatically execute the following commands during deployment:
+
+**Build Command:**
+```bash
+npm install && npx prisma generate && npm run build
+```
+
+**Start Command:**
+```bash
+npm run db:migrate && npm start
+```
