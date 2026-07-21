@@ -1,63 +1,79 @@
 # OzLotto / MegaDraw & CouponVault Integration Ecosystem
-## Strategic Client Proposal, Integration Architecture & Project Roadmap
+## Detailed User Flow, Admin Flow & Strategic Client Proposal
 
 ---
 
 ## 1. Executive Summary
 
-This proposal outlines the strategic vision, technical architecture, and implementation roadmap for integrating the **OzLotto / MegaDraw Gaming Platform** with the **CouponVault Merchant Voucher System**. 
+This proposal outlines the strategic vision, technical architecture, user flows, and administrative workflows for integrating the **OzLotto / MegaDraw Gaming Platform** with the **CouponVault Merchant Voucher System**. 
 
 By unifying online lottery gameplay with a dynamic merchant coupon ecosystem, businesses can drive user acquisition, enable instant digital voucher redemptions for lottery balance/coins, and allow merchants to run promotional marketing campaigns backed by real-world lottery rewards.
 
 ---
 
-## 2. Platform Architecture Overview
+## 2. User Flow (Customer Experience)
 
-### A. OzLotto / MegaDraw Gaming Platform
-- **Core Gaming Engine:** Supports 8+ global lottery formats including *Powerball, MegaDraw, Saturday Lotto, Set for Life, Lucky Lotteries, Lotto Strike, and Super 66*.
-- **Automated Draw Execution:** Cron-scheduled draw engine, prize tier division processing, and instant win notification system.
-- **Ticket & Syndicate System:** Handles single ticket entries, Quick Picks, System Entries, and multi-share Syndicates.
-- **Security & Compliance:** Fastify-JWT authentication, Argon2 password hashing, 2FA, rate limiting, and complete KYC identity verification workflows.
+The user flow covers the end-to-end journey from acquiring a coupon to playing lottery games and withdrawing winnings:
 
-### B. CouponVault Merchant Platform
-- **Merchant Management Portal:** Dashboard allowing merchants to create, issue, and manage promotional vouchers, gift cards, and discount codes.
-- **Payment Gateway Integration:** Direct payment checkout via **Razorpay** and **Stripe** for acquiring gift vouchers.
-- **Single-Use Token Verification:** Encrypted token lifecycle management preventing double-redemption or fraudulent reuse.
-- **Granular Security:** Supabase backend with Row-Level Security (RLS) policies and admin function controls.
+```text
+[Step 1: Buy Voucher] ──> [Step 2: Login to Lottery] ──> [Step 3: Enter Code] ──> [Step 4: API Validation] ──> [Step 5: Play & Win]
+ (CouponVault Portal)       (MegaDraw Deposit Page)       (Redeem Coupon)        (Wallet Credited)         (Draws & Payouts)
+```
+
+### Phase A: Voucher Acquisition (CouponVault Platform)
+1. **Browse Vouchers:** Customer visits the Merchant / Coupon Portal (CouponVault).
+2. **Select Gift Card:** User picks a gift voucher or promotional code (e.g. $10, $50, $100 lottery coupon).
+3. **Payment Processing:** User completes checkout via **Razorpay** or **Stripe** (or redeems merchant loyalty points).
+4. **Code Generation:** The system issues a unique, single-use encrypted coupon code (e.g., `OZ-982F-77A1`) with a QR code and expiry date.
+
+### Phase B: Wallet Deposit & Redemption (OzLotto Platform)
+1. **Account Login:** User logs into the OzLotto Gaming Platform (with 2FA / KYC verification).
+2. **Redeem Coupon:** User navigates to `Wallet` -> `Add Funds / Redeem Coupon`.
+3. **Code Input:** User enters the coupon code `OZ-982F-77A1`.
+4. **Backend Validation:** The Fastify backend executes an authenticated API handshake with CouponVault to verify the code's validity, amount, and expiry.
+5. **Wallet Credited:** CouponVault marks the token as `REDEEMED`, and the user's lottery wallet is instantly credited with Coins/USD.
+
+### Phase C: Gameplay & Prize Payouts (OzLotto Platform)
+1. **Select Game:** User selects from 8+ games (*Powerball, MegaDraw, Saturday Lotto, Set for Life, etc.*).
+2. **Choose Numbers:** User picks numbers manually, uses **Quick Pick**, or joins a **Syndicate** group.
+3. **Ticket Generation:** Wallet balance is deducted, and a digital ticket with a unique QR code is generated.
+4. **Draw Execution & Winning:** Automated cron jobs execute the draw, calculate division prizes, and credit winnings directly back to the user's wallet.
+5. **Bank Withdrawal:** User requests withdrawal to their bank account (subject to approved KYC verification).
 
 ---
 
-## 3. Integrated User Journey & Data Flow
+## 3. Admin & Merchant Flow (Operational Governance)
 
-```
-+------------------------+          +------------------------+          +-------------------------+
-|      CouponVault       |          |  API Handshake Server  |          |   OzLotto Platform      |
-| (Merchant / Payment)   |          |  (Single-Use Validation) |          | (Wallet & Lottery App)  |
-+-----------+------------+          +-----------+------------+          +------------+------------+
-            |                                   |                                    |
-  1. User buys / receives                       |                                    |
-     Coupon (e.g. FREE50)                       |                                    |
-            |                                   |                                    |
-            +-----------------------------------|----------------------------------->| 2. User submits Code
-                                                |                                       in Deposit Page
-                                                |<-----------------------------------+
-                                                | 3. Verify Code & Expiry
-                                                |
-                                                | 4. Invalidate Token & Return Amount
-                                                +----------------------------------->|
-                                                                                     | 5. Credit Wallet Balance
-                                                                                     | 6. User plays Lottery!
+```text
++------------------------------------+          +------------------------------------+
+|    CouponVault Merchant Admin      |          |     MegaDraw Gaming Admin          |
++------------------------------------+          +------------------------------------+
+| 1. Onboard Merchants & Issue Keys  |          | 1. Configure Games & Cron Schedules|
+| 2. Create Promo Campaigns & Batches|          | 2. Perform KYC & Document Review   |
+| 3. Track Sales & Redemption Analytics|       | 3. Approve Bank Withdrawals        |
+| 4. Export Payout Settlement Reports |          | 4. Manage RBAC Roles & Audit Logs  |
++------------------------------------+          +------------------------------------+
 ```
 
-1. **Voucher Acquisition:** A user buys or receives a promotional voucher (e.g., `FREE50`, `LOTTO100`) via CouponVault or merchant marketing campaigns.
-2. **Redemption Request:** The user navigates to the Lottery Platform Deposit Page and inputs their coupon code.
-3. **Secure Handshake:** The Fastify backend executes an authenticated API request to the CouponVault service to validate the voucher's status, balance, and expiration date.
-4. **Token Burn & Credit:** Once verified, CouponVault marks the voucher as `REDEEMED`, and the Lottery Platform instantly credits the equivalent balance/coins to the user's wallet.
-5. **Gameplay:** The user selects their lottery numbers or quick picks and enters upcoming draws.
+### Phase A: Merchant & Coupon Management (CouponVault Admin Portal)
+1. **Merchant Onboarding:** Super Admin creates merchant accounts and generates secure API keys (`COUPON_API_KEY`) for system communication.
+2. **Campaign Setup:** Merchants create promotional voucher batches, specifying face value, usage limits, expiration rules, and bonus percentages.
+3. **Real-time Analytics:** Merchants track voucher metrics:
+   - Total vouchers issued vs. purchased.
+   - Redemption rate & active vs. expired status.
+   - Total revenue collected via Razorpay/Stripe.
+4. **Financial Settlement:** System generates financial reports for merchant payout reconciliation.
+
+### Phase B: Platform & Gaming Governance (MegaDraw Admin Portal)
+1. **Game & Draw Control:** Admin configures draw schedules (cron expressions), ticket prices, jackpot amounts, and division prize allocation.
+2. **Manual Verification & Override:** Admins can review draw numbers, trigger manual payouts, or suspend draws if required.
+3. **KYC & Compliance:** Compliance officers inspect uploaded identity documents (Passports / Driver Licenses) and approve/reject withdrawal permissions.
+4. **RBAC & Security Audit:** Super Admin manages user roles (`SUPER_ADMIN`, `ADMIN`, `SUPPORT`, `AFFILIATE_MANAGER`) and reviews system audit logs.
+5. **Support & Affiliate Operations:** Support staff respond to customer tickets; Affiliate managers audit referral signups and commissions.
 
 ---
 
-## 4. Technical Stack
+## 4. Technical Architecture Overview
 
 | Layer | Technology | Function |
 | :--- | :--- | :--- |
@@ -70,36 +86,16 @@ By unifying online lottery gameplay with a dynamic merchant coupon ecosystem, bu
 
 ---
 
-## 5. Project Implementation Roadmap
+## 5. Implementation Roadmap (12 Weeks)
 
-```
-+-----------------------------------------------------------------------------------+
-| Phase 1: Foundation & DB Sync (Weeks 1 - 3)                                       |
-| - Finalize API contracts, JWT / Supabase auth links, and database schemas.       |
-+-----------------------------------------------------------------------------------+
-                                      │
-                                      ▼
-+-----------------------------------------------------------------------------------+
-| Phase 2: Payment Gateway & Coupon API Engine (Weeks 4 - 6)                        |
-| - Implement Razorpay webhooks, token burn logic, and Fastify wallet handlers.      |
-+-----------------------------------------------------------------------------------+
-                                      │
-                                      ▼
-+-----------------------------------------------------------------------------------+
-| Phase 3: Frontend Integration & UX Polish (Weeks 7 - 9)                           |
-| - Build Redemption UI in Lottery App, Merchant analytics, and real-time alerts.    |
-+-----------------------------------------------------------------------------------+
-                                      │
-                                      ▼
-+-----------------------------------------------------------------------------------+
-| Phase 4: QA, Security Audit & Production Launch (Weeks 10 - 12)                    |
-| - Load testing, penetration testing, Render/Docker deployment, client handover.   |
-+-----------------------------------------------------------------------------------+
-```
+- **Weeks 1–3: Architecture & DB Synchronization** — Shared API schemas, JWT & Supabase auth linking, database migrations.
+- **Weeks 4–6: Payment Gateway & Coupon Engine** — Razorpay webhooks, single-use token verification, Fastify wallet handlers.
+- **Weeks 7–9: Frontend Integration & UX Polish** — Redemption UI in Lottery App, merchant analytics dashboard, real-time alerts.
+- **Weeks 10–12: QA, Security Audit & Production Launch** — Load testing, Redis rate-limiting, penetration testing, Render/Docker deployment, and final client handover.
 
 ---
 
-## 6. PDF Artifact Location
+## 6. Generated PDF Location
 
-The formatted presentation document has been compiled and saved to:
+The presentation PDF document has been updated and compiled at:
 `c:\Users\hi\Documents\lotto coupon integration\lottery-platform\Lottery_Coupon_Integration_Client_Roadmap.pdf`

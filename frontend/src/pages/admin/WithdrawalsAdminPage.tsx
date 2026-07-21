@@ -66,7 +66,11 @@ export default function WithdrawalsAdminPage() {
     {
       accessorKey: 'id',
       header: 'Tx ID',
-      cell: info => <span style={{ fontFamily: 'monospace', color: 'var(--text-secondary)' }}>{(info.getValue() as string).substring(0, 8).toUpperCase()}</span>
+      cell: info => {
+        const id = info.getValue() as string
+        const displayId = 'WDR-' + id.substring(Math.max(0, id.length - 6)).toUpperCase()
+        return <span style={{ fontFamily: 'monospace', color: 'var(--text-secondary)' }}>{displayId}</span>
+      }
     },
     {
       accessorKey: 'wallet.user',
@@ -94,7 +98,7 @@ export default function WithdrawalsAdminPage() {
     {
       accessorKey: 'gateway',
       header: 'Method',
-      cell: info => <span style={{ textTransform: 'capitalize' }}>{(info.getValue() as string).toLowerCase()}</span>
+      cell: info => <span style={{ textTransform: 'capitalize' }}>{(info.getValue() as string).replace(/_/g, ' ').toLowerCase()}</span>
     },
     {
       accessorKey: 'status',

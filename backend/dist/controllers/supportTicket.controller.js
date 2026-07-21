@@ -40,7 +40,22 @@ class SupportTicketController {
     static async listTickets(request, reply) {
         try {
             const tickets = await supportTicket_service_1.SupportTicketService.listTickets(request.query);
-            return reply.send({ success: true, data: tickets });
+            const formattedTickets = tickets.map((t) => ({
+                ...t,
+                userEmail: t.user?.email || 'Unknown',
+                username: t.user?.username || t.user?.firstName || 'Unknown',
+                category: t.category?.name || t.categoryId || 'GENERAL',
+            }));
+            return reply.send({
+                success: true,
+                data: formattedTickets,
+                pagination: {
+                    total: tickets.length,
+                    pages: 1,
+                    page: 1,
+                    limit: 100
+                }
+            });
         }
         catch (error) {
             return reply.status(400).send({ success: false, error: error.message || error });
@@ -50,7 +65,7 @@ class SupportTicketController {
         try {
             const data = support_validator_1.replyTicketSchema.parse(request.body);
             const user = request.user;
-            const senderId = user.id; // Either user or agent id
+            const senderId = user.userId; // JWT contains userId
             const senderType = user.role === 'USER' ? 'USER' : 'AGENT';
             const message = await supportTicket_service_1.SupportTicketService.replyToTicket(request.params.id, senderId, senderType, data.message, data.isInternal);
             return reply.send({ success: true, data: message });
@@ -63,7 +78,7 @@ class SupportTicketController {
         try {
             const data = support_validator_1.assignTicketSchema.parse(request.body);
             const user = request.user; // The person assigning
-            const ticket = await supportTicket_service_1.SupportTicketService.assignTicket(request.params.id, data.agentId, user?.id);
+            const ticket = await supportTicket_service_1.SupportTicketService.assignTicket(request.params.id, data.agentId, user?.userId);
             return reply.send({ success: true, data: ticket });
         }
         catch (error) {

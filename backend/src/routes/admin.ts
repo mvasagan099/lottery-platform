@@ -1134,6 +1134,7 @@ export default async function adminRoutes(app: FastifyInstance) {
 
     return reply.send({ success: true, data: logs, pagination: { page: Number(page), limit: Number(limit), total } })
   })
+
 }
 
 // Helper: determine prize division based on matches

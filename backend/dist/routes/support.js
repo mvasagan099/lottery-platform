@@ -56,16 +56,21 @@ async function supportRoutes(app) {
     // POST /support/tickets - Submit a support ticket
     app.post('/tickets', {
         preHandler: auth_1.authenticate,
-        config: { rateLimit: { max: 5, timeWindow: '1 hour' } },
+        config: { rateLimit: { max: 50, timeWindow: '1 hour' } },
     }, async (request, reply) => {
         const body = createTicketSchema.parse(request.body);
         const userId = request.user.userId;
         const ticket = await server_1.prisma.$transaction(async (tx) => {
+            // Find or create the category
+            let categoryRecord = await tx.ticketCategoryModel.findUnique({ where: { name: body.category } });
+            if (!categoryRecord) {
+                categoryRecord = await tx.ticketCategoryModel.create({ data: { name: body.category } });
+            }
             const t = await tx.supportTicket.create({
                 data: {
                     userId,
                     subject: body.subject,
-                    categoryId: body.category,
+                    categoryId: categoryRecord.id,
                     priority: body.priority,
                 },
             });

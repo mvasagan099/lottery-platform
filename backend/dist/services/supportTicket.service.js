@@ -33,7 +33,18 @@ class SupportTicketService {
         return prisma.supportTicket.findUnique({
             where: { id },
             include: {
-                user: { select: { id: true, firstName: true, lastName: true, email: true } },
+                user: {
+                    select: {
+                        id: true,
+                        firstName: true,
+                        lastName: true,
+                        email: true,
+                        kycStatus: true,
+                        country: true,
+                        wallet: { select: { balance: true } },
+                        _count: { select: { transactions: true } }
+                    }
+                },
                 category: true,
                 department: true,
                 assignedTo: {
@@ -72,7 +83,7 @@ class SupportTicketService {
             include: {
                 category: true,
                 department: true,
-                user: { select: { firstName: true, lastName: true } },
+                user: { select: { firstName: true, lastName: true, email: true, username: true } },
                 assignedTo: {
                     include: { user: { select: { firstName: true, lastName: true } } }
                 }

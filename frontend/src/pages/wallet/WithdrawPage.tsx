@@ -1,11 +1,14 @@
 import { useState } from 'react'
 import { useQuery, useMutation } from '@tanstack/react-query'
 import { walletService } from '@/services/wallet.service'
-import { ArrowUpRight, Info } from 'lucide-react'
+import { ArrowUpRight, Info, ShieldAlert } from 'lucide-react'
 import toast from 'react-hot-toast'
+import { Link } from 'react-router-dom'
+import { useAuthStore } from '@/store/authStore'
 
 export default function WithdrawPage() {
   const [amount, setAmount] = useState('')
+  const { user } = useAuthStore()
 
   const { data: wallet } = useQuery({
     queryKey: ['wallet'],
@@ -19,11 +22,19 @@ export default function WithdrawPage() {
       toast.success('Transferred to Coupon Wallet successfully!')
       setAmount('')
     },
-    onError: (err: any) => toast.error(err.response?.data?.error || 'Transfer failed'),
+    onError: (err: any) => {
+      const errMsg = err.response?.data?.error || 'Transfer failed'
+      if (err.response?.data?.code === 'KYC_REQUIRED') {
+        toast.error('Please complete KYC verification before withdrawing funds')
+      } else {
+        toast.error(errMsg)
+      }
+    },
   })
 
   const available = Number(wallet?.balance || 0)
-  const isInvalid = !amount || Number(amount) < 50 || Number(amount) > available
+  const isKycVerified = user?.kycStatus === 'APPROVED'
+  const isInvalid = !amount || Number(amount) < 50 || Number(amount) > available || !isKycVerified
 
   return (
     <div className="page-wrapper section">
@@ -34,6 +45,23 @@ export default function WithdrawPage() {
         </h1>
 
         <div className="card card-body" style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+          {!isKycVerified && (
+            <div className="alert alert-danger" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.3)', color: '#f87171', padding: '16px', borderRadius: '12px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <ShieldAlert size={24} style={{ flexShrink: 0 }} />
+                <div>
+                  <strong style={{ fontSize: '15px' }}>Please complete KYC verification</strong>
+                  <div style={{ fontSize: '13px', opacity: 0.9, marginTop: '2px' }}>
+                    Identity verification is required before withdrawing or transferring funds.
+                  </div>
+                </div>
+              </div>
+              <Link to="/profile/kyc" className="btn btn-sm btn-gold" style={{ whiteSpace: 'nowrap' }}>
+                Verify Now
+              </Link>
+            </div>
+          )}
+
           <div className="alert alert-info">
             <Info size={18} className="alert-icon" />
             <div>
@@ -55,11 +83,13 @@ export default function WithdrawPage() {
                 onChange={(e) => setAmount(e.target.value)}
                 min="50"
                 max={available}
+                disabled={!isKycVerified}
               />
               <button
                 className="btn btn-ghost btn-sm"
                 style={{ position: 'absolute', right: '6px', top: '50%', transform: 'translateY(-50%)' }}
                 onClick={() => setAmount(String(available))}
+                disabled={!isKycVerified}
               >
                 Max
               </button>
@@ -81,3 +111,4 @@ export default function WithdrawPage() {
     </div>
   )
 }
+

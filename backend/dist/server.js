@@ -68,6 +68,9 @@ const support_1 = __importDefault(require("./routes/support"));
 const publicCms_1 = __importDefault(require("./routes/publicCms"));
 const reports_1 = __importDefault(require("./routes/reports"));
 const payments_1 = __importDefault(require("./routes/payments"));
+const settings_1 = __importDefault(require("./routes/settings"));
+const rbac_1 = __importDefault(require("./routes/rbac"));
+const cron_1 = require("./jobs/cron");
 // Initialize Prisma
 exports.prisma = new client_1.PrismaClient({
     log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error'],
@@ -95,7 +98,7 @@ async function buildApp() {
         crossOriginResourcePolicy: { policy: 'cross-origin' },
     });
     await app.register(cors_1.default, {
-        origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+        origin: true,
         credentials: true,
         methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
         allowedHeaders: ['Content-Type', 'Authorization', 'X-Refresh-Token'],
@@ -124,7 +127,7 @@ async function buildApp() {
         openapi: {
             info: {
                 title: 'MegaDraw API',
-                description: 'Production-ready Australian Lottery Platform API',
+                description: 'Production-ready global Lottery Platform API',
                 version: '1.0.0',
             },
             tags: [
@@ -168,6 +171,8 @@ async function buildApp() {
     await app.register(publicCms_1.default, { prefix: '/cms' });
     await app.register(reports_1.default, { prefix: '/reports' });
     await app.register(payments_1.default, { prefix: '/payments' });
+    await app.register(settings_1.default, { prefix: '/settings' });
+    await app.register(rbac_1.default, { prefix: '/rbac' });
     // ── Global error handler ──────────────────────────────
     app.setErrorHandler(async (error, request, reply) => {
         request.log.error({ err: error, url: request.url, method: request.method });
@@ -206,6 +211,10 @@ async function start() {
     catch (err) {
         app.log.error(err);
         process.exit(1);
+    }
+    // ── Initialize Background Jobs ──────────────────────
+    if (process.env.NODE_ENV !== 'test') {
+        (0, cron_1.initCronJobs)();
     }
     // Graceful shutdown
     const signals = ['SIGTERM', 'SIGINT'];

@@ -9,13 +9,13 @@ import { prisma } from '../server'
 import { authenticate, requireVerifiedEmail, auditLog } from '../middleware/auth'
 
 const depositSchema = z.object({
-  amount: z.number().positive().min(10).max(10000),
+  amount: z.number().positive(),
   gateway: z.enum(['STRIPE', 'PAYPAL', 'BANK_TRANSFER', 'CRYPTO']),
   paymentMethodId: z.string().optional(),
 })
 
 const withdrawalSchema = z.object({
-  amount: z.number().positive().min(10).max(50000),
+  amount: z.number().positive(),
   gateway: z.enum(['STRIPE', 'PAYPAL', 'BANK_TRANSFER']),
   accountDetails: z.object({
     accountName: z.string(),
@@ -28,6 +28,27 @@ const withdrawalSchema = z.object({
 const redeemSchema = z.object({
   code: z.string().min(3).max(50),
 })
+
+async function getWalletSettings() {
+  const defaultWallet = {
+    minDeposit: 10,
+    maxDeposit: 10000,
+    minWithdrawal: 10,
+    maxWithdrawal: 50000,
+    dailyDepositLimit: 20000,
+    dailyWithdrawalLimit: 100000,
+    bonusWalletEnabled: true,
+  }
+  try {
+    const setting = await prisma.systemSetting.findUnique({ where: { category: 'wallet' } })
+    if (setting && setting.data && typeof setting.data === 'object') {
+      return { ...defaultWallet, ...(setting.data as any) }
+    }
+  } catch (err) {
+    console.error('Error fetching wallet settings:', err)
+  }
+  return defaultWallet
+}
 
 export default async function walletRoutes(app: FastifyInstance) {
 
@@ -104,8 +125,34 @@ export default async function walletRoutes(app: FastifyInstance) {
     const body = depositSchema.parse(request.body)
     const userId = request.user.userId
 
+    const walletSettings = await getWalletSettings()
+    if (body.amount < walletSettings.minDeposit) {
+      return reply.status(400).send({ success: false, error: `Minimum deposit amount is $${walletSettings.minDeposit}` })
+    }
+    if (body.amount > walletSettings.maxDeposit) {
+      return reply.status(400).send({ success: false, error: `Maximum deposit amount per transaction is $${walletSettings.maxDeposit}` })
+    }
+
     const wallet = await prisma.wallet.findUnique({ where: { userId } })
     if (!wallet) return reply.status(404).send({ success: false, error: 'Wallet not found' })
+
+    // Check daily deposit limit (last 24h)
+    const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000)
+    const dailyDepositSum = await prisma.deposit.aggregate({
+      where: {
+        walletId: wallet.id,
+        createdAt: { gte: oneDayAgo },
+        status: { in: ['COMPLETED', 'PENDING'] },
+      },
+      _sum: { amount: true },
+    })
+    const totalDepositedToday = Number(dailyDepositSum._sum.amount || 0)
+    if (totalDepositedToday + body.amount > walletSettings.dailyDepositLimit) {
+      return reply.status(400).send({
+        success: false,
+        error: `Daily deposit limit of $${walletSettings.dailyDepositLimit} exceeded. (Already deposited $${totalDepositedToday.toFixed(2)} in last 24h)`,
+      })
+    }
 
     // Create pending deposit
     const deposit = await prisma.deposit.create({
@@ -222,6 +269,14 @@ export default async function walletRoutes(app: FastifyInstance) {
     const body = withdrawalSchema.parse(request.body)
     const userId = request.user.userId
 
+    const walletSettings = await getWalletSettings()
+    if (body.amount < walletSettings.minWithdrawal) {
+      return reply.status(400).send({ success: false, error: `Minimum withdrawal amount is $${walletSettings.minWithdrawal}` })
+    }
+    if (body.amount > walletSettings.maxWithdrawal) {
+      return reply.status(400).send({ success: false, error: `Maximum withdrawal amount per transaction is $${walletSettings.maxWithdrawal}` })
+    }
+
     const wallet = await prisma.wallet.findUnique({
       where: { userId },
       select: { id: true, balance: true },
@@ -236,6 +291,24 @@ export default async function walletRoutes(app: FastifyInstance) {
       })
     }
 
+    // Check daily withdrawal limit (last 24h)
+    const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000)
+    const dailyWithdrawalSum = await prisma.withdrawal.aggregate({
+      where: {
+        walletId: wallet.id,
+        createdAt: { gte: oneDayAgo },
+        status: { in: ['COMPLETED', 'PENDING'] },
+      },
+      _sum: { amount: true },
+    })
+    const totalWithdrawnToday = Number(dailyWithdrawalSum._sum.amount || 0)
+    if (totalWithdrawnToday + body.amount > walletSettings.dailyWithdrawalLimit) {
+      return reply.status(400).send({
+        success: false,
+        error: `Daily withdrawal limit of $${walletSettings.dailyWithdrawalLimit} exceeded. (Already requested $${totalWithdrawnToday.toFixed(2)} in last 24h)`,
+      })
+    }
+
     // Check KYC
     const user = await prisma.user.findUnique({
       where: { id: userId },
@@ -245,7 +318,7 @@ export default async function walletRoutes(app: FastifyInstance) {
     if (user?.kycStatus !== 'APPROVED') {
       return reply.status(403).send({
         success: false,
-        error: 'Identity verification required before withdrawing funds',
+        error: 'Please complete KYC verification before withdrawing funds',
         code: 'KYC_REQUIRED',
       })
     }
@@ -303,10 +376,18 @@ export default async function walletRoutes(app: FastifyInstance) {
 
     const user = await prisma.user.findUnique({
       where: { id: userId },
-      select: { email: true }
+      select: { email: true, kycStatus: true }
     })
 
     if (!user) return reply.status(404).send({ success: false, error: 'User not found' })
+
+    if (user.kycStatus !== 'APPROVED') {
+      return reply.status(403).send({
+        success: false,
+        error: 'Please complete KYC verification before transferring funds',
+        code: 'KYC_REQUIRED',
+      })
+    }
 
     const wallet = await prisma.wallet.findUnique({
       where: { userId },
@@ -528,6 +609,18 @@ export default async function walletRoutes(app: FastifyInstance) {
           data: {
             balance: { increment: amount },
             totalDeposited: { increment: amount },
+          },
+        })
+
+        // Create deposit record so it appears on Admin Wallet & Deposits page
+        await tx.deposit.create({
+          data: {
+            walletId: wallet.id,
+            amount,
+            gateway: 'STRIPE',
+            gatewayRef: `CPN-${codeUpper}`,
+            status: 'COMPLETED',
+            processedAt: new Date(),
           },
         })
 

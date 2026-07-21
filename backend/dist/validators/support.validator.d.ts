@@ -12,29 +12,29 @@ export declare const createAgentSchema: z.ZodObject<{
     experience: z.ZodOptional<z.ZodString>;
     notes: z.ZodOptional<z.ZodString>;
 }, "strip", z.ZodTypeAny, {
-    userId: string;
-    employeeId: string;
-    role?: "SUPER_ADMIN" | "SUPPORT_AGENT" | "SENIOR_AGENT" | "TEAM_LEAD" | "SUPPORT_MANAGER" | "COMPLIANCE_OFFICER" | undefined;
-    notes?: string | undefined;
-    team?: string | undefined;
-    designation?: string | undefined;
-    timeZone?: string | undefined;
-    languages?: string[] | undefined;
-    skills?: string[] | undefined;
-    experience?: string | undefined;
-    departmentId?: string | undefined;
+    role?: "SUPER_ADMIN" | "SUPPORT_AGENT" | "SENIOR_AGENT" | "TEAM_LEAD" | "SUPPORT_MANAGER" | "COMPLIANCE_OFFICER";
+    userId?: string;
+    employeeId?: string;
+    departmentId?: string;
+    team?: string;
+    designation?: string;
+    timeZone?: string;
+    languages?: string[];
+    skills?: string[];
+    experience?: string;
+    notes?: string;
 }, {
-    userId: string;
-    employeeId: string;
-    role?: "SUPER_ADMIN" | "SUPPORT_AGENT" | "SENIOR_AGENT" | "TEAM_LEAD" | "SUPPORT_MANAGER" | "COMPLIANCE_OFFICER" | undefined;
-    notes?: string | undefined;
-    team?: string | undefined;
-    designation?: string | undefined;
-    timeZone?: string | undefined;
-    languages?: string[] | undefined;
-    skills?: string[] | undefined;
-    experience?: string | undefined;
-    departmentId?: string | undefined;
+    role?: "SUPER_ADMIN" | "SUPPORT_AGENT" | "SENIOR_AGENT" | "TEAM_LEAD" | "SUPPORT_MANAGER" | "COMPLIANCE_OFFICER";
+    userId?: string;
+    employeeId?: string;
+    departmentId?: string;
+    team?: string;
+    designation?: string;
+    timeZone?: string;
+    languages?: string[];
+    skills?: string[];
+    experience?: string;
+    notes?: string;
 }>;
 export declare const updateAgentSchema: z.ZodObject<{
     userId: z.ZodOptional<z.ZodString>;
@@ -51,31 +51,31 @@ export declare const updateAgentSchema: z.ZodObject<{
 } & {
     status: z.ZodOptional<z.ZodEnum<["ONLINE", "OFFLINE", "BUSY", "AWAY", "ON_BREAK"]>>;
 }, "strip", z.ZodTypeAny, {
-    role?: "SUPER_ADMIN" | "SUPPORT_AGENT" | "SENIOR_AGENT" | "TEAM_LEAD" | "SUPPORT_MANAGER" | "COMPLIANCE_OFFICER" | undefined;
-    status?: "ONLINE" | "OFFLINE" | "BUSY" | "AWAY" | "ON_BREAK" | undefined;
-    notes?: string | undefined;
-    userId?: string | undefined;
-    employeeId?: string | undefined;
-    team?: string | undefined;
-    designation?: string | undefined;
-    timeZone?: string | undefined;
-    languages?: string[] | undefined;
-    skills?: string[] | undefined;
-    experience?: string | undefined;
-    departmentId?: string | undefined;
+    role?: "SUPER_ADMIN" | "SUPPORT_AGENT" | "SENIOR_AGENT" | "TEAM_LEAD" | "SUPPORT_MANAGER" | "COMPLIANCE_OFFICER";
+    status?: "ONLINE" | "OFFLINE" | "BUSY" | "AWAY" | "ON_BREAK";
+    userId?: string;
+    employeeId?: string;
+    departmentId?: string;
+    team?: string;
+    designation?: string;
+    timeZone?: string;
+    languages?: string[];
+    skills?: string[];
+    experience?: string;
+    notes?: string;
 }, {
-    role?: "SUPER_ADMIN" | "SUPPORT_AGENT" | "SENIOR_AGENT" | "TEAM_LEAD" | "SUPPORT_MANAGER" | "COMPLIANCE_OFFICER" | undefined;
-    status?: "ONLINE" | "OFFLINE" | "BUSY" | "AWAY" | "ON_BREAK" | undefined;
-    notes?: string | undefined;
-    userId?: string | undefined;
-    employeeId?: string | undefined;
-    team?: string | undefined;
-    designation?: string | undefined;
-    timeZone?: string | undefined;
-    languages?: string[] | undefined;
-    skills?: string[] | undefined;
-    experience?: string | undefined;
-    departmentId?: string | undefined;
+    role?: "SUPER_ADMIN" | "SUPPORT_AGENT" | "SENIOR_AGENT" | "TEAM_LEAD" | "SUPPORT_MANAGER" | "COMPLIANCE_OFFICER";
+    status?: "ONLINE" | "OFFLINE" | "BUSY" | "AWAY" | "ON_BREAK";
+    userId?: string;
+    employeeId?: string;
+    departmentId?: string;
+    team?: string;
+    designation?: string;
+    timeZone?: string;
+    languages?: string[];
+    skills?: string[];
+    experience?: string;
+    notes?: string;
 }>;
 export declare const createTicketSchema: z.ZodObject<{
     subject: z.ZodString;
@@ -84,17 +84,17 @@ export declare const createTicketSchema: z.ZodObject<{
     priority: z.ZodOptional<z.ZodEnum<["LOW", "MEDIUM", "HIGH", "URGENT", "CRITICAL"]>>;
     departmentId: z.ZodOptional<z.ZodString>;
 }, "strip", z.ZodTypeAny, {
-    description: string;
-    subject: string;
-    priority?: "LOW" | "MEDIUM" | "HIGH" | "URGENT" | "CRITICAL" | undefined;
-    departmentId?: string | undefined;
-    categoryId?: string | undefined;
+    departmentId?: string;
+    description?: string;
+    subject?: string;
+    priority?: "LOW" | "MEDIUM" | "HIGH" | "URGENT" | "CRITICAL";
+    categoryId?: string;
 }, {
-    description: string;
-    subject: string;
-    priority?: "LOW" | "MEDIUM" | "HIGH" | "URGENT" | "CRITICAL" | undefined;
-    departmentId?: string | undefined;
-    categoryId?: string | undefined;
+    departmentId?: string;
+    description?: string;
+    subject?: string;
+    priority?: "LOW" | "MEDIUM" | "HIGH" | "URGENT" | "CRITICAL";
+    categoryId?: string;
 }>;
 export declare const updateTicketSchema: z.ZodObject<{
     status: z.ZodOptional<z.ZodEnum<["OPEN", "PENDING", "WAITING_FOR_CUSTOMER", "ASSIGNED", "IN_PROGRESS", "RESOLVED", "CLOSED", "ESCALATED"]>>;
@@ -102,38 +102,38 @@ export declare const updateTicketSchema: z.ZodObject<{
     departmentId: z.ZodOptional<z.ZodString>;
     categoryId: z.ZodOptional<z.ZodString>;
 }, "strip", z.ZodTypeAny, {
-    status?: "PENDING" | "IN_PROGRESS" | "OPEN" | "WAITING_FOR_CUSTOMER" | "ASSIGNED" | "RESOLVED" | "CLOSED" | "ESCALATED" | undefined;
-    priority?: "LOW" | "MEDIUM" | "HIGH" | "URGENT" | "CRITICAL" | undefined;
-    departmentId?: string | undefined;
-    categoryId?: string | undefined;
+    status?: "PENDING" | "IN_PROGRESS" | "OPEN" | "WAITING_FOR_CUSTOMER" | "ASSIGNED" | "RESOLVED" | "CLOSED" | "ESCALATED";
+    departmentId?: string;
+    priority?: "LOW" | "MEDIUM" | "HIGH" | "URGENT" | "CRITICAL";
+    categoryId?: string;
 }, {
-    status?: "PENDING" | "IN_PROGRESS" | "OPEN" | "WAITING_FOR_CUSTOMER" | "ASSIGNED" | "RESOLVED" | "CLOSED" | "ESCALATED" | undefined;
-    priority?: "LOW" | "MEDIUM" | "HIGH" | "URGENT" | "CRITICAL" | undefined;
-    departmentId?: string | undefined;
-    categoryId?: string | undefined;
+    status?: "PENDING" | "IN_PROGRESS" | "OPEN" | "WAITING_FOR_CUSTOMER" | "ASSIGNED" | "RESOLVED" | "CLOSED" | "ESCALATED";
+    departmentId?: string;
+    priority?: "LOW" | "MEDIUM" | "HIGH" | "URGENT" | "CRITICAL";
+    categoryId?: string;
 }>;
 export declare const replyTicketSchema: z.ZodObject<{
     message: z.ZodString;
     isInternal: z.ZodDefault<z.ZodOptional<z.ZodBoolean>>;
 }, "strip", z.ZodTypeAny, {
-    message: string;
-    isInternal: boolean;
+    message?: string;
+    isInternal?: boolean;
 }, {
-    message: string;
-    isInternal?: boolean | undefined;
+    message?: string;
+    isInternal?: boolean;
 }>;
 export declare const assignTicketSchema: z.ZodObject<{
     agentId: z.ZodString;
 }, "strip", z.ZodTypeAny, {
-    agentId: string;
+    agentId?: string;
 }, {
-    agentId: string;
+    agentId?: string;
 }>;
 export declare const closeTicketSchema: z.ZodObject<{
     reason: z.ZodOptional<z.ZodString>;
 }, "strip", z.ZodTypeAny, {
-    reason?: string | undefined;
+    reason?: string;
 }, {
-    reason?: string | undefined;
+    reason?: string;
 }>;
 //# sourceMappingURL=support.validator.d.ts.map

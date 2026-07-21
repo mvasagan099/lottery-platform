@@ -146,19 +146,28 @@ async function authRoutes(app) {
         // Send verification email
         const verifyToken = (0, crypto_1.randomBytes)(32).toString('hex');
         await server_1.redis.setex(`email_verify:${verifyToken}`, 86400, user.id); // 24h TTL
-        await (0, email_1.sendEmail)({
-            to: user.email,
-            subject: 'Verify your MegaDraw account',
-            template: 'email-verification',
-            data: {
-                name: user.firstName,
-                verifyUrl: `${process.env.FRONTEND_URL}/verify-email?token=${verifyToken}`,
-            },
-        });
+        let emailSent = true;
+        try {
+            await (0, email_1.sendEmail)({
+                to: user.email,
+                subject: 'Verify your MegaDraw account',
+                template: 'email-verification',
+                data: {
+                    name: user.firstName,
+                    verifyUrl: `${process.env.FRONTEND_URL}/verify-email?token=${verifyToken}`,
+                },
+            });
+        }
+        catch (emailErr) {
+            emailSent = false;
+            console.error('Verification email failed after retries:', emailErr);
+        }
         await (0, auth_1.auditLog)(user.id, 'REGISTER', 'User', user.id, undefined, { email: user.email }, request);
         return reply.status(201).send({
             success: true,
-            message: 'Account created. Please check your email to verify your account.',
+            message: emailSent
+                ? 'Account created. Please check your email to verify your account.'
+                : 'Account created. We had trouble sending the verification email — please use Resend Verification from your profile.',
             data: {
                 id: user.id,
                 email: user.email,
@@ -175,15 +184,21 @@ async function authRoutes(app) {
             return reply.status(400).send({ success: false, error: 'Email is already verified' });
         const verifyToken = (0, crypto_1.randomBytes)(32).toString('hex');
         await server_1.redis.setex(`email_verify:${verifyToken}`, 86400, user.id); // 24h TTL
-        await (0, email_1.sendEmail)({
-            to: user.email,
-            subject: 'Verify your MegaDraw account',
-            template: 'email-verification',
-            data: {
-                name: user.firstName,
-                verifyUrl: `${process.env.FRONTEND_URL}/verify-email?token=${verifyToken}`,
-            },
-        });
+        try {
+            await (0, email_1.sendEmail)({
+                to: user.email,
+                subject: 'Verify your MegaDraw account',
+                template: 'email-verification',
+                data: {
+                    name: user.firstName,
+                    verifyUrl: `${process.env.FRONTEND_URL}/verify-email?token=${verifyToken}`,
+                },
+            });
+        }
+        catch (emailErr) {
+            console.error('Resend verification email failed after retries:', emailErr);
+            return reply.status(503).send({ success: false, error: 'Failed to send email. Please try again in a moment.' });
+        }
         return reply.send({ success: true, message: 'Verification email resent' });
     });
     // POST /auth/login
@@ -193,7 +208,18 @@ async function authRoutes(app) {
         const body = loginSchema.parse(request.body);
         const user = await server_1.prisma.user.findUnique({
             where: { email: body.email },
-            include: { wallet: { select: { balance: true, bonusBalance: true } } },
+            include: {
+                wallet: { select: { balance: true, bonusBalance: true } },
+                roles: {
+                    include: {
+                        role: {
+                            include: {
+                                permissions: { include: { permission: true } }
+                            }
+                        }
+                    }
+                }
+            },
         });
         if (!user) {
             return reply.status(401).send({ success: false, error: 'Incorrect email or password' });
@@ -281,6 +307,7 @@ async function authRoutes(app) {
                     twoFactorEnabled: user.twoFactorEnabled,
                     kycStatus: user.kycStatus,
                     wallet: user.wallet,
+                    roles: user.roles,
                 },
             },
         });

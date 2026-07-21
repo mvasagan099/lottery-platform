@@ -67,7 +67,11 @@ export default function WalletAdminPage() {
     {
       accessorKey: 'id',
       header: 'Deposit ID',
-      cell: info => <span style={{ fontFamily: 'monospace', color: 'var(--text-secondary)' }}>{(info.getValue() as string).substring(0, 8).toUpperCase()}</span>
+      cell: info => {
+        const id = info.getValue() as string
+        const displayId = 'DEP-' + id.substring(Math.max(0, id.length - 6)).toUpperCase()
+        return <span style={{ fontFamily: 'monospace', color: 'var(--text-secondary)' }}>{displayId}</span>
+      }
     },
     {
       accessorKey: 'wallet.user',
@@ -95,7 +99,7 @@ export default function WalletAdminPage() {
     {
       accessorKey: 'gateway',
       header: 'Gateway',
-      cell: info => <span style={{ textTransform: 'capitalize' }}>{(info.getValue() as string).toLowerCase()}</span>
+      cell: info => <span style={{ textTransform: 'capitalize' }}>{(info.getValue() as string).replace(/_/g, ' ').toLowerCase()}</span>
     },
     {
       accessorKey: 'status',
@@ -153,34 +157,34 @@ export default function WalletAdminPage() {
         </div>
 
         {/* Summary Cards */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 'var(--space-md)' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 'var(--space-md)' }}>
           
-          <div className="card" style={{ padding: 'var(--space-lg)', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
-            <div>
-              <div style={{ color: 'var(--text-secondary)', fontSize: '14px', fontWeight: 500, marginBottom: '8px' }}>Total Deposits</div>
-              <div style={{ fontSize: '2rem', fontWeight: 700, color: 'var(--text-primary)' }}>🪙 {Number(totalCompletedAmount).toLocaleString()}</div>
+          <div className="card" style={{ padding: 'var(--space-md) var(--space-lg)', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '12px', minWidth: 0 }}>
+            <div style={{ minWidth: 0, flex: 1 }}>
+              <div style={{ color: 'var(--text-secondary)', fontSize: '13px', fontWeight: 500, marginBottom: '6px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>Total Deposits</div>
+              <div style={{ fontSize: 'clamp(1rem, 1.4vw, 1.5rem)', fontWeight: 700, color: 'var(--text-primary)', wordBreak: 'break-word', overflowWrap: 'anywhere' }}>🪙 {Number(totalCompletedAmount).toLocaleString()}</div>
             </div>
-            <div style={{ width: '40px', height: '40px', borderRadius: '12px', backgroundColor: 'rgba(16,185,129,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#10b981' }}>
+            <div style={{ width: '40px', height: '40px', borderRadius: '12px', backgroundColor: 'rgba(16,185,129,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#10b981', flexShrink: 0 }}>
               <ArrowUpRight size={20} />
             </div>
           </div>
 
-          <div className="card" style={{ padding: 'var(--space-lg)', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
-            <div>
-              <div style={{ color: 'var(--text-secondary)', fontSize: '14px', fontWeight: 500, marginBottom: '8px' }}>Pending Deposits</div>
-              <div style={{ fontSize: '2rem', fontWeight: 700, color: 'var(--text-primary)' }}>{totalPending}</div>
+          <div className="card" style={{ padding: 'var(--space-md) var(--space-lg)', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '12px', minWidth: 0 }}>
+            <div style={{ minWidth: 0, flex: 1 }}>
+              <div style={{ color: 'var(--text-secondary)', fontSize: '13px', fontWeight: 500, marginBottom: '6px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>Pending Deposits</div>
+              <div style={{ fontSize: 'clamp(1rem, 1.4vw, 1.5rem)', fontWeight: 700, color: 'var(--text-primary)', wordBreak: 'break-word', overflowWrap: 'anywhere' }}>{totalPending}</div>
             </div>
-            <div style={{ width: '40px', height: '40px', borderRadius: '12px', backgroundColor: 'rgba(245,158,11,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#f59e0b' }}>
+            <div style={{ width: '40px', height: '40px', borderRadius: '12px', backgroundColor: 'rgba(245,158,11,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#f59e0b', flexShrink: 0 }}>
               <Clock size={20} />
             </div>
           </div>
 
-          <div className="card" style={{ padding: 'var(--space-lg)', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
-            <div>
-              <div style={{ color: 'var(--text-secondary)', fontSize: '14px', fontWeight: 500, marginBottom: '8px' }}>Failed Deposits</div>
-              <div style={{ fontSize: '2rem', fontWeight: 700, color: 'var(--text-primary)' }}>{totalFailedCount}</div>
+          <div className="card" style={{ padding: 'var(--space-md) var(--space-lg)', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '12px', minWidth: 0 }}>
+            <div style={{ minWidth: 0, flex: 1 }}>
+              <div style={{ color: 'var(--text-secondary)', fontSize: '13px', fontWeight: 500, marginBottom: '6px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>Failed Deposits</div>
+              <div style={{ fontSize: 'clamp(1rem, 1.4vw, 1.5rem)', fontWeight: 700, color: 'var(--text-primary)', wordBreak: 'break-word', overflowWrap: 'anywhere' }}>{totalFailedCount}</div>
             </div>
-            <div style={{ width: '40px', height: '40px', borderRadius: '12px', backgroundColor: 'rgba(239,68,68,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--error-color)' }}>
+            <div style={{ width: '40px', height: '40px', borderRadius: '12px', backgroundColor: 'rgba(239,68,68,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--error-color)', flexShrink: 0 }}>
               <AlertTriangle size={20} />
             </div>
           </div>

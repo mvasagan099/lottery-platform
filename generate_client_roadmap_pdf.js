@@ -4,7 +4,7 @@ const path = require('path');
 
 const outputPath = path.join(__dirname, 'Lottery_Coupon_Integration_Client_Roadmap.pdf');
 const doc = new PDFDocument({
-  margin: 50,
+  margin: 40,
   size: 'A4',
   bufferPages: true
 });
@@ -17,139 +17,125 @@ const PRIMARY = '#1E293B';    // Deep Slate
 const ACCENT = '#D97706';     // Gold/Amber
 const SECONDARY = '#0F172A';  // Darker Slate
 const TEXT_DARK = '#334155';  // Body text
-const LIGHT_BG = '#F8FAFC';   // Light background for cards
+const LIGHT_BG = '#F8FAFC';   // Light background
 const BORDER_COLOR = '#E2E8F0';
 
-// --- Helper Functions ---
 function addHeader(title, subtitle) {
-  doc.rect(0, 0, 595.28, 120).fill(PRIMARY);
-  doc.fillColor('#FFFFFF').fontSize(22).font('Helvetica-Bold').text(title, 50, 40);
-  doc.fillColor(ACCENT).fontSize(13).font('Helvetica').text(subtitle, 50, 75);
-  doc.y = 140;
+  doc.rect(0, 0, 595.28, 110).fill(PRIMARY);
+  doc.fillColor('#FFFFFF').fontSize(20).font('Helvetica-Bold').text(title, 40, 35);
+  doc.fillColor(ACCENT).fontSize(12).font('Helvetica').text(subtitle, 40, 68);
+  doc.y = 125;
 }
 
 function addSectionTitle(title) {
-  if (doc.y > 680) doc.addPage();
-  doc.moveDown(0.8);
-  doc.fillColor(SECONDARY).fontSize(16).font('Helvetica-Bold').text(title);
-  doc.strokeColor(ACCENT).lineWidth(2).moveTo(50, doc.y + 4).lineTo(200, doc.y + 4).stroke();
-  doc.moveDown(0.8);
+  if (doc.y > 670) doc.addPage();
+  doc.moveDown(0.6);
+  doc.fillColor(SECONDARY).fontSize(15).font('Helvetica-Bold').text(title);
+  doc.strokeColor(ACCENT).lineWidth(2).moveTo(40, doc.y + 3).lineTo(220, doc.y + 3).stroke();
+  doc.moveDown(0.6);
 }
 
 function addSubTitle(title) {
   if (doc.y > 700) doc.addPage();
-  doc.fillColor(PRIMARY).fontSize(12).font('Helvetica-Bold').text(title);
-  doc.moveDown(0.4);
+  doc.fillColor(PRIMARY).fontSize(11).font('Helvetica-Bold').text(title);
+  doc.moveDown(0.3);
 }
 
 function addParagraph(text) {
   if (doc.y > 710) doc.addPage();
-  doc.fillColor(TEXT_DARK).fontSize(10).font('Helvetica').text(text, { align: 'justify', lineGap: 3 });
-  doc.moveDown(0.5);
-}
-
-function addBullet(label, text) {
-  if (doc.y > 710) doc.addPage();
-  doc.fillColor(ACCENT).fontSize(10).font('Helvetica-Bold').text(`•  ${label}: `, { continued: true });
-  doc.fillColor(TEXT_DARK).font('Helvetica').text(text, { lineGap: 2 });
-  doc.moveDown(0.3);
-}
-
-function addBox(title, contentArray) {
-  if (doc.y > 620) doc.addPage();
-  const startY = doc.y;
-  doc.rect(50, startY, 495.28, 10).fill(LIGHT_BG).stroke(BORDER_COLOR);
-  
-  doc.y = startY + 10;
-  doc.fillColor(SECONDARY).fontSize(11).font('Helvetica-Bold').text(title, 60, doc.y);
+  doc.fillColor(TEXT_DARK).fontSize(9.5).font('Helvetica').text(text, { align: 'justify', lineGap: 2.5 });
   doc.moveDown(0.4);
-  
-  contentArray.forEach(item => {
-    doc.fillColor(TEXT_DARK).fontSize(9.5).font('Helvetica').text(`-  ${item}`, 65, doc.y, { width: 465 });
-    doc.moveDown(0.3);
-  });
-
-  const endY = doc.y + 10;
-  doc.rect(50, startY, 495.28, endY - startY).stroke(BORDER_COLOR);
-  doc.y = endY + 15;
 }
 
-// ==================== DOCUMENT GENERATION ====================
+function addStepBox(stepNum, stepTitle, stepDesc) {
+  if (doc.y > 660) doc.addPage();
+  const startY = doc.y;
+  doc.rect(40, startY, 515.28, 48).fill(LIGHT_BG).stroke(BORDER_COLOR);
+  
+  // Step Number Badge
+  doc.rect(48, startY + 8, 32, 32).fill(PRIMARY);
+  doc.fillColor('#FFFFFF').fontSize(11).font('Helvetica-Bold').text(stepNum, 48, startY + 18, { width: 32, align: 'center' });
+  
+  // Text
+  doc.fillColor(SECONDARY).fontSize(10).font('Helvetica-Bold').text(stepTitle, 90, startY + 10);
+  doc.fillColor(TEXT_DARK).fontSize(8.8).font('Helvetica').text(stepDesc, 90, startY + 24, { width: 450 });
+  
+  doc.y = startY + 54;
+}
 
-// --- PAGE 1: Executive Overview ---
-addHeader('Lotto & Coupon Ecosystem', 'Strategic Client Proposal & Technical Integration Roadmap');
+// ==================== DOCUMENT PAGES ====================
 
-addSectionTitle('1. Executive Summary');
-addParagraph('This proposal outlines the seamless integration between the OzLotto / MegaDraw Gaming Platform and the CouponVault Merchant Voucher Engine. By combining a state-of-the-art online lottery system with an agile coupon infrastructure, this solution provides merchants with customer acquisition tools and offers users a frictionless way to convert gift cards into lottery ticket purchases.');
+// --- PAGE 1: Executive Summary & System Overview ---
+addHeader('OzLotto & Coupon Ecosystem', 'Complete User & Admin Operational Workflows');
 
-addSectionTitle('2. Core Platform Capabilities');
+addSectionTitle('1. Executive Overview');
+addParagraph('This document presents the complete end-to-end User Flow (customer experience) and Admin/Merchant Flow (operational governance) for the integrated OzLotto / MegaDraw Gaming Platform and CouponVault System. It is designed to be presented directly to stakeholders and clients to demonstrate how users acquire coupons and play lotteries, and how admins manage merchants, draws, and payouts.');
 
-addSubTitle('A. OzLotto / MegaDraw Platform (Gaming Backend & Portal)');
-addBullet('Global Lottery Games', 'Supports 8+ major formats (Powerball, MegaDraw, Saturday Lotto, Set for Life, Lucky Lotteries, Lotto Strike, Super 66).');
-addBullet('Automated Draw Engine', 'Cron-scheduled draws, prize tier division calculations, and instant win processing.');
-addBullet('Syndicates & System Entries', 'Allows group ticket purchasing and multi-number system combinations.');
-addBullet('User Security & Compliance', 'JWT authentication, Argon2 password hashing, 2FA enforcement, and automated KYC verification.');
+addSectionTitle('2. User Flow (End-to-End Customer Experience)');
 
-addSubTitle('B. CouponVault Platform (Merchant Engine & Payment Gateway)');
-addBullet('Merchant Dashboard', 'Centralized hub for merchants to create, issue, track, and manage promotional gift vouchers.');
-addBullet('Razorpay & Payment Gateway Integration', 'Instant fiat payment processing for voucher purchases.');
-addBullet('Single-Use Security Token', 'Encrypted voucher redemption system guaranteeing zero double-spending.');
+addStepBox('1', 'Voucher Purchase (CouponVault)', 'Customer visits the Merchant / Coupon Portal, selects a gift voucher (e.g. $10, $50), and completes checkout via Razorpay or Stripe to receive a unique single-use code.');
 
-// --- PAGE 2: User Flow & Technical Integration ---
+addStepBox('2', 'Account Login & Deposit Page (Lottery Platform)', 'User logs into the OzLotto Platform (with 2FA / KYC verification) and navigates to the Wallet > Redeem Coupon page.');
+
+addStepBox('3', 'Code Redemption & API Handshake', 'User inputs the coupon code. The Fastify backend executes an authenticated API check with CouponVault to verify validity, expiry, and balance.');
+
+addStepBox('4', 'Instant Wallet Credit', 'CouponVault burns (locks) the voucher code. The Lottery backend instantly credits the user\'s wallet in Coins/USD, sending a success toast and notification.');
+
+addStepBox('5', 'Ticket Purchase & Lottery Draw', 'User chooses numbers (or Quick Pick / Syndicates) for Powerball, MegaDraw, etc. Ticket is registered with a QR code, and prizes are automatically credited upon draw completion.');
+
+// --- PAGE 2: Admin & Merchant Workflows ---
 doc.addPage();
 
-addSectionTitle('3. Integrated User Journey & Data Flow');
-addParagraph('The integration connects merchant voucher distribution directly into the lottery wallet, driving user conversion and cross-promotions.');
+addSectionTitle('3. Admin & Merchant Operations Flow');
 
-addBox('Step-by-Step Integration Workflow', [
-  '1. Voucher Issuance: Merchant creates or user purchases a gift coupon (e.g., FREE50, LOTTO100) via CouponVault using Razorpay/Stripe.',
-  '2. Redemption Request: User navigates to the Lottery Deposit page and inputs the voucher code.',
-  '3. API Handshake: Fastify backend performs an authenticated API request to CouponVault to verify validity, expiry, and balance.',
-  '4. Wallet Credit: Upon confirmation, CouponVault locks/invalidates the voucher, and the Lottery backend instantly credits the user\'s wallet in Coins/USD.',
-  '5. Gameplay & Payout: User purchases lottery tickets for upcoming draws. Prize winnings are credited directly back to the user\'s wallet.'
-]);
+addSubTitle('A. Merchant & Coupon Management Flow (CouponVault Admin)');
 
-addSectionTitle('4. Technical Architecture Stack');
-addBullet('Backend API', 'Fastify (Node.js), TypeScript, Prisma ORM, Zod Validation.');
-addBullet('Database & Cache', 'PostgreSQL 16 (Relational schemas) + Redis 7 (Rate limiting, session store, queue management).');
-addBullet('Coupon Engine', 'Supabase, PostgreSQL Row-Level Security (RLS), Netlify/Node serverless functions.');
-addBullet('Frontend Applications', 'React 18, Vite, Zustand state management, TanStack React Query, Tailwind CSS.');
-addBullet('Deployment', 'Render (Database, Redis, Fastify Backend), Docker Compose, Netlify / Vite static hosting.');
+addStepBox('M1', 'Merchant Onboarding & API Setup', 'Super Admin creates merchant profiles and issues secure API keys (COUPON_API_KEY) for backend-to-backend communication.');
 
-// --- PAGE 3: Client Roadmap & Phases ---
+addStepBox('M2', 'Campaign & Batch Creation', 'Merchant sets up promo campaigns defining voucher face values, total batch volume, expiration rules, and bonus percentages.');
+
+addStepBox('M3', 'Real-Time Analytics & Settlement', 'Merchant monitors sales revenue, redemption rates, and active vs expired vouchers. Financial reports are exported for monthly settlements.');
+
+addSubTitle('B. Platform & Gaming Operations Flow (MegaDraw Admin)');
+
+addStepBox('A1', 'Game & Draw Engine Control', 'Admin configures draw schedules (cron format), ticket prices, min/max numbers, jackpot amounts, and prize division percentages.');
+
+addStepBox('A2', 'KYC & Withdrawal Approval', 'Compliance officers review uploaded identity documents (Passports/ID) and approve or reject customer bank withdrawal requests.');
+
+addStepBox('A3', 'RBAC & Financial Auditing', 'Super Admin manages access roles (Admin, Support, Affiliate Manager) and reviews real-time transaction logs and affiliate commissions.');
+
+// --- PAGE 3: Summary Roadmap & Checklist ---
 doc.addPage();
 
-addSectionTitle('5. Project Implementation Roadmap');
+addSectionTitle('4. Implementation Milestones & Technical Stack');
+addParagraph('The integration relies on a dual-backend architecture designed for maximum performance, security, and uptime:');
 
-addSubTitle('Phase 1: Architecture & DB Synchronization (Weeks 1 – 3)');
-addBullet('Deliverables', 'Setup shared API schemas, establish secure service-to-service API key authentication, and deploy database migrations across environments.');
+doc.fillColor(ACCENT).fontSize(10).font('Helvetica-Bold').text('•  Fastify Backend: ', { continued: true });
+doc.fillColor(TEXT_DARK).font('Helvetica').text('Handles high-concurrency ticket sales, JWT sessions, and draw execution.', { lineGap: 3 });
 
-addSubTitle('Phase 2: Payment Gateway & Coupon API Engine (Weeks 4 – 6)');
-addBullet('Deliverables', 'Implement Razorpay/Stripe webhooks in CouponVault, build the single-use token verification endpoint, and connect Fastify wallet handlers.');
+doc.fillColor(ACCENT).fontSize(10).font('Helvetica-Bold').text('•  CouponVault Supabase Engine: ', { continued: true });
+doc.fillColor(TEXT_DARK).font('Helvetica').text('Manages merchant accounts, Razorpay webhooks, and single-use voucher validation.', { lineGap: 3 });
 
-addSubTitle('Phase 3: Frontend Integration & UX Polish (Weeks 7 – 9)');
-addBullet('Deliverables', 'Integrate redemption page in Lottery App, build Merchant analytics dashboard, and implement real-time toast notifications and audit logs.');
+doc.fillColor(ACCENT).fontSize(10).font('Helvetica-Bold').text('•  PostgreSQL & Redis: ', { continued: true });
+doc.fillColor(TEXT_DARK).font('Helvetica').text('Ensures relational integrity, fast rate limiting, and real-time WebSocket state distribution.', { lineGap: 3 });
 
-addSubTitle('Phase 4: Testing, Security Audit & Go-Live (Weeks 10 – 12)');
-addBullet('Deliverables', 'End-to-end integration testing, Redis rate-limit benchmarking, penetration testing, Render/Docker production deployment, and client handover.');
-
-addSectionTitle('6. Next Steps & Action Items');
-addParagraph('To initiate Phase 1, the client and development team will align on API secret management, payment gateway keys, and merchant sandbox accounts.');
+addSectionTitle('5. Deliverable Summary for Client');
+addParagraph('With this flow, your client achieves a complete closed-loop ecosystem: merchants generate revenue selling gift cards, users convert vouchers into lottery entries with zero payment friction, and admins retain total control over compliance, draws, and finances.');
 
 // --- Page Numbers & Footer ---
 const pages = doc.bufferedPageRange();
 for (let i = 0; i < pages.count; i++) {
   doc.switchToPage(i);
   doc.fillColor('#94A3B8').fontSize(8).font('Helvetica').text(
-    `Lottery & Coupon Platform Integration Proposal  |  Page ${i + 1} of ${pages.count}`,
-    50,
-    780,
-    { align: 'center', width: 495.28 }
+    `OzLotto & Coupon Integration Proposal  |  Page ${i + 1} of ${pages.count}`,
+    40,
+    800,
+    { align: 'center', width: 515.28 }
   );
 }
 
 doc.end();
 
 stream.on('finish', () => {
-  console.log('PDF generated successfully at:', outputPath);
+  console.log('PDF updated successfully at:', outputPath);
 });

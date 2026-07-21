@@ -188,7 +188,7 @@ async function walletRoutes(app) {
             data: {
                 userId,
                 title: 'Deposit confirmed',
-                message: `$${deposit.amount} AUD has been added to your wallet.`,
+                message: `$${deposit.amount} USD has been added to your wallet.`,
             },
         });
         return reply.send({ success: true, message: 'Deposit confirmed' });
@@ -220,7 +220,7 @@ async function walletRoutes(app) {
         if (user?.kycStatus !== 'APPROVED') {
             return reply.status(403).send({
                 success: false,
-                error: 'Identity verification required before withdrawing funds',
+                error: 'Please complete KYC verification before withdrawing funds',
                 code: 'KYC_REQUIRED',
             });
         }
@@ -250,12 +250,129 @@ async function walletRoutes(app) {
             data: {
                 userId,
                 title: 'Withdrawal request received',
-                message: `Your withdrawal of $${body.amount} AUD is being processed.`,
+                message: `Your withdrawal of $${body.amount} USD is being processed.`,
             },
         });
         return reply.status(201).send({
             success: true,
             message: 'Withdrawal request submitted. Processing within 1-3 business days.',
+        });
+    });
+    // POST /wallet/transfer - Transfer winnings to Coupon Wallet
+    app.post('/transfer', {
+        preHandler: [auth_1.authenticate, auth_1.requireVerifiedEmail],
+        config: { rateLimit: { max: 50, timeWindow: '1 hour' } },
+    }, async (request, reply) => {
+        const transferSchema = zod_1.z.object({
+            amount: zod_1.z.number().positive().min(1),
+        });
+        const body = transferSchema.parse(request.body);
+        const userId = request.user.userId;
+        const user = await server_1.prisma.user.findUnique({
+            where: { id: userId },
+            select: { email: true, kycStatus: true }
+        });
+        if (!user)
+            return reply.status(404).send({ success: false, error: 'User not found' });
+        if (user.kycStatus !== 'APPROVED') {
+            return reply.status(403).send({
+                success: false,
+                error: 'Please complete KYC verification before transferring funds',
+                code: 'KYC_REQUIRED',
+            });
+        }
+        const wallet = await server_1.prisma.wallet.findUnique({
+            where: { userId },
+            select: { id: true, balance: true },
+        });
+        if (!wallet)
+            return reply.status(404).send({ success: false, error: 'Wallet not found' });
+        if (Number(wallet.balance) < body.amount) {
+            return reply.status(400).send({
+                success: false,
+                error: 'Insufficient balance for transfer',
+            });
+        }
+        const transactionId = `TRF-${userId.substring(0, 8)}-${Date.now()}`;
+        // 1. Send authenticated request to Coupon Platform
+        const transferUrl = `${process.env.COUPON_API_URL}/wallet/transfer`;
+        const transferRes = await fetch(transferUrl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'x-api-key': process.env.COUPON_API_KEY || ''
+            },
+            body: JSON.stringify({
+                userId: userId,
+                userEmail: user.email,
+                amount: body.amount,
+                transactionId: transactionId
+            })
+        });
+        let transferData;
+        try {
+            transferData = await transferRes.json();
+        }
+        catch (e) {
+            console.error('Failed to parse Coupon API response:', transferRes.status);
+            return reply.status(502).send({ success: false, error: 'Bad Gateway: Coupon API returned invalid response.' });
+        }
+        // Handle idempotency (409 Conflict) or failure
+        if (!transferRes.ok && transferRes.status !== 409) {
+            console.error('Transfer to Coupon Wallet failed:', transferData);
+            return reply.status(400).send({
+                success: false,
+                error: transferData.message || 'Failed to transfer to Coupon Wallet',
+                code: transferData.code || 'TRANSFER_FAILED'
+            });
+        }
+        // 2. Deduct from game wallet on success
+        try {
+            await server_1.prisma.$transaction(async (tx) => {
+                const balBefore = Number(wallet.balance);
+                // Deduct wallet
+                await tx.wallet.update({
+                    where: { id: wallet.id },
+                    data: {
+                        balance: { decrement: body.amount },
+                        totalWithdrawn: { increment: body.amount },
+                    },
+                });
+                // Log transaction
+                await tx.transaction.create({
+                    data: {
+                        userId,
+                        walletId: wallet.id,
+                        type: 'WITHDRAWAL',
+                        status: 'COMPLETED',
+                        amount: body.amount,
+                        balanceBefore: balBefore,
+                        balanceAfter: balBefore - body.amount,
+                        reference: transactionId,
+                        description: 'Transfer to Coupon Wallet',
+                    },
+                });
+            });
+        }
+        catch (err) {
+            console.error('CRITICAL: Transfer credited in Coupon Wallet but failed to deduct from Game Wallet', {
+                userId, transactionId, amount: body.amount, error: err
+            });
+            return reply.status(500).send({ success: false, error: 'Transfer failed during finalization. Contact support.' });
+        }
+        await (0, auth_1.auditLog)(userId, 'WALLET_TRANSFER', 'Withdrawal', undefined, undefined, { amount: body.amount, transactionId }, request);
+        // Notify user
+        await server_1.prisma.notification.create({
+            data: {
+                userId,
+                title: 'Transfer Successful',
+                message: `$${body.amount} has been transferred to your Coupon Wallet.`,
+            },
+        });
+        return reply.status(200).send({
+            success: true,
+            message: 'Transfer to Coupon Wallet successful.',
+            data: { transactionId, amount: body.amount }
         });
     });
     // GET /wallet/deposits - Deposit history
@@ -324,53 +441,97 @@ async function walletRoutes(app) {
         if (!wallet)
             return reply.status(404).send({ success: false, error: 'Wallet not found' });
         const codeUpper = body.code.trim().toUpperCase();
-        // Needs to use raw query because Prisma Client might not have Coupon types generated locally due to EPERM
-        const coupons = await server_1.prisma.$queryRaw `SELECT * FROM "coupons" WHERE "code" = ${codeUpper} LIMIT 1`;
-        const coupon = coupons[0];
-        if (!coupon) {
-            return reply.status(404).send({ success: false, error: 'Invalid coupon code' });
-        }
-        if (coupon.isUsed) {
-            return reply.status(400).send({ success: false, error: 'Coupon code has already been redeemed' });
-        }
-        await server_1.prisma.$transaction(async (tx) => {
-            // Mark used
-            await tx.$executeRaw `UPDATE "coupons" SET "isUsed" = true, "usedById" = ${userId}, "usedAt" = NOW() WHERE "id" = ${coupon.id}`;
-            const amount = Number(coupon.amount);
-            const balBefore = Number(wallet.balance);
-            // Credit wallet
-            await tx.wallet.update({
-                where: { id: wallet.id },
-                data: {
-                    balance: { increment: amount },
-                    totalDeposited: { increment: amount },
-                },
-            });
-            // Log transaction
-            await tx.transaction.create({
-                data: {
-                    userId,
-                    walletId: wallet.id,
-                    type: 'DEPOSIT',
-                    status: 'COMPLETED',
-                    amount,
-                    balanceBefore: balBefore,
-                    balanceAfter: balBefore + amount,
-                    reference: `CPN-${coupon.code}`,
-                    description: 'Coupon Redemption',
-                },
-            });
+        // 1. Verify coupon via external API
+        const verifyUrl = `${process.env.COUPON_API_URL}/coupons/verify`;
+        const verifyRes = await fetch(verifyUrl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'x-api-key': process.env.COUPON_API_KEY || ''
+            },
+            body: JSON.stringify({
+                couponCode: codeUpper,
+                userId: userId,
+                gameId: 'lottery-platform'
+            })
         });
-        await (0, auth_1.auditLog)(userId, 'COUPON_REDEEMED', 'Deposit', undefined, undefined, { code: codeUpper, amount: Number(coupon.amount) }, request);
+        const verifyData = await verifyRes.json();
+        if (!verifyRes.ok || !verifyData.success) {
+            return reply.status(verifyRes.status === 404 ? 404 : 400).send({
+                success: false,
+                code: verifyData.code || 'INVALID_COUPON',
+                error: verifyData.message || 'Failed to verify coupon'
+            });
+        }
+        const amount = Number(verifyData.amount);
+        const couponId = verifyData.couponId;
+        // 2. Credit Wallet
+        let walletTransactionId = '';
+        try {
+            await server_1.prisma.$transaction(async (tx) => {
+                const balBefore = Number(wallet.balance);
+                // Credit wallet
+                await tx.wallet.update({
+                    where: { id: wallet.id },
+                    data: {
+                        balance: { increment: amount },
+                        totalDeposited: { increment: amount },
+                    },
+                });
+                // Log transaction
+                const txn = await tx.transaction.create({
+                    data: {
+                        userId,
+                        walletId: wallet.id,
+                        type: 'DEPOSIT',
+                        status: 'COMPLETED',
+                        amount,
+                        balanceBefore: balBefore,
+                        balanceAfter: balBefore + amount,
+                        reference: `CPN-${codeUpper}-${Date.now()}`,
+                        description: 'Coupon Redemption',
+                    },
+                });
+                walletTransactionId = txn.id;
+            });
+        }
+        catch (err) {
+            return reply.status(500).send({ success: false, error: 'Failed to credit wallet' });
+        }
+        // 3. Redeem Coupon on Coupon Service
+        const redeemUrl = `${process.env.COUPON_API_URL}/coupons/redeem`;
+        const redeemRes = await fetch(redeemUrl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'x-api-key': process.env.COUPON_API_KEY || ''
+            },
+            body: JSON.stringify({
+                couponId,
+                userId,
+                gameId: 'lottery-platform',
+                walletTransactionId
+            })
+        });
+        const redeemData = await redeemRes.json();
+        if (!redeemRes.ok || !redeemData.success) {
+            // In a robust system, we would queue a compensation transaction here to reverse the wallet credit.
+            // For now, log critically.
+            console.error('CRITICAL: Wallet credited but coupon redemption failed on Coupon Service', {
+                userId, couponId, walletTransactionId, error: redeemData
+            });
+            return reply.status(500).send({ success: false, error: 'Redemption failed during finalization. Contact support.' });
+        }
+        await (0, auth_1.auditLog)(userId, 'COUPON_REDEEMED', 'Deposit', undefined, undefined, { code: codeUpper, amount }, request);
         // Notify user
         await server_1.prisma.notification.create({
             data: {
                 userId,
                 title: 'Coupon Redeemed',
-                message: `${Number(coupon.amount).toFixed(2)} Coins have been added to your wallet.`,
+                message: `${amount.toFixed(2)} Coins have been added to your wallet.`,
             },
         });
-        return reply.send({ success: true, message: 'Coupon redeemed successfully', data: { amount: Number(coupon.amount) } });
+        return reply.send({ success: true, message: 'Coupon redeemed successfully', data: { amount } });
     });
 }
 //# sourceMappingURL=wallet.js.map

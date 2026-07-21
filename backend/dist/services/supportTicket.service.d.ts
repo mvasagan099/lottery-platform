@@ -4,7 +4,7 @@ export declare class SupportTicketService {
             email: string;
             firstName: string;
             lastName: string;
-        } | null;
+        };
         department: {
             id: string;
             createdAt: Date;
@@ -12,25 +12,25 @@ export declare class SupportTicketService {
             name: string;
             description: string | null;
             isActive: boolean;
-        } | null;
+        };
         category: {
             id: string;
             createdAt: Date;
             name: string;
             description: string | null;
             isActive: boolean;
-        } | null;
+        };
     } & {
         id: string;
         status: import(".prisma/client").$Enums.SupportTicketStatus;
         createdAt: Date;
         updatedAt: Date;
-        description: string | null;
         userId: string | null;
+        departmentId: string | null;
+        description: string | null;
         subject: string;
         priority: import(".prisma/client").$Enums.TicketPriority;
         ticketNumber: string;
-        departmentId: string | null;
         categoryId: string | null;
         assignedToId: string | null;
         firstResponseTime: Date | null;
@@ -38,28 +38,21 @@ export declare class SupportTicketService {
         closedAt: Date | null;
         slaDeadline: Date | null;
     }>;
-    static getTicketById(id: string): Promise<({
+    static getTicketById(id: string): Promise<{
         user: {
             id: string;
             email: string;
             firstName: string;
             lastName: string;
-        } | null;
-        attachments: {
-            id: string;
-            createdAt: Date;
-            messageId: string | null;
-            ticketId: string | null;
-            fileName: string;
-            fileUrl: string;
-            fileType: import(".prisma/client").$Enums.AttachmentType;
-            fileSize: number;
-        }[];
-        tags: {
-            id: string;
-            createdAt: Date;
-            name: string;
-        }[];
+            kycStatus: import(".prisma/client").$Enums.KYCStatus;
+            country: string;
+            wallet: {
+                balance: import("@prisma/client/runtime/library").Decimal;
+            };
+            _count: {
+                transactions: number;
+            };
+        };
         department: {
             id: string;
             createdAt: Date;
@@ -67,15 +60,30 @@ export declare class SupportTicketService {
             name: string;
             description: string | null;
             isActive: boolean;
-        } | null;
+        };
+        attachments: {
+            id: string;
+            createdAt: Date;
+            messageId: string | null;
+            ticketId: string | null;
+            fileSize: number;
+            fileName: string;
+            fileUrl: string;
+            fileType: import(".prisma/client").$Enums.AttachmentType;
+        }[];
+        tags: {
+            id: string;
+            createdAt: Date;
+            name: string;
+        }[];
         category: {
             id: string;
             createdAt: Date;
             name: string;
             description: string | null;
             isActive: boolean;
-        } | null;
-        assignedTo: ({
+        };
+        assignedTo: {
             user: {
                 firstName: string;
                 lastName: string;
@@ -86,9 +94,9 @@ export declare class SupportTicketService {
             status: import(".prisma/client").$Enums.SupportAgentStatus;
             createdAt: Date;
             updatedAt: Date;
-            notes: string | null;
             userId: string;
             employeeId: string;
+            departmentId: string | null;
             team: string | null;
             designation: string | null;
             workingHours: import("@prisma/client/runtime/library").JsonValue | null;
@@ -96,18 +104,18 @@ export declare class SupportTicketService {
             languages: string[];
             skills: string[];
             experience: string | null;
-            departmentId: string | null;
-        }) | null;
+            notes: string | null;
+        };
         messages: ({
             attachments: {
                 id: string;
                 createdAt: Date;
                 messageId: string | null;
                 ticketId: string | null;
+                fileSize: number;
                 fileName: string;
                 fileUrl: string;
                 fileType: import(".prisma/client").$Enums.AttachmentType;
-                fileSize: number;
             }[];
         } & {
             id: string;
@@ -124,30 +132,30 @@ export declare class SupportTicketService {
         status: import(".prisma/client").$Enums.SupportTicketStatus;
         createdAt: Date;
         updatedAt: Date;
-        description: string | null;
         userId: string | null;
+        departmentId: string | null;
+        description: string | null;
         subject: string;
         priority: import(".prisma/client").$Enums.TicketPriority;
         ticketNumber: string;
-        departmentId: string | null;
         categoryId: string | null;
         assignedToId: string | null;
         firstResponseTime: Date | null;
         resolvedAt: Date | null;
         closedAt: Date | null;
         slaDeadline: Date | null;
-    }) | null>;
+    }>;
     static updateTicket(id: string, data: any): Promise<{
         id: string;
         status: import(".prisma/client").$Enums.SupportTicketStatus;
         createdAt: Date;
         updatedAt: Date;
-        description: string | null;
         userId: string | null;
+        departmentId: string | null;
+        description: string | null;
         subject: string;
         priority: import(".prisma/client").$Enums.TicketPriority;
         ticketNumber: string;
-        departmentId: string | null;
         categoryId: string | null;
         assignedToId: string | null;
         firstResponseTime: Date | null;
@@ -157,9 +165,11 @@ export declare class SupportTicketService {
     }>;
     static listTickets(filters?: any): Promise<({
         user: {
+            email: string;
+            username: string;
             firstName: string;
             lastName: string;
-        } | null;
+        };
         department: {
             id: string;
             createdAt: Date;
@@ -167,15 +177,15 @@ export declare class SupportTicketService {
             name: string;
             description: string | null;
             isActive: boolean;
-        } | null;
+        };
         category: {
             id: string;
             createdAt: Date;
             name: string;
             description: string | null;
             isActive: boolean;
-        } | null;
-        assignedTo: ({
+        };
+        assignedTo: {
             user: {
                 firstName: string;
                 lastName: string;
@@ -186,9 +196,9 @@ export declare class SupportTicketService {
             status: import(".prisma/client").$Enums.SupportAgentStatus;
             createdAt: Date;
             updatedAt: Date;
-            notes: string | null;
             userId: string;
             employeeId: string;
+            departmentId: string | null;
             team: string | null;
             designation: string | null;
             workingHours: import("@prisma/client/runtime/library").JsonValue | null;
@@ -196,19 +206,19 @@ export declare class SupportTicketService {
             languages: string[];
             skills: string[];
             experience: string | null;
-            departmentId: string | null;
-        }) | null;
+            notes: string | null;
+        };
     } & {
         id: string;
         status: import(".prisma/client").$Enums.SupportTicketStatus;
         createdAt: Date;
         updatedAt: Date;
-        description: string | null;
         userId: string | null;
+        departmentId: string | null;
+        description: string | null;
         subject: string;
         priority: import(".prisma/client").$Enums.TicketPriority;
         ticketNumber: string;
-        departmentId: string | null;
         categoryId: string | null;
         assignedToId: string | null;
         firstResponseTime: Date | null;
@@ -231,12 +241,12 @@ export declare class SupportTicketService {
         status: import(".prisma/client").$Enums.SupportTicketStatus;
         createdAt: Date;
         updatedAt: Date;
-        description: string | null;
         userId: string | null;
+        departmentId: string | null;
+        description: string | null;
         subject: string;
         priority: import(".prisma/client").$Enums.TicketPriority;
         ticketNumber: string;
-        departmentId: string | null;
         categoryId: string | null;
         assignedToId: string | null;
         firstResponseTime: Date | null;

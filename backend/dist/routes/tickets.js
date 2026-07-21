@@ -228,7 +228,7 @@ async function ticketRoutes(app) {
             data: {
                 userId,
                 title: '🎉 Prize claimed!',
-                message: `$${totalPrize.toFixed(2)} AUD has been credited to your wallet.`,
+                message: `$${totalPrize.toFixed(2)} USD has been credited to your wallet.`,
                 data: { ticketId: id },
             },
         });

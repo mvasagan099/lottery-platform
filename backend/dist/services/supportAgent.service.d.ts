@@ -12,16 +12,16 @@ export declare class SupportAgentService {
             name: string;
             description: string | null;
             isActive: boolean;
-        } | null;
+        };
     } & {
         id: string;
         role: import(".prisma/client").$Enums.SupportAgentRole;
         status: import(".prisma/client").$Enums.SupportAgentStatus;
         createdAt: Date;
         updatedAt: Date;
-        notes: string | null;
         userId: string;
         employeeId: string;
+        departmentId: string | null;
         team: string | null;
         designation: string | null;
         workingHours: import("@prisma/client/runtime/library").JsonValue | null;
@@ -29,7 +29,7 @@ export declare class SupportAgentService {
         languages: string[];
         skills: string[];
         experience: string | null;
-        departmentId: string | null;
+        notes: string | null;
     }>;
     static updateAgent(id: string, data: any): Promise<{
         user: {
@@ -44,16 +44,16 @@ export declare class SupportAgentService {
             name: string;
             description: string | null;
             isActive: boolean;
-        } | null;
+        };
     } & {
         id: string;
         role: import(".prisma/client").$Enums.SupportAgentRole;
         status: import(".prisma/client").$Enums.SupportAgentStatus;
         createdAt: Date;
         updatedAt: Date;
-        notes: string | null;
         userId: string;
         employeeId: string;
+        departmentId: string | null;
         team: string | null;
         designation: string | null;
         workingHours: import("@prisma/client/runtime/library").JsonValue | null;
@@ -61,9 +61,9 @@ export declare class SupportAgentService {
         languages: string[];
         skills: string[];
         experience: string | null;
-        departmentId: string | null;
+        notes: string | null;
     }>;
-    static getAgentById(id: string): Promise<({
+    static getAgentById(id: string): Promise<{
         user: {
             email: string;
             firstName: string;
@@ -76,7 +76,7 @@ export declare class SupportAgentService {
             name: string;
             description: string | null;
             isActive: boolean;
-        } | null;
+        };
         performance: {
             id: string;
             updatedAt: Date;
@@ -91,16 +91,16 @@ export declare class SupportAgentService {
             rating: import("@prisma/client/runtime/library").Decimal;
             escalatedTickets: number;
             firstResponseSlaMet: number;
-        } | null;
+        };
     } & {
         id: string;
         role: import(".prisma/client").$Enums.SupportAgentRole;
         status: import(".prisma/client").$Enums.SupportAgentStatus;
         createdAt: Date;
         updatedAt: Date;
-        notes: string | null;
         userId: string;
         employeeId: string;
+        departmentId: string | null;
         team: string | null;
         designation: string | null;
         workingHours: import("@prisma/client/runtime/library").JsonValue | null;
@@ -108,8 +108,8 @@ export declare class SupportAgentService {
         languages: string[];
         skills: string[];
         experience: string | null;
-        departmentId: string | null;
-    }) | null>;
+        notes: string | null;
+    }>;
     static listAgents(filters?: any): Promise<({
         user: {
             email: string;
@@ -123,16 +123,16 @@ export declare class SupportAgentService {
             name: string;
             description: string | null;
             isActive: boolean;
-        } | null;
+        };
     } & {
         id: string;
         role: import(".prisma/client").$Enums.SupportAgentRole;
         status: import(".prisma/client").$Enums.SupportAgentStatus;
         createdAt: Date;
         updatedAt: Date;
-        notes: string | null;
         userId: string;
         employeeId: string;
+        departmentId: string | null;
         team: string | null;
         designation: string | null;
         workingHours: import("@prisma/client/runtime/library").JsonValue | null;
@@ -140,7 +140,7 @@ export declare class SupportAgentService {
         languages: string[];
         skills: string[];
         experience: string | null;
-        departmentId: string | null;
+        notes: string | null;
     })[]>;
     static deleteAgent(id: string): Promise<{
         id: string;
@@ -148,9 +148,9 @@ export declare class SupportAgentService {
         status: import(".prisma/client").$Enums.SupportAgentStatus;
         createdAt: Date;
         updatedAt: Date;
-        notes: string | null;
         userId: string;
         employeeId: string;
+        departmentId: string | null;
         team: string | null;
         designation: string | null;
         workingHours: import("@prisma/client/runtime/library").JsonValue | null;
@@ -158,7 +158,7 @@ export declare class SupportAgentService {
         languages: string[];
         skills: string[];
         experience: string | null;
-        departmentId: string | null;
+        notes: string | null;
     }>;
 }
 //# sourceMappingURL=supportAgent.service.d.ts.map

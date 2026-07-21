@@ -112,11 +112,11 @@ export function ReportsPage() {
 
       {/* KPI Cards */}
       {overviewLoading ? <div className="loading-spinner" style={{ margin: '40px auto' }}></div> : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 'var(--space-lg)', marginBottom: 'var(--space-xl)' }}>
-          <KPICard title="Total Revenue" value={formatCurrency(overview?.grossProfit)} icon={<DollarSign color="#10b981" />} trend={+12.5} />
-          <KPICard title="Total Deposits" value={formatCurrency(overview?.totalDeposits)} icon={<ArrowUpRight color="#3b82f6" />} trend={+8.2} />
-          <KPICard title="Total Withdrawals" value={formatCurrency(overview?.totalWithdrawals)} icon={<ArrowDownRight color="#ef4444" />} trend={-2.4} />
-          <KPICard title="Net Profit" value={formatCurrency(overview?.netProfit)} icon={<TrendingUp color="#8b5cf6" />} trend={+15.3} />
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 'var(--space-md)', marginBottom: 'var(--space-xl)' }}>
+          <KPICard title="Total Revenue" value={formatCurrency(overview?.grossProfit)} icon={<DollarSign color="#10b981" size={20} />} trend={+12.5} />
+          <KPICard title="Total Deposits" value={formatCurrency(overview?.totalDeposits)} icon={<ArrowUpRight color="#3b82f6" size={20} />} trend={+8.2} />
+          <KPICard title="Total Withdrawals" value={formatCurrency(overview?.totalWithdrawals)} icon={<ArrowDownRight color="#ef4444" size={20} />} trend={-2.4} />
+          <KPICard title="Net Profit" value={formatCurrency(overview?.netProfit)} icon={<TrendingUp color="#8b5cf6" size={20} />} trend={+15.3} />
         </div>
       )}
 
@@ -188,8 +188,8 @@ export function ReportsPage() {
             Live Transactions
           </h3>
         </div>
-        <div className="card-body" style={{ padding: 0 }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+        <div className="card-body" style={{ padding: 0, overflowX: 'auto' }}>
+          <table style={{ width: '100%', minWidth: '600px', borderCollapse: 'collapse', textAlign: 'left' }}>
             <thead>
               <tr style={{ borderBottom: '1px solid var(--border-color)', backgroundColor: 'var(--bg-secondary)' }}>
                 <th style={{ padding: '12px var(--space-md)', color: 'var(--text-secondary)', fontWeight: 500 }}>Time</th>
@@ -249,27 +249,37 @@ function KPICard({ title, value, icon, trend }: { title: string, value: string, 
   const isPositive = trend > 0
   
   return (
-    <div className="card" style={{ padding: 'var(--space-lg)' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 'var(--space-md)' }}>
-        <div>
-          <p style={{ margin: '0 0 4px', color: 'var(--text-secondary)', fontSize: '0.9rem', fontWeight: 500 }}>{title}</p>
-          <h3 style={{ margin: 0, fontSize: '1.8rem', fontWeight: 700, color: 'var(--text-primary)' }}>{value}</h3>
+    <div className="card" style={{ padding: 'var(--space-md) var(--space-lg)', minWidth: 0 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 'var(--space-xs)', gap: '8px' }}>
+        <div style={{ minWidth: 0, flex: 1 }}>
+          <p style={{ margin: '0 0 4px', color: 'var(--text-secondary)', fontSize: '0.85rem', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{title}</p>
+          <h3 style={{ 
+            margin: 0, 
+            fontSize: 'clamp(1rem, 1.4vw, 1.45rem)', 
+            fontWeight: 700, 
+            color: 'var(--text-primary)', 
+            wordBreak: 'break-word',
+            overflowWrap: 'anywhere',
+            lineHeight: 1.25
+          }}>
+            {value}
+          </h3>
         </div>
-        <div style={{ padding: '10px', backgroundColor: 'var(--bg-secondary)', borderRadius: '12px' }}>
+        <div style={{ padding: '8px', backgroundColor: 'var(--bg-secondary)', borderRadius: '10px', flexShrink: 0 }}>
           {icon}
         </div>
       </div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', marginTop: '6px' }}>
         <span style={{ 
           display: 'inline-flex', alignItems: 'center', gap: '2px',
           color: isPositive ? '#10b981' : '#ef4444', 
           backgroundColor: isPositive ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)',
-          padding: '2px 6px', borderRadius: '4px', fontSize: '0.8rem', fontWeight: 600
+          padding: '2px 6px', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 600
         }}>
-          {isPositive ? <TrendingUp size={14} /> : <ArrowDownRight size={14} />}
+          {isPositive ? <TrendingUp size={12} /> : <ArrowDownRight size={12} />}
           {Math.abs(trend)}%
         </span>
-        <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>vs last period</span>
+        <span style={{ color: 'var(--text-secondary)', fontSize: '0.8rem' }}>vs last period</span>
       </div>
     </div>
   )

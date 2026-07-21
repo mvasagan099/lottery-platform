@@ -42,13 +42,34 @@ export function WithdrawalDetailsDrawer({ withdrawalId, onClose }: Props) {
   const user = withdrawal?.wallet?.user
   const accountDetails = withdrawal?.accountDetails || {}
 
-  // Simulated Fraud Checks
-  const fraudChecks = [
-    { label: 'KYC Verified', passed: true, icon: <CheckCircle size={16} color="var(--success-color)" /> },
-    { label: 'IP Address Matching', passed: true, icon: <CheckCircle size={16} color="var(--success-color)" /> },
-    { label: 'VPN Detection', passed: true, icon: <CheckCircle size={16} color="var(--success-color)" /> },
-    { label: 'Velocity Check', passed: false, icon: <AlertTriangle size={16} color="var(--warning-color)" />, info: '3 requests in 24 hours' },
-    { label: 'Large Amount Alert', passed: Number(withdrawal?.amount) > 10000 ? false : true, icon: Number(withdrawal?.amount) > 10000 ? <AlertTriangle size={16} color="var(--warning-color)"/> : <CheckCircle size={16} color="var(--success-color)" /> }
+  // Real Validation Checks for Withdrawals
+  const validationChecks = [
+    { 
+      label: `KYC Status: ${user?.kycStatus || 'NOT_SUBMITTED'}`, 
+      passed: user?.kycStatus === 'APPROVED', 
+      icon: user?.kycStatus === 'APPROVED' ? <CheckCircle size={16} color="var(--success-color)" /> : <AlertTriangle size={16} color="var(--warning-color)" /> 
+    },
+    { 
+      label: `User Status: ${user?.status || 'ACTIVE'}`, 
+      passed: user?.status === 'ACTIVE', 
+      icon: user?.status === 'ACTIVE' ? <CheckCircle size={16} color="var(--success-color)" /> : <XCircle size={16} color="var(--error-color)" /> 
+    },
+    { 
+      label: `Email Verification: ${user?.emailVerified ? 'Verified' : 'Unverified'}`, 
+      passed: Boolean(user?.emailVerified), 
+      icon: user?.emailVerified ? <CheckCircle size={16} color="var(--success-color)" /> : <AlertTriangle size={16} color="var(--warning-color)" /> 
+    },
+    { 
+      label: 'Sufficient Balance Check', 
+      passed: Number(withdrawal?.wallet?.balance || 0) >= 0, 
+      icon: Number(withdrawal?.wallet?.balance || 0) >= 0 ? <CheckCircle size={16} color="var(--success-color)" /> : <AlertTriangle size={16} color="var(--warning-color)" /> 
+    },
+    { 
+      label: 'High Value Threshold', 
+      passed: Number(withdrawal?.amount) <= 10000, 
+      icon: Number(withdrawal?.amount) <= 10000 ? <CheckCircle size={16} color="var(--success-color)" /> : <AlertTriangle size={16} color="var(--warning-color)" />, 
+      info: Number(withdrawal?.amount) > 10000 ? 'Requires Admin Approval' : 'Standard Amount' 
+    }
   ]
 
   const getStatusBadge = (status: string) => {
@@ -189,7 +210,7 @@ export function WithdrawalDetailsDrawer({ withdrawalId, onClose }: Props) {
                 <h3 style={{ margin: '0 0 16px 0', fontSize: '1rem', color: 'var(--warning-color)', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '8px' }}><ShieldAlert size={16}/> Automated Validation</h3>
                 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                  {fraudChecks.map((check, i) => (
+                  {validationChecks.map((check, i) => (
                     <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: check.passed ? 'var(--text-primary)' : 'var(--warning-color)', fontWeight: check.passed ? 500 : 600 }}>
                         {check.icon}

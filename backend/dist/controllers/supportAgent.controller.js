@@ -39,7 +39,12 @@ class SupportAgentController {
     static async listAgents(request, reply) {
         try {
             const agents = await supportAgent_service_1.SupportAgentService.listAgents(request.query);
-            return reply.send({ success: true, data: agents });
+            const formattedAgents = agents.map((agent) => ({
+                ...agent,
+                fullName: agent.user ? `${agent.user.firstName} ${agent.user.lastName}`.trim() : 'Unknown',
+                username: agent.user?.email, // Fallback
+            }));
+            return reply.send({ success: true, data: formattedAgents });
         }
         catch (error) {
             return reply.status(400).send({ success: false, error: error.message || error });

@@ -16,8 +16,8 @@ export function WalletSettingsPage() {
     values: settings,
   });
 
-  const onSubmit = (data: WalletSettings) => {
-    updateSettings(data);
+  const onSubmit = async (data: WalletSettings) => {
+    await updateSettings(data);
   };
 
   if (isLoading) {
@@ -34,13 +34,14 @@ export function WalletSettingsPage() {
           </p>
         </div>
         <button
+          type="button"
           onClick={handleSubmit(onSubmit)}
-          disabled={!isDirty || isUpdating}
+          disabled={isUpdating}
           className="btn btn-primary"
           style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
         >
           {isUpdating ? <Spinner size="sm" /> : <Save size={18} />}
-          Save Changes
+          {isUpdating ? 'Saving...' : 'Save Changes'}
         </button>
       </div>
 

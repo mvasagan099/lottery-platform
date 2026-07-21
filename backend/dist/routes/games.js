@@ -16,7 +16,7 @@ const purchaseSchema = zod_1.z.object({
         numbers: zod_1.z.array(zod_1.z.number().int().positive()),
         supplementary: zod_1.z.array(zod_1.z.number().int().positive()).optional(),
         powerball: zod_1.z.number().int().positive().optional(),
-    })).min(1).max(50),
+    })).min(1).max(1000),
     isQuickPick: zod_1.z.boolean().default(false),
     draws: zod_1.z.number().int().min(1).max(25).default(1),
     isSyndicate: zod_1.z.boolean().default(false),
@@ -34,6 +34,7 @@ async function gameRoutes(app) {
             where: { isActive: true },
             orderBy: [{ isFeatured: 'desc' }, { sortOrder: 'asc' }],
             include: {
+                jackpotPool: true,
                 prizeDivisions: { orderBy: { divisionOrder: 'asc' } },
                 draws: {
                     where: { status: 'SCHEDULED' },
@@ -61,6 +62,7 @@ async function gameRoutes(app) {
         const game = await server_1.prisma.game.findUnique({
             where: { slug },
             include: {
+                jackpotPool: true,
                 prizeDivisions: { orderBy: { divisionOrder: 'asc' } },
                 draws: {
                     where: { status: { in: ['SCHEDULED', 'COMPLETED'] } },
@@ -304,7 +306,7 @@ async function gameRoutes(app) {
         });
         if (!game)
             return reply.status(404).send({ success: false, error: 'Game not found' });
-        const picks = Array.from({ length: Math.min(lines, 20) }, () => {
+        const picks = Array.from({ length: Math.min(lines, 1000) }, () => {
             const nums = shuffleArray(Array.from({ length: game.numberPool }, (_, i) => i + 1)).slice(0, game.minNumbers).sort((a, b) => a - b);
             const result = { numbers: nums };
             if (game.hasPowerball && game.powerballPool) {

@@ -13,6 +13,7 @@ const server_1 = require("../server");
 const auth_1 = require("../middleware/auth");
 const cms_1 = __importDefault(require("./cms"));
 const adminSupport_1 = __importDefault(require("./adminSupport"));
+const jackpot_1 = __importDefault(require("./jackpot"));
 async function adminRoutes(app) {
     // All admin routes require authentication + admin role
     app.addHook('preHandler', auth_1.authenticate);
@@ -20,6 +21,7 @@ async function adminRoutes(app) {
     // Register Sub-routers
     app.register(cms_1.default, { prefix: '/cms' });
     app.register(adminSupport_1.default, { prefix: '/support' });
+    app.register(jackpot_1.default, { prefix: '/jackpot' });
     // ── Dashboard Stats ───────────────────────────────────────────────────────
     app.get('/stats', async (request, reply) => {
         const [totalUsers, activeUsers, pendingKYC, pendingWithdrawals, totalRevenue, todayTickets, activeSessions,] = await Promise.all([
@@ -89,6 +91,7 @@ async function adminRoutes(app) {
                     createdAt: true,
                     lastLoginAt: true,
                     wallet: { select: { balance: true, totalDeposited: true } },
+                    roles: { include: { role: { select: { name: true } } } },
                 },
             }),
             server_1.prisma.user.count({ where }),
@@ -119,6 +122,9 @@ async function adminRoutes(app) {
                     where: { isActive: true },
                     select: { id: true, ipAddress: true, lastUsedAt: true, userAgent: true },
                 },
+                roles: {
+                    include: { role: true }
+                }
             },
         });
         if (!user)
@@ -690,11 +696,84 @@ async function adminRoutes(app) {
     });
     app.patch('/draws/:id/publish', async (request, reply) => {
         const { id } = request.params;
-        const draw = await server_1.prisma.draw.update({
+        // 1. Fetch draw with tickets
+        const draw = await server_1.prisma.draw.findUnique({
             where: { id },
-            data: {
-                publishedAt: new Date()
+            include: {
+                game: {
+                    include: { prizeDivisions: { orderBy: { divisionOrder: 'asc' } } }
+                },
+                tickets: {
+                    include: { numbers: true }
+                }
             }
+        });
+        if (!draw)
+            return reply.status(404).send({ success: false, error: 'Draw not found' });
+        if (draw.publishedAt)
+            return reply.status(400).send({ success: false, error: 'Already published' });
+        // 2. Process tickets
+        const winningNums = draw.winningNumbers || [];
+        const pb = draw.powerball;
+        for (const ticket of draw.tickets) {
+            if (ticket.status !== 'ACTIVE')
+                continue;
+            let bestDivision = null;
+            let bestPrize = 0;
+            for (const line of ticket.numbers) {
+                const nums = line.numbers;
+                const matched = nums.filter(n => winningNums.includes(n)).length;
+                const pbMatched = pb && line.powerball === pb;
+                for (const div of draw.game.prizeDivisions) {
+                    const numMatch = div.matchNumbers === matched;
+                    const pbMatch = !div.matchPB || pbMatched;
+                    if (numMatch && pbMatch) {
+                        const prizeAmt = Number(div.fixedPrize || draw.jackpotAmount);
+                        if (prizeAmt > bestPrize) {
+                            bestPrize = prizeAmt;
+                            bestDivision = div;
+                        }
+                        break;
+                    }
+                }
+            }
+            if (bestDivision && bestPrize > 0) {
+                await server_1.prisma.ticket.update({
+                    where: { id: ticket.id },
+                    data: { status: 'WON', prizeAmount: bestPrize, prizeDivision: bestDivision.divisionName }
+                });
+                const wallet = await server_1.prisma.wallet.findUnique({ where: { userId: ticket.userId } });
+                if (wallet) {
+                    await server_1.prisma.wallet.update({
+                        where: { id: wallet.id },
+                        data: { balance: { increment: bestPrize }, totalWon: { increment: bestPrize } }
+                    });
+                    await server_1.prisma.transaction.create({
+                        data: {
+                            userId: ticket.userId,
+                            walletId: wallet.id,
+                            type: 'PRIZE_CREDIT',
+                            amount: bestPrize,
+                            balanceBefore: wallet.balance,
+                            balanceAfter: Number(wallet.balance) + bestPrize,
+                            reference: 'admin-pub-' + draw.id + '-' + ticket.id,
+                            description: 'Winnings from Draw #' + draw.drawNumber,
+                            status: 'COMPLETED'
+                        }
+                    });
+                }
+            }
+            else {
+                await server_1.prisma.ticket.update({
+                    where: { id: ticket.id },
+                    data: { status: 'LOST' }
+                });
+            }
+        }
+        // 3. Mark as published
+        const updatedDraw = await server_1.prisma.draw.update({
+            where: { id },
+            data: { publishedAt: new Date() }
         });
         await (0, auth_1.auditLog)(request.user.userId, 'DRAW_PUBLISHED', 'Draw', id, undefined, {}, request);
         return reply.send({ success: true, message: 'Draw results published securely' });
@@ -788,6 +867,31 @@ async function adminRoutes(app) {
         await server_1.prisma.game.update({ where: { id }, data: dataToUpdate });
         await (0, auth_1.auditLog)(request.user.userId, 'GAME_UPDATED', 'Game', id, undefined, dataToUpdate, request);
         return reply.send({ success: true, message: 'Game updated successfully' });
+    });
+    app.patch('/games/:id/divisions', async (request, reply) => {
+        const { id } = request.params;
+        const { divisions } = request.body;
+        // Use a transaction to delete old and create new divisions
+        await server_1.prisma.$transaction(async (tx) => {
+            await tx.prizeDivision.deleteMany({ where: { gameId: id } });
+            if (divisions && divisions.length > 0) {
+                await tx.prizeDivision.createMany({
+                    data: divisions.map((div, i) => ({
+                        gameId: id,
+                        divisionName: div.divisionName,
+                        divisionOrder: div.divisionOrder ?? i + 1,
+                        description: div.description || '',
+                        fixedPrize: div.fixedPrize ? parseFloat(div.fixedPrize) : null,
+                        isJackpot: Boolean(div.isJackpot),
+                        matchNumbers: parseInt(div.matchNumbers),
+                        matchSupp: div.matchSupp ? parseInt(div.matchSupp) : 0,
+                        matchPB: Boolean(div.matchPB)
+                    }))
+                });
+            }
+        });
+        await (0, auth_1.auditLog)(request.user.userId, 'GAME_DIVISIONS_UPDATED', 'Game', id, undefined, { divisions }, request);
+        return reply.send({ success: true, message: 'Prize divisions updated successfully' });
     });
     app.post('/games/bulk-action', async (request, reply) => {
         const { recordIds, action } = request.body;

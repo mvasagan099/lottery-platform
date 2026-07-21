@@ -17,17 +17,17 @@ declare module '@fastify/jwt' {
     }
 }
 /** Verify JWT and attach user to request */
-export declare function authenticate(request: FastifyRequest, reply: FastifyReply): Promise<undefined>;
+export declare function authenticate(request: FastifyRequest, reply: FastifyReply): Promise<never>;
 /** Require specific roles */
-export declare function requireRole(...roles: string[]): (request: FastifyRequest, reply: FastifyReply) => Promise<undefined>;
+export declare function requireRole(...roles: string[]): (request: FastifyRequest, reply: FastifyReply) => Promise<never>;
 /** Admin only */
-export declare const requireAdmin: (request: FastifyRequest, reply: FastifyReply) => Promise<undefined>;
+export declare const requireAdmin: (request: FastifyRequest, reply: FastifyReply) => Promise<never>;
 /** Support or admin */
-export declare const requireSupport: (request: FastifyRequest, reply: FastifyReply) => Promise<undefined>;
+export declare const requireSupport: (request: FastifyRequest, reply: FastifyReply) => Promise<never>;
 /** Check if user account is active */
-export declare function requireActiveAccount(request: FastifyRequest, reply: FastifyReply): Promise<undefined>;
+export declare function requireActiveAccount(request: FastifyRequest, reply: FastifyReply): Promise<never>;
 /** Require email verification for sensitive actions */
-export declare function requireVerifiedEmail(request: FastifyRequest, reply: FastifyReply): Promise<undefined>;
+export declare function requireVerifiedEmail(request: FastifyRequest, reply: FastifyReply): Promise<never>;
 /** Log audit trail */
 export declare function auditLog(userId: string, action: string, resource: string, resourceId?: string, oldValues?: object, newValues?: object, request?: FastifyRequest): Promise<void>;
 //# sourceMappingURL=auth.d.ts.map
