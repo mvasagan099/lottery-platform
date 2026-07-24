@@ -5,12 +5,16 @@ export interface LoginPayload { email: string; password: string; totp?: string }
 export interface RegisterPayload {
   email: string; username: string; password: string
   firstName: string; lastName: string
+  country?: string; phone?: string
   dateOfBirth?: string; referralCode?: string
 }
 
 export const authService = {
   login: (payload: LoginPayload) =>
     api.post<ApiResponse<{ accessToken: string; refreshToken: string; user: User }>>('/auth/login', payload),
+
+  requestEmailOtp: (payload: LoginPayload) =>
+    api.post<ApiResponse>('/auth/request-email-otp', payload),
 
   register: (payload: RegisterPayload) =>
     api.post<ApiResponse<{ id: string; email: string }>>('/auth/register', payload),
@@ -20,8 +24,14 @@ export const authService = {
   refresh: (refreshToken: string) =>
     api.post<ApiResponse<{ accessToken: string }>>('/auth/refresh', { refreshToken }),
 
-  verifyEmail: (token: string) =>
-    api.post<ApiResponse>('/auth/verify-email', { token }),
+  verifyEmail: (email: string, token: string) =>
+    api.post<ApiResponse>('/auth/verify-email', { email, token }),
+
+  resendVerification: (email: string) =>
+    api.post<ApiResponse>('/auth/resend-verification', { email }),
+
+  skipVerification: (email: string) =>
+    api.post<ApiResponse>('/auth/skip-verification', { email }),
 
   forgotPassword: (email: string) =>
     api.post<ApiResponse>('/auth/forgot-password', { email }),

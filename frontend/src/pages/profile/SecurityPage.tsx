@@ -18,7 +18,10 @@ const passwordSchema = z.object({
 export default function SecurityPage() {
   const { user, updateUser } = useAuthStore()
   const [show2FAModal, setShow2FAModal] = useState(false)
+  const [showDisable2FAModal, setShowDisable2FAModal] = useState(false)
   const [totpToken, setTotpToken] = useState('')
+  const [disablePassword, setDisablePassword] = useState('')
+  const [disableToken, setDisableToken] = useState('')
   const [setupData, setSetupData] = useState<{ qrCode: string; secret: string } | null>(null)
 
   const { register, handleSubmit, reset, formState: { errors } } = useForm({
@@ -51,6 +54,18 @@ export default function SecurityPage() {
       setShow2FAModal(false)
     },
     onError: (err: any) => toast.error(err.response?.data?.error || 'Invalid code')
+  })
+
+  const disable2FAMutation = useMutation({
+    mutationFn: () => authService.disable2FA(disablePassword, disableToken),
+    onSuccess: () => {
+      toast.success('2FA Disabled!')
+      updateUser({ twoFactorEnabled: false })
+      setShowDisable2FAModal(false)
+      setDisablePassword('')
+      setDisableToken('')
+    },
+    onError: (err: any) => toast.error(err.response?.data?.error || 'Failed to disable 2FA. Please check your password and code.')
   })
 
   const revokeSessionMutation = useMutation({
@@ -96,7 +111,7 @@ export default function SecurityPage() {
               {user?.twoFactorEnabled ? (
                 <div>
                   <div className="alert alert-success" style={{ marginBottom: '16px' }}>2FA is currently ENABLED on your account.</div>
-                  <button className="btn btn-danger btn-outline">Disable 2FA</button>
+                  <button className="btn btn-danger btn-outline" onClick={() => setShowDisable2FAModal(true)}>Disable 2FA</button>
                 </div>
               ) : (
                 <div>
@@ -141,7 +156,7 @@ export default function SecurityPage() {
 
       <Modal isOpen={show2FAModal} onClose={() => setShow2FAModal(false)} title="Enable 2FA">
         {setupData ? (
-          <div style={{ textAlign: 'center' }}>
+          <div style={{ textAlign: 'center', padding: '16px 0 24px 0' }}>
             <p style={{ marginBottom: '16px', color: 'var(--text-secondary)' }}>Scan this QR code with your authenticator app (Google Authenticator, Authy, etc.)</p>
             <img src={setupData.qrCode} alt="2FA QR" style={{ width: '200px', height: '200px', margin: '0 auto 16px', background: 'white', padding: '8px', borderRadius: '8px' }} />
             <div style={{ marginBottom: '24px', fontSize: '13px' }}>Manual Code: <code style={{ padding: '4px', background: 'var(--bg-secondary)' }}>{setupData.secret}</code></div>
@@ -150,13 +165,42 @@ export default function SecurityPage() {
               <label className="form-label">Enter 6-digit code to verify</label>
               <input type="text" className="form-input" value={totpToken} onChange={(e) => setTotpToken(e.target.value)} maxLength={6} placeholder="000000" />
             </div>
-            <button className="btn btn-primary btn-full" onClick={() => confirm2FAMutation.mutate()} disabled={totpToken.length !== 6 || confirm2FAMutation.isPending}>
+            <button 
+              className="btn btn-primary btn-full" 
+              style={{ marginTop: '24px' }}
+              onClick={() => confirm2FAMutation.mutate()} 
+              disabled={totpToken.length !== 6 || confirm2FAMutation.isPending}
+            >
               Verify & Enable
             </button>
           </div>
         ) : (
           <div style={{ textAlign: 'center', padding: '40px' }}><div className="btn-spinner" style={{ width: '32px', height: '32px', borderColor: 'var(--color-primary)' }} /></div>
         )}
+      </Modal>
+
+      <Modal isOpen={showDisable2FAModal} onClose={() => setShowDisable2FAModal(false)} title="Disable 2FA">
+        <div style={{ padding: '16px 0' }}>
+          <p style={{ marginBottom: '24px', color: 'var(--text-secondary)' }}>
+            To disable 2-Factor Authentication, please enter your current password and a code from your authenticator app.
+          </p>
+          <div className="form-group">
+            <label className="form-label">Current Password</label>
+            <input type="password" className="form-input" value={disablePassword} onChange={(e) => setDisablePassword(e.target.value)} />
+          </div>
+          <div className="form-group">
+            <label className="form-label">Authenticator Code</label>
+            <input type="text" className="form-input" value={disableToken} onChange={(e) => setDisableToken(e.target.value)} maxLength={6} placeholder="000000" />
+          </div>
+          <button 
+            className="btn btn-danger btn-full" 
+            style={{ marginTop: '24px' }}
+            onClick={() => disable2FAMutation.mutate()} 
+            disabled={!disablePassword || disableToken.length !== 6 || disable2FAMutation.isPending}
+          >
+            Confirm & Disable 2FA
+          </button>
+        </div>
       </Modal>
     </div>
   )

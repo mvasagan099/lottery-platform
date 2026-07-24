@@ -1,6 +1,7 @@
 import { FastifyPluginAsync } from 'fastify'
 import { PrismaClient } from '@prisma/client'
 import { auditLog } from '../middleware/auth'
+import crypto from 'crypto'
 
 const prisma = new PrismaClient()
 
@@ -158,8 +159,8 @@ const cmsRoutes: FastifyPluginAsync = async (app) => {
       d.setDate(d.getDate() - (6 - i))
       return {
         date: d.toLocaleDateString('en-US', { weekday: 'short' }),
-        views: Math.floor(Math.random() * 5000) + 1000,
-        conversions: Math.floor(Math.random() * 200) + 50
+        views: crypto.randomInt(1000, 6000),
+        conversions: crypto.randomInt(50, 250)
       }
     })
 

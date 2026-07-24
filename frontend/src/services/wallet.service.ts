@@ -4,6 +4,8 @@ import type { Wallet, Transaction, Deposit, Withdrawal, PaginatedResponse, ApiRe
 export const walletService = {
   get: () => api.get<ApiResponse<Wallet>>('/wallet'),
 
+  requestEmailOtp: () => api.post<ApiResponse>('/wallet/request-email-otp'),
+
   getTransactions: (params?: { page?: number; limit?: number; type?: string; status?: string }) =>
     api.get<PaginatedResponse<Transaction>>('/wallet/transactions', { params }),
 

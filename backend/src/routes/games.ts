@@ -8,6 +8,7 @@ import { FastifyInstance } from 'fastify'
 import { z } from 'zod'
 import { prisma, redis } from '../server'
 import { authenticate, requireAdmin } from '../middleware/auth'
+import crypto from 'crypto'
 
 const purchaseSchema = z.object({
   gameId: z.string(),
@@ -354,7 +355,7 @@ export default async function gameRoutes(app: FastifyInstance) {
       const result: any = { numbers: nums }
 
       if (game.hasPowerball && game.powerballPool) {
-        result.powerball = Math.ceil(Math.random() * game.powerballPool)
+        result.powerball = crypto.randomInt(1, game.powerballPool + 1)
       }
 
       return result
@@ -366,13 +367,13 @@ export default async function gameRoutes(app: FastifyInstance) {
 
 function generateTicketNumber(): string {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
-  return Array.from({ length: 12 }, () => chars[Math.floor(Math.random() * chars.length)]).join('')
+  return Array.from({ length: 12 }, () => chars[crypto.randomInt(0, chars.length)]).join('')
 }
 
 function shuffleArray<T>(arr: T[]): T[] {
   const a = [...arr]
   for (let i = a.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1))
+    const j = crypto.randomInt(0, i + 1)
     ;[a[i], a[j]] = [a[j], a[i]]
   }
   return a

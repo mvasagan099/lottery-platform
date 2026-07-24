@@ -5,7 +5,7 @@
 
 import { FastifyInstance } from 'fastify'
 import { z } from 'zod'
-import { prisma } from '../server'
+import { prisma, redis } from '../server'
 import { authenticate, requireVerifiedEmail, auditLog } from '../middleware/auth'
 
 const depositSchema = z.object({
@@ -264,6 +264,37 @@ export default async function walletRoutes(app: FastifyInstance) {
     return reply.send({ success: true, message: 'Deposit confirmed' })
   })
 
+  // POST /wallet/request-email-otp - Request OTP for withdrawals/transfers
+  app.post('/request-email-otp', {
+    preHandler: [authenticate, requireVerifiedEmail],
+    config: { rateLimit: { max: 3, timeWindow: '5 minutes' } },
+  }, async (request, reply) => {
+    const userId = request.user.userId
+    const user = await prisma.user.findUnique({ where: { id: userId } })
+    if (!user) return reply.status(404).send({ success: false, error: 'User not found' })
+
+    const { randomInt } = require('crypto')
+    const code = randomInt(100000, 1000000).toString()
+    await redis.set(`email_otp:${userId}:withdraw`, code, 'EX', 300)
+
+    console.log(`\n\n🔑 [TESTING] WALLET WITHDRAW OTP CODE FOR ${user.email}: ${code}\n\n`)
+
+    try {
+      const { sendEmail } = require('../services/email')
+      await sendEmail({
+        to: user.email,
+        subject: 'MegaDraw Wallet Verification Code',
+        template: 'email-otp',
+        data: { name: user.firstName, action: 'wallet transfer or withdrawal', code },
+      })
+    } catch (e) {
+      console.error('Failed to send OTP:', e)
+      return reply.status(500).send({ success: false, error: 'Failed to send verification email' })
+    }
+
+    return reply.send({ success: true, message: 'Verification code sent to email' })
+  })
+
   // POST /wallet/withdraw - Request withdrawal
   app.post('/withdraw', {
     preHandler: [authenticate, requireVerifiedEmail],
@@ -287,16 +318,23 @@ export default async function walletRoutes(app: FastifyInstance) {
     
     if (!user) return reply.status(404).send({ success: false, error: 'User not found' })
     
-    if (user.twoFactorEnabled) {
+    let valid = false
+    const cachedOtp = await redis.get(`email_otp:${userId}:withdraw`)
+    
+    if (cachedOtp && cachedOtp === body.totp) {
+      valid = true
+      await redis.del(`email_otp:${userId}:withdraw`)
+    } else if (user.twoFactorEnabled && user.twoFactorSecret) {
       if (!body.totp) {
         return reply.status(400).send({ success: false, error: '2FA code is required', code: '2FA_REQUIRED' })
       }
-      const valid = otplib.authenticator.verify({ token: body.totp, secret: user.twoFactorSecret! })
-      if (!valid) {
-        return reply.status(400).send({ success: false, error: 'Invalid 2FA code' })
-      }
+      valid = otplib.authenticator.verify({ token: body.totp, secret: user.twoFactorSecret })
     } else {
-      return reply.status(403).send({ success: false, error: 'You must enable 2-Step Verification in your profile security settings before withdrawing funds.', code: '2FA_SETUP_REQUIRED' })
+      return reply.status(403).send({ success: false, error: 'You must enable 2-Step Verification or request an Email OTP before withdrawing funds.', code: '2FA_SETUP_REQUIRED' })
+    }
+
+    if (!valid) {
+      return reply.status(400).send({ success: false, error: 'Invalid verification code' })
     }
 
     const wallet = await prisma.wallet.findUnique({
@@ -399,16 +437,23 @@ export default async function walletRoutes(app: FastifyInstance) {
 
     if (!user) return reply.status(404).send({ success: false, error: 'User not found' })
 
-    if (user.twoFactorEnabled) {
+    let valid = false
+    const cachedOtp = await redis.get(`email_otp:${userId}:withdraw`)
+    
+    if (cachedOtp && cachedOtp === body.totp) {
+      valid = true
+      await redis.del(`email_otp:${userId}:withdraw`)
+    } else if (user.twoFactorEnabled && user.twoFactorSecret) {
       if (!body.totp) {
         return reply.status(400).send({ success: false, error: '2FA code is required', code: '2FA_REQUIRED' })
       }
-      const valid = otplib.authenticator.verify({ token: body.totp, secret: user.twoFactorSecret! })
-      if (!valid) {
-        return reply.status(400).send({ success: false, error: 'Invalid 2FA code' })
-      }
+      valid = otplib.authenticator.verify({ token: body.totp, secret: user.twoFactorSecret })
     } else {
-      return reply.status(403).send({ success: false, error: 'You must enable 2-Step Verification in your profile security settings before transferring funds.', code: '2FA_SETUP_REQUIRED' })
+      return reply.status(403).send({ success: false, error: 'You must enable 2-Step Verification or request an Email OTP before transferring funds.', code: '2FA_SETUP_REQUIRED' })
+    }
+
+    if (!valid) {
+      return reply.status(400).send({ success: false, error: 'Invalid verification code' })
     }
 
     if (user.kycStatus !== 'APPROVED') {

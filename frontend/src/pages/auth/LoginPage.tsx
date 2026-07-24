@@ -31,7 +31,7 @@ export default function LoginPage() {
 
   if (isAuthenticated) return null
 
-  const { register, handleSubmit, formState: { errors } } = useForm<FormData>({
+  const { register, handleSubmit, getValues, formState: { errors } } = useForm<FormData>({
     resolver: zodResolver(schema),
   })
 
@@ -53,6 +53,15 @@ export default function LoginPage() {
       if (msg.includes('2FA') || msg.includes('TOTP')) setNeeds2FA(true)
       else toast.error(msg)
     },
+  })
+
+  const requestOtpMutation = useMutation({
+    mutationFn: () => {
+      const { email, password } = getValues()
+      return authService.requestEmailOtp({ email, password })
+    },
+    onSuccess: () => toast.success('Verification code sent to your email'),
+    onError: () => toast.error('Failed to send verification code'),
   })
 
   const onSubmit = (data: FormData) => mutation.mutate(data as any)
@@ -122,7 +131,18 @@ export default function LoginPage() {
               {/* 2FA */}
               {needs2FA && (
                 <div className="form-group">
-                  <label className="form-label">Two-Factor Code</label>
+                  <div className="form-label" style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span>Verification Code (2FA or Email)</span>
+                    <button
+                      type="button"
+                      className="btn btn-ghost btn-sm"
+                      style={{ padding: 0, height: 'auto', color: 'var(--color-accent)' }}
+                      onClick={() => requestOtpMutation.mutate()}
+                      disabled={requestOtpMutation.isPending}
+                    >
+                      {requestOtpMutation.isPending ? 'Sending...' : 'Send Code via Email'}
+                    </button>
+                  </div>
                   <input {...register('totp')} type="text" className="form-input" placeholder="000000" maxLength={6} inputMode="numeric" />
                 </div>
               )}

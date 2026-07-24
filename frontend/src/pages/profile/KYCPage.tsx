@@ -4,13 +4,69 @@ import { ShieldCheck, UploadCloud, FileText, CheckCircle, AlertTriangle } from '
 import toast from 'react-hot-toast'
 import { supabase } from '@/lib/supabase'
 import imageCompression from 'browser-image-compression'
+import { useEffect } from 'react'
+
+const COUNTRY_DOCUMENTS: Record<string, { value: string; label: string }[]> = {
+  India: [
+    { value: 'AADHAAR', label: 'Aadhaar' },
+    { value: 'PAN', label: 'PAN' },
+    { value: 'DRIVERS_LICENSE', label: 'Driving Licence' },
+    { value: 'PASSPORT', label: 'Passport / Visa' },
+    { value: 'HEALTH_ID', label: 'Ayushman Bharat / ABHA Health ID' },
+  ],
+  'United Kingdom': [
+    { value: 'NATIONAL_INSURANCE', label: 'National Insurance Number (NINo)' },
+    { value: 'DRIVERS_LICENSE', label: 'Driving Licence' },
+    { value: 'NHS_NUMBER', label: 'NHS Number' },
+    { value: 'PASSPORT', label: 'Passport / Visa / BRP or eVisa' },
+  ],
+  'United States': [
+    { value: 'SSN', label: 'Social Security Number (SSN)' },
+    { value: 'DRIVERS_LICENSE', label: 'Driver License' },
+    { value: 'MEDICARE', label: 'Medicare Number' },
+    { value: 'PASSPORT', label: 'Passport / Visa / Green Card' },
+  ],
+  UAE: [
+    { value: 'EMIRATES_ID', label: 'Emirates ID' },
+    { value: 'TRN', label: 'Tax Registration Number (TRN)' },
+    { value: 'DRIVERS_LICENSE', label: 'UAE Driving Licence' },
+    { value: 'HEALTH_CARD', label: 'Emirates Health Card / Insurance' },
+    { value: 'PASSPORT', label: 'Passport / Visa' },
+  ],
+  Australia: [
+    { value: 'TFN', label: 'Tax File Number (TFN)' },
+    { value: 'DRIVERS_LICENSE', label: 'Driver Licence' },
+    { value: 'MEDICARE', label: 'Medicare Card' },
+    { value: 'PASSPORT', label: 'Passport / Visa' },
+  ],
+  DEFAULT: [
+    { value: 'PASSPORT', label: 'Passport' },
+    { value: 'DRIVERS_LICENSE', label: "Driver's License" },
+    { value: 'NATIONAL_ID', label: 'National ID Card' },
+  ]
+}
 
 export default function KYCPage() {
   const { user } = useAuthStore()
-  const [docType, setDocType] = useState('PASSPORT')
+  
+  const getDocumentOptions = () => {
+    if (!user?.country) return COUNTRY_DOCUMENTS.DEFAULT
+    const key = Object.keys(COUNTRY_DOCUMENTS).find(
+      k => k.toLowerCase() === user.country.toLowerCase()
+    )
+    return key ? COUNTRY_DOCUMENTS[key] : COUNTRY_DOCUMENTS.DEFAULT
+  }
+
+  const docOptions = getDocumentOptions()
+  const [docType, setDocType] = useState(docOptions[0].value)
   const [isUploading, setIsUploading] = useState(false)
   const [frontFile, setFrontFile] = useState<File | null>(null)
   const [backFile, setBackFile] = useState<File | null>(null)
+
+  useEffect(() => {
+    // If the options change (e.g. user finishes loading), reset the docType to the first option
+    setDocType(getDocumentOptions()[0].value)
+  }, [user?.country])
 
   const handleUpload = async () => {
     if (!frontFile) {
@@ -95,9 +151,11 @@ export default function KYCPage() {
               <div className="form-group">
                 <label className="form-label">Document Type</label>
                 <select className="form-select" value={docType} onChange={(e) => setDocType(e.target.value)}>
-                  <option value="PASSPORT">Passport</option>
-                  <option value="DRIVERS_LICENSE">Driver's License</option>
-                  <option value="NATIONAL_ID">National ID Card</option>
+                  {docOptions.map(option => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
                 </select>
               </div>
 

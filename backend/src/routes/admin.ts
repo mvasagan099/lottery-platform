@@ -11,6 +11,7 @@ import { authenticate, requireAdmin, auditLog } from '../middleware/auth'
 import cmsRoutes from './cms'
 import adminSupportRoutes from './adminSupport'
 import jackpotRoutes from './jackpot'
+import crypto from 'crypto'
 
 export default async function adminRoutes(app: FastifyInstance) {
 
@@ -676,7 +677,7 @@ export default async function adminRoutes(app: FastifyInstance) {
           amount: type === 'DEBIT' ? -amount : amount,
           balanceBefore,
           balanceAfter,
-          reference: `ADJ-${Math.random().toString(36).substring(2, 10).toUpperCase()}`,
+          reference: `ADJ-${crypto.randomBytes(4).toString('hex').toUpperCase()}`,
           description: `Admin Adjustment: ${reason}`
         }
       })

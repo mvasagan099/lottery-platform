@@ -23,7 +23,7 @@ export default function ProfilePage() {
   const handleResendVerification = async () => {
     setIsResending(true)
     try {
-      await api.post('/auth/resend-verification')
+      await api.post('/auth/resend-verification', { email: user?.email })
       toast.success('Verification email sent! Check your inbox (or terminal).')
     } catch (err: any) {
       const errorMsg = err.response?.data?.error
@@ -39,7 +39,7 @@ export default function ProfilePage() {
   }
 
   const { register, handleSubmit } = useForm({
-    defaultValues: {
+    values: {
       firstName: user?.firstName || '',
       lastName: user?.lastName || '',
       phone: user?.phone || '',
@@ -145,7 +145,8 @@ export default function ProfilePage() {
                 </div>
                 <div className="form-group">
                   <label className="form-label">Country</label>
-                  <input {...register('country')} className="form-input" disabled={!isEditing} placeholder="global" />
+                  <input type="text" className="form-input" value={user?.country || ''} disabled />
+                  <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Country cannot be changed</span>
                 </div>
 
                 {isEditing && (

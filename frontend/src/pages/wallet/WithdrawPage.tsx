@@ -34,10 +34,17 @@ export default function WithdrawPage() {
     },
   })
 
+  const requestOtpMutation = useMutation({
+    mutationFn: () => walletService.requestEmailOtp(),
+    onSuccess: () => toast.success('Verification code sent to your email'),
+    onError: () => toast.error('Failed to send verification code'),
+  })
+
   const available = Number(wallet?.balance || 0)
   const isKycVerified = user?.kycStatus === 'APPROVED'
+  const isEmailVerified = user?.emailVerified
   const is2FAEnabled = user?.twoFactorEnabled
-  const isInvalid = !amount || Number(amount) < 50 || Number(amount) > available || !isKycVerified || !is2FAEnabled || totp.length !== 6
+  const isInvalid = !amount || Number(amount) < 50 || Number(amount) > available || !isKycVerified || !isEmailVerified || totp.length !== 6
 
   return (
     <div className="page-wrapper section">
@@ -48,6 +55,23 @@ export default function WithdrawPage() {
         </h1>
 
         <div className="card card-body" style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+          {!isEmailVerified && (
+            <div className="alert alert-danger" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.3)', color: '#f87171', padding: '16px', borderRadius: '12px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <ShieldAlert size={24} style={{ flexShrink: 0 }} />
+                <div>
+                  <strong style={{ fontSize: '15px' }}>Email not verified</strong>
+                  <div style={{ fontSize: '13px', opacity: 0.9, marginTop: '2px' }}>
+                    You must verify your email address before withdrawing or transferring funds.
+                  </div>
+                </div>
+              </div>
+              <Link to="/profile" className="btn btn-sm btn-gold" style={{ whiteSpace: 'nowrap' }}>
+                Verify Email
+              </Link>
+            </div>
+          )}
+
           {!isKycVerified && (
             <div className="alert alert-danger" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.3)', color: '#f87171', padding: '16px', borderRadius: '12px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -66,18 +90,18 @@ export default function WithdrawPage() {
           )}
 
           {!is2FAEnabled && (
-            <div className="alert alert-danger" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.3)', color: '#f87171', padding: '16px', borderRadius: '12px' }}>
+            <div className="alert alert-warning" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', background: 'rgba(245, 158, 11, 0.1)', border: '1px solid rgba(245, 158, 11, 0.3)', color: '#fbbf24', padding: '16px', borderRadius: '12px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                 <ShieldAlert size={24} style={{ flexShrink: 0 }} />
                 <div>
-                  <strong style={{ fontSize: '15px' }}>2-Step Verification Required</strong>
+                  <strong style={{ fontSize: '15px' }}>Authenticator App Not Setup</strong>
                   <div style={{ fontSize: '13px', opacity: 0.9, marginTop: '2px' }}>
-                    You must enable 2FA in your security settings before withdrawing funds.
+                    You will need to request an Email OTP to proceed, or setup an Authenticator App in your profile.
                   </div>
                 </div>
               </div>
               <Link to="/profile/security" className="btn btn-sm btn-gold" style={{ whiteSpace: 'nowrap' }}>
-                Setup 2FA
+                Setup App
               </Link>
             </div>
           )}
@@ -119,19 +143,27 @@ export default function WithdrawPage() {
             )}
           </div>
 
-          {is2FAEnabled && (
-            <div>
-              <div className="form-label" style={{ marginBottom: '12px' }}>Authenticator Code (2FA)</div>
-              <input
-                type="text"
-                className="form-input"
-                placeholder="6-digit code"
-                value={totp}
-                onChange={(e) => setTotp(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                disabled={!isKycVerified}
-              />
+          <div>
+            <div className="form-label" style={{ marginBottom: '12px', display: 'flex', justifyContent: 'space-between' }}>
+              <span>Verification Code (2FA or Email)</span>
+              <button 
+                className="btn btn-ghost btn-sm" 
+                style={{ padding: 0, height: 'auto', color: 'var(--color-accent)' }}
+                onClick={() => requestOtpMutation.mutate()}
+                disabled={requestOtpMutation.isPending || !isKycVerified}
+              >
+                {requestOtpMutation.isPending ? 'Sending...' : 'Send Code via Email'}
+              </button>
             </div>
-          )}
+            <input
+              type="text"
+              className="form-input"
+              placeholder="6-digit code"
+              value={totp}
+              onChange={(e) => setTotp(e.target.value.replace(/\D/g, '').slice(0, 6))}
+              disabled={!isKycVerified}
+            />
+          </div>
 
           <button
             className="btn btn-primary btn-lg btn-full"

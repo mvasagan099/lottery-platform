@@ -8,7 +8,7 @@
 import { FastifyInstance } from 'fastify'
 import { z } from 'zod'
 import argon2 from 'argon2'
-import { randomBytes } from 'crypto'
+import { randomBytes, randomInt } from 'crypto'
 import * as otplib from 'otplib'
 import { prisma, redis } from '../server'
 import { authenticate, auditLog } from '../middleware/auth'
@@ -23,6 +23,8 @@ const registerSchema = z.object({
   password: z.string().min(8).max(100),
   firstName: z.string().min(1).max(50),
   lastName: z.string().min(1).max(50),
+  country: z.string().optional(),
+  phone: z.string().optional(),
   dateOfBirth: z.string().optional(),
   referralCode: z.string().optional(),
 })
@@ -43,7 +45,8 @@ const resetPasswordSchema = z.object({
 })
 
 const verifyEmailSchema = z.object({
-  token: z.string(),
+  email: z.string().email().toLowerCase(),
+  token: z.string().length(6),
 })
 
 const changePasswordSchema = z.object({
@@ -90,59 +93,25 @@ export default async function authRoutes(app: FastifyInstance) {
       }
     }
 
-    // Find referrer
-    let referrerId: string | undefined
-    if (body.referralCode) {
-      const referrer = await prisma.user.findFirst({
-        where: { referralCode: body.referralCode },
-      })
-      referrerId = referrer?.id
-    }
-
-    // Hash password
-    const passwordHash = await argon2.hash(body.password, {
-      type: argon2.argon2id,
-      memoryCost: 65536,
-      timeCost: 3,
-      parallelism: 4,
-    })
-
-    // Create user with wallet
-    const user = await prisma.$transaction(async (tx) => {
-      const newUser = await tx.user.create({
-        data: {
-          email: body.email,
-          username: body.username,
-          passwordHash,
-          firstName: body.firstName,
-          lastName: body.lastName,
-          dateOfBirth: body.dateOfBirth ? new Date(body.dateOfBirth) : undefined,
-          referredById: referrerId,
-        },
-      })
-
-      // Create wallet
-      await tx.wallet.create({ data: { userId: newUser.id } })
-
-      // Create notification preferences
-      await tx.notificationPreference.create({ data: { userId: newUser.id } })
-
-      return newUser
-    })
+    // Store registration data in Redis (15 minutes TTL)
+    await redis.setex(`pending_reg:${body.email}`, 900, JSON.stringify(body))
 
     // Send verification email
-    const verifyToken = randomBytes(32).toString('hex')
-    await redis.setex(`email_verify:${verifyToken}`, 86400, user.id) // 24h TTL
+    const otp = randomInt(100000, 999999).toString()
+    await redis.setex(`email_verify:${body.email}`, 300, otp) // 5m TTL
+
+    console.log(`\n\n🔑 [TESTING] OTP CODE FOR ${body.email}: ${otp}\n\n`)
 
     let emailSent = true
     try {
       await sendEmail({
-        to: user.email,
+        to: body.email,
         subject: 'Verify your MegaDraw account',
-        template: 'email-verification',
+        template: 'email-otp',
         data: {
-          name: user.firstName,
-          verifyUrl: `${process.env.FRONTEND_URL}/verify-email?token=${verifyToken}`,
+          name: body.firstName || body.username || 'User',
+          action: 'account verification',
+          code: otp,
         },
       })
     } catch (emailErr) {
@@ -150,46 +119,62 @@ export default async function authRoutes(app: FastifyInstance) {
       console.error('Verification email failed after retries:', emailErr)
     }
 
-    await auditLog(user.id, 'REGISTER', 'User', user.id, undefined, { email: user.email }, request)
-
     return reply.status(201).send({
       success: true,
       message: emailSent
-        ? 'Account created. Please check your email to verify your account.'
-        : 'Account created. We had trouble sending the verification email — please use Resend Verification from your profile.',
+        ? 'OTP sent. Please check your email to verify your account.'
+        : 'We had trouble sending the verification email. Please try resending the code.',
       data: {
-        id: user.id,
-        email: user.email,
-        username: user.username,
+        email: body.email,
+        username: body.username,
       },
     })
   })
 
   // POST /auth/resend-verification
-  app.post('/resend-verification', { preHandler: authenticate }, async (request, reply) => {
-    const user = await prisma.user.findUnique({ where: { id: request.user.userId } })
-    if (!user) return reply.status(404).send({ success: false, error: 'User not found' })
-    if (user.emailVerified) return reply.status(400).send({ success: false, error: 'Email is already verified' })
+  app.post('/resend-verification', async (request, reply) => {
+    const { email } = forgotPasswordSchema.parse(request.body)
+    const user = await prisma.user.findUnique({ where: { email } })
+    
+    let isPending = false
+    let pendingName = ''
+    if (!user) {
+      const pendingData = await redis.get(`pending_reg:${email}`)
+      if (!pendingData) {
+        return reply.status(404).send({ success: false, error: 'User not found or registration expired' })
+      }
+      isPending = true
+      pendingName = JSON.parse(pendingData).firstName || JSON.parse(pendingData).username
+    } else if (user.emailVerified) {
+      return reply.status(400).send({ success: false, error: 'Email is already verified' })
+    }
 
-    const verifyToken = randomBytes(32).toString('hex')
-    await redis.setex(`email_verify:${verifyToken}`, 86400, user.id) // 24h TTL
+    const otp = randomInt(100000, 999999).toString()
+    await redis.setex(`email_verify:${email}`, 300, otp) // 5m TTL
 
+    console.log(`\n\n🔑 [TESTING] RESENT OTP CODE FOR ${email}: ${otp}\n\n`)
+
+    let emailSent = true
     try {
       await sendEmail({
-        to: user.email,
+        to: email,
         subject: 'Verify your MegaDraw account',
-        template: 'email-verification',
+        template: 'email-otp',
         data: {
-          name: user.firstName,
-          verifyUrl: `${process.env.FRONTEND_URL}/verify-email?token=${verifyToken}`,
+          name: (isPending ? pendingName : (user?.firstName || user?.username)) || 'User',
+          action: 'account verification',
+          code: otp,
         },
       })
     } catch (emailErr) {
+      emailSent = false
       console.error('Resend verification email failed after retries:', emailErr)
-      return reply.status(503).send({ success: false, error: 'Failed to send email. Please try again in a moment.' })
     }
 
-    return reply.send({ success: true, message: 'Verification email resent' })
+    return reply.send({ 
+      success: true, 
+      message: emailSent ? 'Verification email resent' : 'Failed to send email due to Resend tier limits, but OTP is in terminal logs.' 
+    })
   })
 
   // POST /auth/login
@@ -239,17 +224,31 @@ export default async function authRoutes(app: FastifyInstance) {
         return reply.status(200).send({
           success: false,
           requiresTOTP: true,
-          message: 'Please enter your authenticator code',
+          message: 'Please enter your verification code',
         })
       }
 
-      const valid = otplib.authenticator.verify({
-        token: body.totp,
-        secret: user.twoFactorSecret!,
-      })
+      let valid = false
+      const cachedOtp = await redis.get(`email_otp:${user.id}:login`)
+      
+      if (cachedOtp && cachedOtp === body.totp) {
+        valid = true
+        await redis.del(`email_otp:${user.id}:login`)
+      }
+      
+      if (!valid && user.twoFactorSecret) {
+        try {
+          valid = otplib.authenticator.verify({
+            token: body.totp,
+            secret: user.twoFactorSecret,
+          })
+        } catch (e) {
+          console.error('TOTP verify error:', e)
+        }
+      }
 
       if (!valid) {
-        return reply.status(401).send({ success: false, error: 'Invalid authenticator code' })
+        return reply.status(401).send({ success: false, error: 'Invalid verification code' })
       }
     }
 
@@ -317,6 +316,38 @@ export default async function authRoutes(app: FastifyInstance) {
     })
   })
 
+  // POST /auth/request-email-otp
+  app.post('/request-email-otp', {
+    config: { rateLimit: devLimit(3, '5 minutes') },
+  }, async (request, reply) => {
+    const body = loginSchema.parse(request.body)
+    
+    const user = await prisma.user.findUnique({ where: { email: body.email } })
+    if (!user) return reply.status(401).send({ success: false, error: 'Incorrect email or password' })
+
+    const validPassword = await argon2.verify(user.passwordHash, body.password)
+    if (!validPassword) return reply.status(401).send({ success: false, error: 'Incorrect email or password' })
+
+    const code = randomInt(100000, 1000000).toString()
+    await redis.set(`email_otp:${user.id}:login`, code, 'EX', 300)
+
+    console.log(`\n\n🔑 [TESTING] LOGIN OTP CODE FOR ${user.email}: ${code}\n\n`)
+
+    try {
+      await sendEmail({
+        to: user.email,
+        subject: 'MegaDraw Login Verification Code',
+        template: 'email-otp',
+        data: { name: user.firstName, action: 'login', code },
+      })
+    } catch (e) {
+      console.error('Failed to send OTP:', e)
+      return reply.status(500).send({ success: false, error: 'Failed to send verification email' })
+    }
+
+    return reply.send({ success: true, message: 'Verification code sent to email' })
+  })
+
   // POST /auth/refresh
   app.post('/refresh', async (request, reply) => {
     const { refreshToken } = request.body as { refreshToken: string }
@@ -364,25 +395,144 @@ export default async function authRoutes(app: FastifyInstance) {
 
   // POST /auth/verify-email
   app.post('/verify-email', async (request, reply) => {
-    const { token } = verifyEmailSchema.parse(request.body)
+    const { email, token } = verifyEmailSchema.parse(request.body)
 
-    const userId = await redis.get(`email_verify:${token}`)
-    if (!userId) {
-      return reply.status(400).send({ success: false, error: 'Invalid or expired verification link' })
+    const cachedOtp = await redis.get(`email_verify:${email}`)
+    if (!cachedOtp || cachedOtp !== token) {
+      return reply.status(400).send({ success: false, error: 'Invalid or expired verification code' })
     }
 
-    await prisma.user.update({
-      where: { id: userId },
-      data: {
-        emailVerified: true,
-        emailVerifiedAt: new Date(),
-        status: 'ACTIVE',
-      },
-    })
+    const user = await prisma.user.findUnique({ where: { email } })
+    
+    if (user) {
+      // User exists but unverified (old flow compatibility)
+      await prisma.user.update({
+        where: { id: user.id },
+        data: {
+          emailVerified: true,
+          emailVerifiedAt: new Date(),
+          status: 'ACTIVE',
+        },
+      })
+    } else {
+      // Check pending registration
+      const pendingDataStr = await redis.get(`pending_reg:${email}`)
+      if (!pendingDataStr) {
+        return reply.status(404).send({ success: false, error: 'User registration not found or expired. Please register again.' })
+      }
 
-    await redis.del(`email_verify:${token}`)
+      const body = JSON.parse(pendingDataStr)
+
+      // Find referrer
+      let referrerId: string | undefined
+      if (body.referralCode) {
+        const referrer = await prisma.user.findFirst({
+          where: { referralCode: body.referralCode },
+        })
+        referrerId = referrer?.id
+      }
+
+      // Hash password
+      const passwordHash = await argon2.hash(body.password, {
+        type: argon2.argon2id,
+        memoryCost: 65536,
+        timeCost: 3,
+        parallelism: 4,
+      })
+
+      // Create user with wallet
+      const newUser = await prisma.$transaction(async (tx) => {
+        const createdUser = await tx.user.create({
+          data: {
+            email: body.email,
+            username: body.username,
+            passwordHash,
+            firstName: body.firstName,
+            lastName: body.lastName,
+            country: body.country,
+            phone: body.phone,
+            dateOfBirth: body.dateOfBirth ? new Date(body.dateOfBirth) : undefined,
+            referredById: referrerId,
+            referralCode: Array.from({length: 8}, () => 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'[Math.floor(Math.random() * 36)]).join(''),
+            emailVerified: true,
+            emailVerifiedAt: new Date(),
+            status: 'ACTIVE',
+          },
+        })
+
+        await tx.wallet.create({ data: { userId: createdUser.id } })
+        await tx.notificationPreference.create({ data: { userId: createdUser.id } })
+
+        return createdUser
+      })
+
+      await auditLog(newUser.id, 'REGISTER', 'User', newUser.id, undefined, { email: newUser.email }, request)
+      await redis.del(`pending_reg:${email}`)
+    }
+
+    await redis.del(`email_verify:${email}`)
 
     return reply.send({ success: true, message: 'Email verified successfully' })
+  })
+
+  // POST /auth/skip-verification
+  app.post('/skip-verification', async (request, reply) => {
+    const { email } = forgotPasswordSchema.parse(request.body)
+
+    const pendingDataStr = await redis.get(`pending_reg:${email}`)
+    if (!pendingDataStr) {
+      return reply.status(404).send({ success: false, error: 'User registration not found or expired. Please register again.' })
+    }
+
+    const body = JSON.parse(pendingDataStr)
+
+    // Find referrer
+    let referrerId: string | undefined
+    if (body.referralCode) {
+      const referrer = await prisma.user.findFirst({
+        where: { referralCode: body.referralCode },
+      })
+      referrerId = referrer?.id
+    }
+
+    // Hash password
+    const passwordHash = await argon2.hash(body.password, {
+      type: argon2.argon2id,
+      memoryCost: 65536,
+      timeCost: 3,
+      parallelism: 4,
+    })
+
+    // Create user with wallet
+    const newUser = await prisma.$transaction(async (tx) => {
+      const createdUser = await tx.user.create({
+        data: {
+          email: body.email,
+          username: body.username,
+          passwordHash,
+          firstName: body.firstName,
+          lastName: body.lastName,
+          country: body.country,
+          phone: body.phone,
+          dateOfBirth: body.dateOfBirth ? new Date(body.dateOfBirth) : undefined,
+          referredById: referrerId,
+          referralCode: Array.from({length: 8}, () => 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'[Math.floor(Math.random() * 36)]).join(''),
+          emailVerified: false,
+          status: 'PENDING_VERIFICATION',
+        },
+      })
+
+      await tx.wallet.create({ data: { userId: createdUser.id } })
+      await tx.notificationPreference.create({ data: { userId: createdUser.id } })
+
+      return createdUser
+    })
+
+    await auditLog(newUser.id, 'REGISTER_SKIPPED_VERIFY', 'User', newUser.id, undefined, { email: newUser.email }, request)
+    await redis.del(`pending_reg:${email}`)
+    await redis.del(`email_verify:${email}`)
+
+    return reply.send({ success: true, message: 'Account created. Email verification skipped.' })
   })
 
   // POST /auth/forgot-password

@@ -45,7 +45,7 @@ export default async function affiliateRoutes(app: FastifyInstance) {
       data: {
         ...affiliate,
         referralCode: user?.referralCode,
-        referralLink: `${process.env.FRONTEND_URL}?ref=${user?.referralCode}`,
+        referralLink: `${process.env.FRONTEND_URL}/register?ref=${user?.referralCode}`,
       },
     })
   })

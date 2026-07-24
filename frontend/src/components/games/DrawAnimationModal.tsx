@@ -454,9 +454,9 @@ export default function DrawAnimationModal({ isOpen, onClose, game }: DrawAnimat
       ctx.fill()
 
       if (flyingCoin) {
-        flyingCoin.progress += 0.035
+        flyingCoin.progress += 0.08 // Fly fast
 
-        if (flyingCoin.progress >= 1) {
+        if (flyingCoin.progress >= 5.8) {
           if (flyingCoin.label === 'main') {
             setDrawnMain(prev => [...prev, flyingCoin.number])
           } else if (flyingCoin.label === 'supp') {
@@ -469,13 +469,13 @@ export default function DrawAnimationModal({ isOpen, onClose, game }: DrawAnimat
           setFlyingCoin(null)
           setTimeout(() => {
             drawNextCoin(nextIdx)
-          }, 800)
+          }, 100)
         } else {
-          const p = flyingCoin.progress
+          const p = Math.min(1, flyingCoin.progress)
           const ease = p * (2 - p)
           const currentX = flyingCoin.x + (flyingCoin.targetX - flyingCoin.x) * ease
           const currentY = flyingCoin.y + (flyingCoin.targetY - flyingCoin.y) * ease
-          const size = flyingCoin.size + Math.sin(p * Math.PI) * 45
+          const size = flyingCoin.size + Math.sin(p * (Math.PI / 2)) * 45
 
           ctx.save()
           ctx.translate(currentX, currentY)
