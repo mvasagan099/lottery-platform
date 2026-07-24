@@ -13,6 +13,7 @@ export default function ResultsPage() {
     queryFn: () => gamesService.getDraws({ page, limit: 10, status: 'COMPLETED' }),
     select: (r) => r.data,
   })
+  const filteredDraws = drawsData?.data?.filter((draw: any) => new Date(draw.scheduledAt).getTime() <= Date.now()) || []
 
   return (
     <div className="page-wrapper section">
@@ -38,10 +39,10 @@ export default function ResultsPage() {
               <tbody>
                 {isLoading ? (
                   <tr><td colSpan={4} style={{ textAlign: 'center', padding: '40px' }}><div className="btn-spinner" style={{ borderColor: 'var(--color-primary)', width: '24px', height: '24px' }} /></td></tr>
-                ) : drawsData?.data?.length === 0 ? (
+                ) : filteredDraws.length === 0 ? (
                   <tr><td colSpan={4} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>No completed draws found.</td></tr>
                 ) : (
-                  drawsData?.data?.map((draw: any) => (
+                  filteredDraws.map((draw: any) => (
                     <tr key={draw.id}>
                       <td style={{ fontWeight: 800, fontFamily: 'var(--font-display)', fontSize: '16px' }}>{draw.game.name}</td>
                       <td>#{draw.drawNumber}</td>

@@ -8,6 +8,7 @@ import { useAuthStore } from '@/store/authStore'
 
 export default function WithdrawPage() {
   const [amount, setAmount] = useState('')
+  const [totp, setTotp] = useState('')
   const { user } = useAuthStore()
 
   const { data: wallet } = useQuery({
@@ -17,10 +18,11 @@ export default function WithdrawPage() {
   })
 
   const transferMutation = useMutation({
-    mutationFn: () => walletService.transferToCouponWallet(Number(amount)),
+    mutationFn: () => walletService.transferToCouponWallet(Number(amount), totp),
     onSuccess: () => {
       toast.success('Transferred to Coupon Wallet successfully!')
       setAmount('')
+      setTotp('')
     },
     onError: (err: any) => {
       const errMsg = err.response?.data?.error || 'Transfer failed'
@@ -34,7 +36,8 @@ export default function WithdrawPage() {
 
   const available = Number(wallet?.balance || 0)
   const isKycVerified = user?.kycStatus === 'APPROVED'
-  const isInvalid = !amount || Number(amount) < 50 || Number(amount) > available || !isKycVerified
+  const is2FAEnabled = user?.twoFactorEnabled
+  const isInvalid = !amount || Number(amount) < 50 || Number(amount) > available || !isKycVerified || !is2FAEnabled || totp.length !== 6
 
   return (
     <div className="page-wrapper section">
@@ -58,6 +61,23 @@ export default function WithdrawPage() {
               </div>
               <Link to="/profile/kyc" className="btn btn-sm btn-gold" style={{ whiteSpace: 'nowrap' }}>
                 Verify Now
+              </Link>
+            </div>
+          )}
+
+          {!is2FAEnabled && (
+            <div className="alert alert-danger" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.3)', color: '#f87171', padding: '16px', borderRadius: '12px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <ShieldAlert size={24} style={{ flexShrink: 0 }} />
+                <div>
+                  <strong style={{ fontSize: '15px' }}>2-Step Verification Required</strong>
+                  <div style={{ fontSize: '13px', opacity: 0.9, marginTop: '2px' }}>
+                    You must enable 2FA in your security settings before withdrawing funds.
+                  </div>
+                </div>
+              </div>
+              <Link to="/profile/security" className="btn btn-sm btn-gold" style={{ whiteSpace: 'nowrap' }}>
+                Setup 2FA
               </Link>
             </div>
           )}
@@ -98,6 +118,20 @@ export default function WithdrawPage() {
               <span className="form-error" style={{ display: 'block', marginTop: '6px' }}>Amount exceeds available balance.</span>
             )}
           </div>
+
+          {is2FAEnabled && (
+            <div>
+              <div className="form-label" style={{ marginBottom: '12px' }}>Authenticator Code (2FA)</div>
+              <input
+                type="text"
+                className="form-input"
+                placeholder="6-digit code"
+                value={totp}
+                onChange={(e) => setTotp(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                disabled={!isKycVerified}
+              />
+            </div>
+          )}
 
           <button
             className="btn btn-primary btn-lg btn-full"

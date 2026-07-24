@@ -313,6 +313,7 @@ export interface ApiResponse<T = unknown> {
   error?: string
   message?: string
   details?: unknown[]
+  requiresTOTP?: boolean
 }
 
 export interface PaginatedResponse<T> extends ApiResponse<T[]> {

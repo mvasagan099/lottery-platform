@@ -54,10 +54,14 @@ const changePasswordSchema = z.object({
 // ── Route handlers ────────────────────────────────────────────────────────────
 
 export default async function authRoutes(app: FastifyInstance) {
+  const devLimit = (max: number, timeWindow: string) => 
+    process.env.NODE_ENV !== 'production' 
+      ? { max: 10000, timeWindow: '1 minute' } 
+      : { max, timeWindow }
 
   // POST /auth/register
   app.post('/register', {
-    config: { rateLimit: { max: 50, timeWindow: '15 minutes' } },
+    config: { rateLimit: devLimit(50, '15 minutes') },
   }, async (request, reply) => {
     const body = registerSchema.parse(request.body)
 
@@ -190,7 +194,7 @@ export default async function authRoutes(app: FastifyInstance) {
 
   // POST /auth/login
   app.post('/login', {
-    config: { rateLimit: { max: 10, timeWindow: '15 minutes' } },
+    config: { rateLimit: devLimit(10, '15 minutes') },
   }, async (request, reply) => {
     const body = loginSchema.parse(request.body)
 
@@ -383,7 +387,7 @@ export default async function authRoutes(app: FastifyInstance) {
 
   // POST /auth/forgot-password
   app.post('/forgot-password', {
-    config: { rateLimit: { max: 3, timeWindow: '15 minutes' } },
+    config: { rateLimit: devLimit(3, '15 minutes') },
   }, async (request, reply) => {
     const { email } = forgotPasswordSchema.parse(request.body)
 

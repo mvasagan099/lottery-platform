@@ -23,9 +23,10 @@ export const walletService = {
     amount: number
     gateway: string
     accountDetails: { accountName: string; accountNumber?: string; bsb?: string; paypalEmail?: string }
+    totp?: string
   }) => api.post<ApiResponse>('/wallet/withdraw', payload),
 
   redeemCoupon: (code: string) => api.post<ApiResponse<any>>('/wallet/redeem', { code }),
 
-  transferToCouponWallet: (amount: number) => api.post<ApiResponse<any>>('/wallet/transfer', { amount }),
+  transferToCouponWallet: (amount: number, totp?: string) => api.post<ApiResponse<any>>('/wallet/transfer', { amount, totp }),
 }

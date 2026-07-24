@@ -38,6 +38,11 @@ export default function LoginPage() {
   const mutation = useMutation({
     mutationFn: authService.login,
     onSuccess: (r) => {
+      if (r.data.requiresTOTP) {
+        setNeeds2FA(true)
+        toast.error('Please enter your 2FA authenticator code')
+        return
+      }
       const { user, accessToken, refreshToken } = r.data.data!
       setAuth(user, accessToken, refreshToken)
       toast.success(`Welcome back, ${user.firstName}!`)

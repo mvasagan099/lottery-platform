@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { ticketsService } from '@/services/index'
 import NumberBall from '@/components/UI/NumberBall'
 import Spinner from '@/components/UI/Spinner'
-import { ArrowLeft, Ticket, Calendar, DollarSign, CheckCircle, Info } from 'lucide-react'
+import { ArrowLeft, Ticket, Calendar, Coins, CheckCircle, Info, Clock, Receipt } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 export default function TicketDetailPage() {
@@ -78,7 +78,7 @@ export default function TicketDetailPage() {
               </div>
             )}
 
-            <div className="grid-3" style={{ gap: '16px', marginBottom: '32px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginBottom: '32px' }}>
               <div style={{ background: 'var(--bg-secondary)', padding: '16px', borderRadius: '12px' }}>
                 <div style={{ color: 'var(--text-muted)', fontSize: '12px', fontWeight: 700, textTransform: 'uppercase', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
                   <Calendar size={14} /> Purchased
@@ -93,10 +93,20 @@ export default function TicketDetailPage() {
               </div>
               <div style={{ background: 'var(--bg-secondary)', padding: '16px', borderRadius: '12px' }}>
                 <div style={{ color: 'var(--text-muted)', fontSize: '12px', fontWeight: 700, textTransform: 'uppercase', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <DollarSign size={14} /> Total Cost
+                  <Receipt size={14} /> Total Cost
                 </div>
-                <div style={{ fontWeight: 600 }}>${Number(ticket.totalCost).toFixed(2)}</div>
+                <div style={{ fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' }}><Coins size={14} color="gold" /> {Number(ticket.totalCost).toFixed(2)}</div>
               </div>
+              {ticket.draw && (
+                <div style={{ background: 'var(--bg-secondary)', padding: '16px', borderRadius: '12px' }}>
+                  <div style={{ color: 'var(--text-muted)', fontSize: '12px', fontWeight: 700, textTransform: 'uppercase', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <Clock size={14} /> Draw Date & Time
+                  </div>
+                  <div style={{ fontWeight: 600 }}>
+                    {new Date(ticket.draw.scheduledAt).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}
+                  </div>
+                </div>
+              )}
             </div>
 
             <h3 style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '18px', marginBottom: '16px' }}>Your Numbers</h3>

@@ -14,6 +14,8 @@ const depositSchema = z.object({
   paymentMethodId: z.string().optional(),
 })
 
+import * as otplib from 'otplib'
+
 const withdrawalSchema = z.object({
   amount: z.number().positive(),
   gateway: z.enum(['STRIPE', 'PAYPAL', 'BANK_TRANSFER']),
@@ -23,6 +25,7 @@ const withdrawalSchema = z.object({
     bsb: z.string().optional(),
     paypalEmail: z.string().email().optional(),
   }),
+  totp: z.string().optional(),
 })
 
 const redeemSchema = z.object({
@@ -277,6 +280,25 @@ export default async function walletRoutes(app: FastifyInstance) {
       return reply.status(400).send({ success: false, error: `Maximum withdrawal amount per transaction is $${walletSettings.maxWithdrawal}` })
     }
 
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { email: true, kycStatus: true, twoFactorEnabled: true, twoFactorSecret: true }
+    })
+    
+    if (!user) return reply.status(404).send({ success: false, error: 'User not found' })
+    
+    if (user.twoFactorEnabled) {
+      if (!body.totp) {
+        return reply.status(400).send({ success: false, error: '2FA code is required', code: '2FA_REQUIRED' })
+      }
+      const valid = otplib.authenticator.verify({ token: body.totp, secret: user.twoFactorSecret! })
+      if (!valid) {
+        return reply.status(400).send({ success: false, error: 'Invalid 2FA code' })
+      }
+    } else {
+      return reply.status(403).send({ success: false, error: 'You must enable 2-Step Verification in your profile security settings before withdrawing funds.', code: '2FA_SETUP_REQUIRED' })
+    }
+
     const wallet = await prisma.wallet.findUnique({
       where: { userId },
       select: { id: true, balance: true },
@@ -310,12 +332,7 @@ export default async function walletRoutes(app: FastifyInstance) {
     }
 
     // Check KYC
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { kycStatus: true },
-    })
-
-    if (user?.kycStatus !== 'APPROVED') {
+    if (user.kycStatus !== 'APPROVED') {
       return reply.status(403).send({
         success: false,
         error: 'Please complete KYC verification before withdrawing funds',
@@ -369,6 +386,7 @@ export default async function walletRoutes(app: FastifyInstance) {
   }, async (request, reply) => {
     const transferSchema = z.object({
       amount: z.number().positive().min(1),
+      totp: z.string().optional(),
     })
     
     const body = transferSchema.parse(request.body)
@@ -376,10 +394,22 @@ export default async function walletRoutes(app: FastifyInstance) {
 
     const user = await prisma.user.findUnique({
       where: { id: userId },
-      select: { email: true, kycStatus: true }
+      select: { email: true, kycStatus: true, twoFactorEnabled: true, twoFactorSecret: true }
     })
 
     if (!user) return reply.status(404).send({ success: false, error: 'User not found' })
+
+    if (user.twoFactorEnabled) {
+      if (!body.totp) {
+        return reply.status(400).send({ success: false, error: '2FA code is required', code: '2FA_REQUIRED' })
+      }
+      const valid = otplib.authenticator.verify({ token: body.totp, secret: user.twoFactorSecret! })
+      if (!valid) {
+        return reply.status(400).send({ success: false, error: 'Invalid 2FA code' })
+      }
+    } else {
+      return reply.status(403).send({ success: false, error: 'You must enable 2-Step Verification in your profile security settings before transferring funds.', code: '2FA_SETUP_REQUIRED' })
+    }
 
     if (user.kycStatus !== 'APPROVED') {
       return reply.status(403).send({

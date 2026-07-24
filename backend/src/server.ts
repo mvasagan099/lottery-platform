@@ -76,7 +76,7 @@ async function buildApp() {
 
   await app.register(rateLimit, {
     global: true,
-    max: 100,
+    max: process.env.NODE_ENV !== 'production' ? 10000 : 100,
     timeWindow: '1 minute',
     redis,
     skipOnError: false,

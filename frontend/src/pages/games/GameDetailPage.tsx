@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useQuery, useMutation } from '@tanstack/react-query'
 import { gamesService } from '@/services/games.service'
@@ -9,6 +9,7 @@ import JackpotCounter from '@/components/UI/JackpotCounter'
 import Spinner from '@/components/UI/Spinner'
 import { Ticket, Zap, RefreshCw, ChevronRight, Info } from 'lucide-react'
 import toast from 'react-hot-toast'
+import DrawAnimationModal from '@/components/games/DrawAnimationModal'
 
 export default function GameDetailPage() {
   const { slug } = useParams<{ slug: string }>()
@@ -19,6 +20,7 @@ export default function GameDetailPage() {
   const [activeLine, setActiveLine] = useState(0)
   const [numDraws, setNumDraws] = useState(1)
   const [activeTab, setActiveTab] = useState<'play' | 'prizes' | 'how'>('play')
+  const [isDrawModalOpen, setIsDrawModalOpen] = useState(false)
 
   const { data: game, isLoading } = useQuery({
     queryKey: ['game', slug],
@@ -26,6 +28,25 @@ export default function GameDetailPage() {
     select: (r) => r.data?.data,
     enabled: !!slug,
   })
+
+  const activeLockDraw = game?.draws?.find((d: any) => {
+    const drawTime = new Date(d.scheduledAt).getTime()
+    return Date.now() >= drawTime - 60 * 60 * 1000 && Date.now() < drawTime + 60 * 60 * 1000
+  })
+  const isLockedForDraw = !!activeLockDraw
+
+  const nextDraw = activeLockDraw || game?.nextDraw || (game?.draws 
+    ? [...game.draws].filter((d: any) => d.status === 'SCHEDULED')
+        .sort((a: any, b: any) => new Date(a.scheduledAt).getTime() - new Date(b.scheduledAt).getTime())[0]
+    : undefined)
+  const nextDrawTime = nextDraw ? new Date(nextDraw.scheduledAt).getTime() : 0
+
+  // Automatically force open live draw modal if within 2-hour locked draw window
+  useEffect(() => {
+    if (isLockedForDraw) {
+      setIsDrawModalOpen(true)
+    }
+  }, [isLockedForDraw])
 
   const quickPickMutation = useMutation({
     mutationFn: (numLines: number) => gamesService.quickPick(game!.id, numLines),
@@ -123,11 +144,13 @@ export default function GameDetailPage() {
   return (
     <div className="page-wrapper">
       {/* Hero */}
-      <div style={{ background: 'var(--gradient-hero)', padding: '60px 0 40px', color: 'white' }}>
+      <div style={{ background: 'var(--gradient-hero)', padding: '24px 0', color: 'white' }}>
         <div className="container">
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px', opacity: 0.6, fontSize: '14px' }}>
-            <Link to="/games" style={{ color: 'inherit' }}>Games</Link>
-            <ChevronRight size={14} /> {game.name}
+          <div style={{ display: 'flex', alignItems: 'center', marginBottom: '16px', fontSize: '14px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', opacity: 0.6 }}>
+              <Link to="/games" style={{ color: 'inherit' }}>Games</Link>
+              <ChevronRight size={14} /> {game.name}
+            </div>
           </div>
           <div className="game-detail-hero-grid">
             <div>
@@ -137,12 +160,58 @@ export default function GameDetailPage() {
               </h1>
               <p style={{ fontSize: '16px', opacity: 0.75, maxWidth: '500px', lineHeight: 1.6 }}>{game.description}</p>
             </div>
-            <div style={{ textAlign: 'right' }}>
+            <div className="game-detail-hero-right">
+              {isLockedForDraw ? (
+                <span
+                  style={{
+                    color: '#ef4444',
+                    background: 'rgba(239, 68, 68, 0.15)',
+                    padding: '6px 14px',
+                    fontSize: '13px',
+                    borderRadius: '8px',
+                    fontWeight: 700,
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px'
+                  }}
+                >
+                  <Zap size={13} fill="currentColor" className="animate-pulse" /> Live Draw Active
+                </span>
+              ) : (
+                <Link
+                  to="/results"
+                  className="btn btn-outline btn-sm"
+                  style={{
+                    color: 'white',
+                    borderColor: 'rgba(255, 255, 255, 0.3)',
+                    background: 'rgba(255, 255, 255, 0.1)',
+                    backdropFilter: 'blur(4px)',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    padding: '6px 14px',
+                    fontSize: '13px',
+                    borderRadius: '8px',
+                    textDecoration: 'none',
+                    transition: 'all 0.2s ease',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = 'var(--gradient-gold)'
+                    e.currentTarget.style.borderColor = '#fca311'
+                    e.currentTarget.style.color = '#000'
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)'
+                    e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.3)'
+                    e.currentTarget.style.color = 'white'
+                  }}
+                >
+                  Results
+                </Link>
+              )}
               <JackpotCounter amount={game.jackpotAmount} size="lg" />
-              {game.nextDraw && (
-                <div style={{ marginTop: '16px' }}>
-                  <CountdownTimer targetDate={game.nextDraw.scheduledAt} label="NEXT DRAW CLOSES IN" />
-                </div>
+              {nextDraw && (
+                <CountdownTimer targetDate={nextDraw.scheduledAt} label="NEXT DRAW CLOSES IN" />
               )}
             </div>
           </div>
@@ -355,7 +424,16 @@ export default function GameDetailPage() {
                 </div>
               </div>
 
-              {isAuthenticated ? (
+              {isLockedForDraw ? (
+                <div style={{ padding: '16px', background: 'rgba(239, 68, 68, 0.08)', borderRadius: '12px', border: '1px solid rgba(239, 68, 68, 0.2)', textAlign: 'center' }}>
+                  <p style={{ color: '#ef4444', fontWeight: 700, fontSize: '14px', margin: 0 }}>
+                    Purchases closed for this draw
+                  </p>
+                  <p style={{ color: 'var(--text-muted)', fontSize: '12px', margin: '4px 0 0 0' }}>
+                    The live draw is currently in progress.
+                  </p>
+                </div>
+              ) : isAuthenticated ? (
                 <button
                   className="btn btn-gold btn-lg btn-full"
                   onClick={() => purchaseMutation.mutate()}
@@ -454,6 +532,17 @@ export default function GameDetailPage() {
           </div>
         )}
       </div>
+      <DrawAnimationModal
+        isOpen={isDrawModalOpen}
+        onClose={() => {
+          if (isLockedForDraw) {
+            navigate('/games')
+          } else {
+            setIsDrawModalOpen(false)
+          }
+        }}
+        game={game}
+      />
     </div>
   )
 }
