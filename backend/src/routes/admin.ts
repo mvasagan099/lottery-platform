@@ -15,9 +15,74 @@ import crypto from 'crypto'
 
 export default async function adminRoutes(app: FastifyInstance) {
 
-  // All admin routes require authentication + admin role
+  // All admin routes require authentication + admin role/permissions check
   app.addHook('preHandler', authenticate)
-  app.addHook('preHandler', requireAdmin)
+  
+  app.addHook('preHandler', async (request, reply) => {
+    const user = request.user
+    
+    // 1. System-level admins get full bypass
+    if (user.role === 'SUPER_ADMIN' || user.role === 'ADMIN') {
+      return
+    }
+
+    // 2. Resolve module from URL path
+    const url = request.url
+    let moduleName = ''
+    if (url.startsWith('/admin/support')) moduleName = 'Support'
+    else if (url.startsWith('/admin/users')) moduleName = 'Users'
+    else if (url.startsWith('/admin/kyc')) moduleName = 'KYC'
+    else if (url.startsWith('/admin/wallet')) moduleName = 'Wallets'
+    else if (url.startsWith('/admin/withdrawals')) moduleName = 'Withdrawals'
+    else if (url.startsWith('/admin/games')) moduleName = 'Games'
+    else if (url.startsWith('/admin/draws')) moduleName = 'Draws'
+    else if (url.startsWith('/admin/jackpot')) moduleName = 'Jackpots'
+    else if (url.startsWith('/admin/cms')) moduleName = 'CMS'
+    else if (url.startsWith('/admin/settings')) moduleName = 'Settings'
+    else if (url.startsWith('/admin/reports')) moduleName = 'Reports'
+    else if (url.startsWith('/admin/stats')) moduleName = 'Dashboard'
+    else if (url === '/admin' || url === '/admin/') moduleName = 'Dashboard'
+
+    if (!moduleName) {
+      return reply.status(403).send({ success: false, error: 'Forbidden', message: 'Access denied' })
+    }
+
+    // 3. Resolve action from HTTP method
+    let action = 'View'
+    if (request.method === 'POST') action = 'Create'
+    else if (request.method === 'PUT' || request.method === 'PATCH') action = 'Edit'
+    else if (request.method === 'DELETE') action = 'Delete'
+
+    // 4. Check database for permission
+    const userMappings = await prisma.userRoleMapping.findMany({
+      where: { userId: user.userId },
+      include: {
+        role: {
+          include: {
+            permissions: {
+              include: { permission: true }
+            }
+          }
+        }
+      }
+    })
+
+    const hasAccess = userMappings.some(mapping => 
+      mapping.role.isActive && 
+      mapping.role.permissions.some(rp => 
+        rp.permission.module === moduleName && rp.permission.action === action
+      )
+    )
+
+    if (!hasAccess) {
+      request.log.warn(`RBAC Denied: User ${user.userId} attempted ${action} on ${moduleName}`)
+      return reply.status(403).send({ 
+        success: false,
+        error: 'Forbidden', 
+        message: `You lack the required permission: ${moduleName}:${action}` 
+      })
+    }
+  })
 
   // Register Sub-routers
   app.register(cmsRoutes, { prefix: '/cms' })
