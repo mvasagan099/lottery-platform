@@ -59,7 +59,7 @@ export default function HomePage() {
   const topGameJackpotStr = topGameJackpot >= 1 ? `${parseFloat(topGameJackpot.toFixed(topGameJackpot >= 10 ? 0 : 1))}` : `${(Number(topGame?.jackpotAmount || 0) / 1_000).toFixed(0)}K`
 
   return (
-    <div className="page-wrapper page-wrapper-light">
+    <div className="page-wrapper">
       {/* ── Hero ─────────────────────────────────────────────────── */}
       <section className="hero" style={{ background: 'transparent', padding: '0', overflow: 'hidden' }}>
         <div className="container">

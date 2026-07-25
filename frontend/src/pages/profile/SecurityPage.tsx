@@ -135,19 +135,23 @@ export default function SecurityPage() {
             <table>
               <thead><tr><th>Device / Browser</th><th>IP Address</th><th>Last Active</th><th>Action</th></tr></thead>
               <tbody>
-                {sessions?.map((s: any) => (
-                  <tr key={s.id}>
-                    <td>
-                      <div style={{ fontWeight: 600 }}>{s.device || 'Unknown Device'}</div>
-                      <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{s.browser}</div>
-                    </td>
-                    <td>{s.ipAddress}</td>
-                    <td style={{ color: 'var(--text-muted)', fontSize: '13px' }}>{new Date(s.lastActiveAt).toLocaleString()}</td>
-                    <td>
-                      <button className="btn btn-ghost btn-sm" style={{ color: '#ef4444' }} onClick={() => revokeSessionMutation.mutate(s.id)}>Revoke</button>
-                    </td>
-                  </tr>
-                ))}
+                {sessions?.map((s: any) => {
+                  const rawDate = s.lastActiveAt || s.lastUsedAt || s.createdAt
+                  const formattedDate = rawDate ? new Date(rawDate).toLocaleString() : 'Just now'
+                  return (
+                    <tr key={s.id}>
+                      <td>
+                        <div style={{ fontWeight: 600 }}>{s.device || 'Desktop PC'}</div>
+                        <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{s.browser || 'Web Browser'}</div>
+                      </td>
+                      <td>{s.ipAddress || '127.0.0.1'}</td>
+                      <td style={{ color: 'var(--text-muted)', fontSize: '13px' }}>{formattedDate}</td>
+                      <td>
+                        <button className="btn btn-ghost btn-sm" style={{ color: '#ef4444' }} onClick={() => revokeSessionMutation.mutate(s.id)}>Revoke</button>
+                      </td>
+                    </tr>
+                  )
+                })}
               </tbody>
             </table>
           </div>

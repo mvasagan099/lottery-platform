@@ -873,10 +873,10 @@ tbody tr:last-child td { border-bottom: none; }
 .wallet-chip {
   display: flex;
   align-items: center;
-  gap: var(--space-sm);
-  padding: 7px 14px;
-  background: rgba(26, 58, 143, 0.08);
-  border: 1px solid rgba(26, 58, 143, 0.15);
+  gap: var(--space-xs);
+  padding: 8px 16px;
+  background: rgba(26, 58, 143, 0.12);
+  border: 1px solid rgba(26, 58, 143, 0.25);
   border-radius: var(--border-radius-full);
   font-size: var(--text-sm);
   font-weight: 700;
@@ -886,8 +886,21 @@ tbody tr:last-child td { border-bottom: none; }
 }
 
 .wallet-chip:hover {
-  background: rgba(26, 58, 143, 0.15);
+  background: rgba(26, 58, 143, 0.2);
   box-shadow: var(--shadow-sm);
+}
+
+[data-theme='dark'] .wallet-chip {
+  background: rgba(107, 158, 248, 0.18);
+  border: 1px solid rgba(107, 158, 248, 0.4);
+  color: #ffffff;
+  box-shadow: 0 0 12px rgba(107, 158, 248, 0.2);
+}
+
+[data-theme='dark'] .wallet-chip:hover {
+  background: rgba(107, 158, 248, 0.3);
+  border-color: #6b9ef8;
+  box-shadow: 0 0 16px rgba(107, 158, 248, 0.4);
 }
 
 /* ── Sidebar (Admin) ─────────────────────────────────────── */
@@ -1432,6 +1445,10 @@ input:checked + .switch-track::after { transform: translateY(-50%) translateX(20
 .page-wrapper-light {
   background-color: #e5f3fa;
   min-height: 100vh;
+}
+
+[data-theme='dark'] .page-wrapper-light {
+  background-color: var(--bg-primary);
 }
 
 .oz-hero-card {

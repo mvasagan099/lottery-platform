@@ -77,17 +77,18 @@ export function GeneralSettingsPage() {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '24px' }}>
           <div className="form-group">
             <label className="form-label">Timezone</label>
-            <select {...register('timezone')} className="form-input">
-              <option value="UTC">UTC</option>
-              <option value="America/New_York">America/New_York</option>
-              <option value="Europe/London">Europe/London</option>
-              <option value="Asia/Tokyo">Asia/Tokyo</option>
+            <select {...register('timezone')} className="form-input" style={{ height: '40px' }}>
+              <option value="UTC">UTC (Coordinated Universal Time)</option>
+              <option value="America/New_York">America/New_York (EST)</option>
+              <option value="Europe/London">Europe/London (GMT)</option>
+              <option value="Asia/Tokyo">Asia/Tokyo (JST)</option>
             </select>
           </div>
           <div className="form-group">
             <label className="form-label">Currency</label>
-            <select {...register('currency')} className="form-input">
+            <select {...register('currency')} className="form-input" style={{ height: '40px' }}>
               <option value="Coins">Coins (🪙)</option>
+              <option value="USD">USD ($)</option>
               <option value="EUR">EUR (€)</option>
               <option value="GBP">GBP (£)</option>
             </select>

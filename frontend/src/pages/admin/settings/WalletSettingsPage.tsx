@@ -48,24 +48,24 @@ export function WalletSettingsPage() {
       <div className="card" style={{ padding: '24px', marginBottom: '24px' }}>
         <h3 style={{ fontSize: '18px', fontWeight: 600, marginBottom: '24px', borderBottom: '1px solid var(--border-color)', paddingBottom: '12px' }}>Transaction Limits (Base Currency)</h3>
         
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '24px', maxWidth: '650px' }}>
           <div className="form-group">
             <label className="form-label">Minimum Deposit</label>
-            <input type="number" step="0.01" {...register('minDeposit', { valueAsNumber: true })} className={`form-input ${errors.minDeposit ? 'error' : ''}`} />
+            <input type="number" step="0.01" {...register('minDeposit', { valueAsNumber: true })} className={`form-input ${errors.minDeposit ? 'error' : ''}`} style={{ height: '40px' }} />
             {errors.minDeposit && <span style={{ color: 'var(--color-danger)', fontSize: '12px' }}>{errors.minDeposit.message}</span>}
           </div>
           <div className="form-group">
             <label className="form-label">Maximum Deposit</label>
-            <input type="number" step="0.01" {...register('maxDeposit', { valueAsNumber: true })} className="form-input" />
+            <input type="number" step="0.01" {...register('maxDeposit', { valueAsNumber: true })} className="form-input" style={{ height: '40px' }} />
           </div>
           
           <div className="form-group">
             <label className="form-label">Minimum Withdrawal</label>
-            <input type="number" step="0.01" {...register('minWithdrawal', { valueAsNumber: true })} className={`form-input ${errors.minWithdrawal ? 'error' : ''}`} />
+            <input type="number" step="0.01" {...register('minWithdrawal', { valueAsNumber: true })} className={`form-input ${errors.minWithdrawal ? 'error' : ''}`} style={{ height: '40px' }} />
           </div>
           <div className="form-group">
             <label className="form-label">Maximum Withdrawal</label>
-            <input type="number" step="0.01" {...register('maxWithdrawal', { valueAsNumber: true })} className="form-input" />
+            <input type="number" step="0.01" {...register('maxWithdrawal', { valueAsNumber: true })} className="form-input" style={{ height: '40px' }} />
           </div>
         </div>
       </div>
@@ -73,14 +73,14 @@ export function WalletSettingsPage() {
       <div className="card" style={{ padding: '24px', marginBottom: '24px' }}>
         <h3 style={{ fontSize: '18px', fontWeight: 600, marginBottom: '24px', borderBottom: '1px solid var(--border-color)', paddingBottom: '12px' }}>Daily Caps & Velocity</h3>
         
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '24px', maxWidth: '650px' }}>
           <div className="form-group">
             <label className="form-label">Daily Deposit Limit</label>
-            <input type="number" step="0.01" {...register('dailyDepositLimit', { valueAsNumber: true })} className={`form-input ${errors.dailyDepositLimit ? 'error' : ''}`} />
+            <input type="number" step="0.01" {...register('dailyDepositLimit', { valueAsNumber: true })} className={`form-input ${errors.dailyDepositLimit ? 'error' : ''}`} style={{ height: '40px' }} />
           </div>
           <div className="form-group">
             <label className="form-label">Daily Withdrawal Limit</label>
-            <input type="number" step="0.01" {...register('dailyWithdrawalLimit', { valueAsNumber: true })} className="form-input" />
+            <input type="number" step="0.01" {...register('dailyWithdrawalLimit', { valueAsNumber: true })} className="form-input" style={{ height: '40px' }} />
           </div>
         </div>
       </div>

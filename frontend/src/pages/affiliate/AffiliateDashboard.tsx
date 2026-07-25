@@ -17,6 +17,18 @@ export default function AffiliateDashboard() {
     select: (r) => r.data?.data,
   })
 
+  const { data: referralsData } = useQuery({
+    queryKey: ['affiliate-referrals'],
+    queryFn: () => affiliateService.getReferrals({ page: 1, limit: 10 }),
+    select: (r) => r.data?.data,
+  })
+
+  const { data: commissionsData } = useQuery({
+    queryKey: ['affiliate-commissions'],
+    queryFn: () => affiliateService.getCommissions({ page: 1, limit: 10 }),
+    select: (r) => r.data?.data,
+  })
+
   const copyLink = () => {
     if (profile?.referralLink) {
       navigator.clipboard.writeText(profile.referralLink)
@@ -27,6 +39,9 @@ export default function AffiliateDashboard() {
   if (!profile) return (
     <div className="page-wrapper section"><div className="container" style={{ textAlign: 'center' }}><h2>Affiliate account not found or not active.</h2></div></div>
   )
+
+  const referrals = referralsData || []
+  const commissions = commissionsData || []
 
   return (
     <div className="page-wrapper section">
@@ -68,7 +83,24 @@ export default function AffiliateDashboard() {
               <table>
                 <thead><tr><th>User</th><th>Joined Date</th><th>Status</th></tr></thead>
                 <tbody>
-                  <tr><td colSpan={3} style={{ textAlign: 'center', padding: '20px', color: 'var(--text-muted)' }}>No referrals yet. Share your link to start earning!</td></tr>
+                  {referrals.length === 0 ? (
+                    <tr><td colSpan={3} style={{ textAlign: 'center', padding: '20px', color: 'var(--text-muted)' }}>No referrals yet. Share your link to start earning!</td></tr>
+                  ) : (
+                    referrals.map((ref: any) => (
+                      <tr key={ref.id}>
+                        <td>
+                          <div style={{ fontWeight: 600 }}>{ref.firstName ? `${ref.firstName} ${ref.lastName || ''}`.trim() : ref.email}</div>
+                          <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{ref.email}</div>
+                        </td>
+                        <td>{new Date(ref.createdAt).toLocaleDateString()}</td>
+                        <td>
+                          <span className={`badge ${ref.status === 'ACTIVE' ? 'badge-success' : 'badge-warning'}`}>
+                            {ref.status}
+                          </span>
+                        </td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>
@@ -79,7 +111,21 @@ export default function AffiliateDashboard() {
               <table>
                 <thead><tr><th>Date</th><th>Amount</th><th>Status</th></tr></thead>
                 <tbody>
-                  <tr><td colSpan={3} style={{ textAlign: 'center', padding: '20px', color: 'var(--text-muted)' }}>No commissions earned yet.</td></tr>
+                  {commissions.length === 0 ? (
+                    <tr><td colSpan={3} style={{ textAlign: 'center', padding: '20px', color: 'var(--text-muted)' }}>No commissions earned yet.</td></tr>
+                  ) : (
+                    commissions.map((comm: any) => (
+                      <tr key={comm.id}>
+                        <td>{new Date(comm.createdAt).toLocaleDateString()}</td>
+                        <td style={{ fontWeight: 700, color: 'var(--color-success)' }}>🪙{Number(comm.amount).toFixed(2)}</td>
+                        <td>
+                          <span className={`badge ${comm.isPaid ? 'badge-success' : 'badge-warning'}`}>
+                            {comm.isPaid ? 'PAID' : 'PENDING'}
+                          </span>
+                        </td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>

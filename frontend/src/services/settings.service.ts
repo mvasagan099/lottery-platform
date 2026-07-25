@@ -11,7 +11,7 @@ const DEFAULT_SETTINGS: SystemSettings = {
     copyright: '© 2026 MegaDraw Global Ltd. All rights reserved.',
     timezone: 'UTC',
     language: 'en',
-    currency: 'USD',
+    currency: 'Coins',
     dateFormat: 'YYYY-MM-DD',
     numberFormat: 'en-US',
     maintenanceMode: false,

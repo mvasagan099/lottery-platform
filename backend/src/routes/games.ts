@@ -8,6 +8,7 @@ import { FastifyInstance } from 'fastify'
 import { z } from 'zod'
 import { prisma, redis } from '../server'
 import { authenticate, requireAdmin } from '../middleware/auth'
+import { processAffiliateCommission } from '../services/affiliate'
 import crypto from 'crypto'
 
 const purchaseSchema = z.object({
@@ -317,6 +318,9 @@ export default async function gameRoutes(app: FastifyInstance) {
         data: { ticketId: ticket.id, gameSlug: game.slug },
       },
     })
+
+    // Process affiliate commission for ticket purchase
+    processAffiliateCommission({ referredUserId: userId, type: 'TICKET_PURCHASE', amount: totalCost }).catch(console.error)
 
     return reply.status(201).send({
       success: true,

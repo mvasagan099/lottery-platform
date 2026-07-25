@@ -120,8 +120,23 @@ export function AffiliateProfileDrawer({ affiliateId, onClose }: Props) {
                     <div className="card" style={{ padding: 'var(--space-lg)' }}>
                       <label style={{ display: 'block', marginBottom: '8px', color: 'var(--text-secondary)', fontSize: '0.9rem' }}>Primary Affiliate Link</label>
                       <div style={{ display: 'flex', gap: '12px' }}>
-                        <input type="text" className="form-input" value={`https://lottery.app/ref/${record?.affiliateCode}`} readOnly style={{ flex: 1 }} />
-                        <button className="btn btn-outline">Copy</button>
+                        <input
+                          type="text"
+                          className="form-input"
+                          value={record?.referralLink || `${window.location.origin}/register?ref=${record?.affiliateCode}`}
+                          readOnly
+                          style={{ flex: 1 }}
+                        />
+                        <button
+                          className="btn btn-outline"
+                          onClick={() => {
+                            const link = record?.referralLink || `${window.location.origin}/register?ref=${record?.affiliateCode}`
+                            navigator.clipboard.writeText(link)
+                            toast.success('Affiliate link copied to clipboard!')
+                          }}
+                        >
+                          Copy
+                        </button>
                       </div>
                       <div style={{ marginTop: 'var(--space-lg)', display: 'flex', flexWrap: 'wrap', gap: 'var(--space-xl)', alignItems: 'center' }}>
                         <div style={{ width: 120, height: 120, backgroundColor: 'white', padding: 8, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -205,7 +220,29 @@ export function AffiliateProfileDrawer({ affiliateId, onClose }: Props) {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-lg)' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <h3 style={{ margin: 0 }}>Recent Commissions</h3>
-                    <button className="btn btn-outline btn-sm">Export CSV</button>
+                    <button
+                      className="btn btn-outline btn-sm"
+                      onClick={() => {
+                        if (!record?.commissions || record.commissions.length === 0) {
+                          return toast.error('No commission history to export')
+                        }
+                        const headers = 'ID,Date,Type,ReferredUserId,Amount,Status\n'
+                        const rows = record.commissions.map((c: any) =>
+                          `"${c.id}","${c.createdAt}","${c.type}","${c.referredUserId}","${c.amount}","${c.isPaid ? 'PAID' : 'PENDING'}"`
+                        ).join('\n')
+                        const blob = new Blob([headers + rows], { type: 'text/csv;charset=utf-8;' })
+                        const url = URL.createObjectURL(blob)
+                        const link = document.createElement('a')
+                        link.href = url
+                        link.setAttribute('download', `commissions_${record.affiliateCode || 'affiliate'}.csv`)
+                        document.body.appendChild(link)
+                        link.click()
+                        document.body.removeChild(link)
+                        toast.success('CSV exported successfully!')
+                      }}
+                    >
+                      Export CSV
+                    </button>
                   </div>
                   <div className="card" style={{ overflow: 'hidden' }}>
                     <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>

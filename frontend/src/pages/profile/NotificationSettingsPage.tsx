@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useQuery, useMutation } from '@tanstack/react-query'
 import { notificationsService } from '@/services/index'
 import { Bell, Mail, Smartphone, Save } from 'lucide-react'
@@ -14,17 +14,19 @@ export default function NotificationSettingsPage() {
   const [localPrefs, setLocalPrefs] = useState<Record<string, boolean>>({})
 
   // Initialize local state when data loads
-  if (prefs && Object.keys(localPrefs).length === 0) {
-    setLocalPrefs(prefs)
-  }
+  useEffect(() => {
+    if (prefs) {
+      setLocalPrefs(prefs)
+    }
+  }, [prefs])
 
   const mutation = useMutation({
     mutationFn: () => notificationsService.updatePreferences(localPrefs),
     onSuccess: () => {
-      toast.success('Preferences updated')
+      toast.success('Preferences updated successfully')
       refetch()
     },
-    onError: () => toast.error('Failed to update preferences'),
+    onError: (err: any) => toast.error(err.response?.data?.error || 'Failed to update preferences'),
   })
 
   const togglePref = (key: string) => {
@@ -114,4 +116,3 @@ export default function NotificationSettingsPage() {
     </div>
   )
 }
-import React from 'react'

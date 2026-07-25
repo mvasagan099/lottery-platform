@@ -22,6 +22,42 @@ const addMessageSchema = z.object({
 
 export default async function supportRoutes(app: FastifyInstance) {
 
+  // POST /support/contact - Public contact form submission
+  app.post('/contact', async (request, reply) => {
+    const body = z.object({
+      name: z.string().min(2),
+      email: z.string().email(),
+      subject: z.string().min(3),
+      message: z.string().min(5),
+    }).parse(request.body)
+
+    let categoryRecord = await prisma.ticketCategoryModel.findFirst({ where: { name: 'General Enquiries' } })
+    if (!categoryRecord) {
+      categoryRecord = await prisma.ticketCategoryModel.create({ data: { name: 'General Enquiries' } })
+    }
+
+    const ticket = await prisma.supportTicket.create({
+      data: {
+        subject: `[Contact Form] ${body.subject}`,
+        categoryId: categoryRecord.id,
+        priority: 'MEDIUM',
+        messages: {
+          create: {
+            senderId: 'GUEST',
+            senderType: 'GUEST',
+            message: `From: ${body.name} (${body.email})\n\n${body.message}`,
+          },
+        },
+      },
+    })
+
+    return reply.status(201).send({
+      success: true,
+      message: 'Your message has been sent successfully. Our team will reply shortly.',
+      data: { ticketId: ticket.id },
+    })
+  })
+
   // GET /support/faqs - Public FAQ list
   app.get('/faqs', async (request, reply) => {
     const { category } = request.query as { category?: string }

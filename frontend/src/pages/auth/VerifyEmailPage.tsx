@@ -8,11 +8,12 @@ import toast from 'react-hot-toast'
 export default function VerifyEmailPage() {
   const [params] = useSearchParams()
   const navigate = useNavigate()
+  const email = params.get('email')
   const token = params.get('token')
   const [done, setDone] = useState(false)
 
   const mutation = useMutation({
-    mutationFn: () => authService.verifyEmail(token!),
+    mutationFn: () => authService.verifyEmail(email || '', token!),
     onSuccess: () => setDone(true),
     onError: (err: any) => toast.error(err.response?.data?.error || 'Verification failed'),
   })

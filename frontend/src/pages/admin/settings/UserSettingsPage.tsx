@@ -93,7 +93,7 @@ export function UserSettingsPage() {
 
         <div className="form-group" style={{ maxWidth: '300px' }}>
           <label className="form-label">Minimum Age Requirement</label>
-          <input type="number" {...register('minimumAge', { valueAsNumber: true })} className={`form-input ${errors.minimumAge ? 'error' : ''}`} />
+          <input type="number" {...register('minimumAge', { valueAsNumber: true })} className={`form-input ${errors.minimumAge ? 'error' : ''}`} style={{ height: '40px' }} />
           {errors.minimumAge && <span style={{ color: 'var(--color-danger)', fontSize: '12px' }}>{errors.minimumAge.message}</span>}
         </div>
       </div>

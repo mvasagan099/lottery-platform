@@ -2,8 +2,22 @@ import React from 'react';
 import StatCard from '../../../components/UI/StatCard';
 import { Activity, Users, Database, Globe, ShieldCheck, HardDrive } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { useQuery } from '@tanstack/react-query';
+import api from '../../../services/api';
 
 export function SettingsDashboard() {
+  const { data } = useQuery({
+    queryKey: ['admin', 'stats'],
+    queryFn: async () => {
+      const res = await api.get('/admin/stats')
+      return res.data?.data
+    },
+    refetchInterval: 15000,
+  })
+
+  const activeUsersCount = data?.activeUsers || data?.totalUsers || 0
+  const activeSessionsCount = data?.activeSessions || 0
+
   return (
     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
       <h2 style={{ fontSize: '24px', fontWeight: 600, marginBottom: '24px' }}>Platform Overview</h2>
@@ -12,14 +26,14 @@ export function SettingsDashboard() {
         <StatCard
           title="System Health"
           value="99.98%"
-          change="+0.01%"
+          change="Operational"
           changePositive={true}
           icon={<Activity size={24} />}
         />
         <StatCard
           title="Active Users"
-          value="12,450"
-          change="+150 today"
+          value={activeUsersCount.toLocaleString()}
+          change={`${activeSessionsCount} active sessions`}
           changePositive={true}
           icon={<Users size={24} />}
         />
@@ -36,7 +50,7 @@ export function SettingsDashboard() {
         <StatCard
           title="Database Load"
           value="42%"
-          change="Normal"
+          change="Optimal"
           changePositive={true}
           icon={<Database size={24} />}
         />

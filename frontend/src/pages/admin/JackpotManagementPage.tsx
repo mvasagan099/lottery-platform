@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import api from '@/services/api'
 import {
@@ -115,6 +115,13 @@ export default function JackpotManagementPage() {
     queryFn: fetchJackpotPools,
     refetchInterval: 30000,
   })
+
+  // Auto-select first game pool when loaded
+  useEffect(() => {
+    if (!selectedGameId && pools.length > 0) {
+      setSelectedGameId(pools[0].gameId)
+    }
+  }, [pools, selectedGameId])
 
   const { data: pool } = useQuery({
     queryKey: ['jackpot-pool', selectedGameId],
@@ -235,14 +242,17 @@ export default function JackpotManagementPage() {
 
             {/* Config Panel */}
             {configOpen && (
-              <div className="card card-body" style={{ marginBottom: '24px', border: '1.5px solid var(--border-color)', background: 'var(--bg-secondary)' }}>
-                <h3 style={{ fontWeight: 800, fontSize: '16px', marginBottom: '16px' }}>⚙️ Jackpot Configuration</h3>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', maxWidth: '500px' }}>
-                  <div>
-                    <label className="form-label">Base Jackpot (coins)</label>
+              <div className="card card-body" style={{ marginBottom: '24px', border: '1px solid var(--border-color)', background: 'var(--bg-secondary)', padding: '20px' }}>
+                <h3 style={{ fontWeight: 700, fontSize: '15px', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  ⚙️ Jackpot Configuration
+                </h3>
+                <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', alignItems: 'flex-start', maxWidth: '600px', marginBottom: '16px' }}>
+                  <div style={{ width: '220px' }}>
+                    <label className="form-label" style={{ display: 'block', fontSize: '13px', fontWeight: 600, marginBottom: '6px' }}>Base Jackpot (coins)</label>
                     <input
                       type="number"
-                      className="form-control"
+                      className="form-input"
+                      style={{ width: '100%', height: '40px', padding: '0 12px', borderRadius: 'var(--radius-md)' }}
                       placeholder={String(Number(pool.baseJackpot))}
                       value={baseJackpot}
                       onChange={e => setBaseJackpot(e.target.value)}
@@ -251,11 +261,12 @@ export default function JackpotManagementPage() {
                       Current: {fmt(pool.baseJackpot)}
                     </div>
                   </div>
-                  <div>
-                    <label className="form-label">Ticket Sales Contribution (%)</label>
+                  <div style={{ width: '220px' }}>
+                    <label className="form-label" style={{ display: 'block', fontSize: '13px', fontWeight: 600, marginBottom: '6px' }}>Ticket Sales Contribution (%)</label>
                     <input
                       type="number"
-                      className="form-control"
+                      className="form-input"
+                      style={{ width: '100%', height: '40px', padding: '0 12px', borderRadius: 'var(--radius-md)' }}
                       placeholder={String(Number(pool.jackpotContribPct))}
                       value={contribPct}
                       min="1" max="100"
@@ -266,7 +277,7 @@ export default function JackpotManagementPage() {
                     </div>
                   </div>
                 </div>
-                <div style={{ display: 'flex', gap: '10px', marginTop: '16px' }}>
+                <div style={{ display: 'flex', gap: '10px' }}>
                   <button
                     className="btn btn-primary btn-sm"
                     disabled={configMutation.isPending || (!baseJackpot && !contribPct)}
@@ -274,6 +285,7 @@ export default function JackpotManagementPage() {
                       ...(baseJackpot && { baseJackpot: Number(baseJackpot) }),
                       ...(contribPct && { jackpotContribPct: Number(contribPct) }),
                     })}
+                    style={{ fontWeight: 600, padding: '8px 16px', borderRadius: 'var(--radius-md)' }}
                   >
                     {configMutation.isPending ? 'Saving...' : 'Save Configuration'}
                   </button>
@@ -284,45 +296,43 @@ export default function JackpotManagementPage() {
 
             {/* Manual Adjust Panel */}
             {adjustOpen && (
-              <div className="card card-body" style={{ marginBottom: '24px', border: '1.5px solid #ef444422', background: '#ef444408' }}>
-                <h3 style={{ fontWeight: 800, fontSize: '16px', marginBottom: '4px', color: '#ef4444' }}>⚠️ Manual Jackpot Adjustment</h3>
-                <p style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '16px' }}>
+              <div className="card card-body" style={{ marginBottom: '24px', border: '1px solid rgba(239, 68, 68, 0.3)', background: 'rgba(239, 68, 68, 0.04)', padding: '20px' }}>
+                <h3 style={{ fontWeight: 700, fontSize: '15px', marginBottom: '4px', color: '#ef4444', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  ⚠️ Manual Jackpot Adjustment
+                </h3>
+                <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '16px' }}>
                   Use positive values to increase and negative values to decrease the jackpot pool. This action is fully audit-logged.
                 </p>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '16px', maxWidth: '600px' }}>
-                  <div>
-                    <label className="form-label">Amount (+ or -)</label>
+                <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', alignItems: 'flex-start', maxWidth: '700px', marginBottom: '16px' }}>
+                  <div style={{ width: '200px' }}>
+                    <label className="form-label" style={{ display: 'block', fontSize: '13px', fontWeight: 600, marginBottom: '6px' }}>Amount (+ or -)</label>
                     <input
                       type="number"
-                      className="form-control"
+                      className="form-input"
+                      style={{ width: '100%', height: '40px', padding: '0 12px', borderRadius: 'var(--radius-md)' }}
                       placeholder="e.g. 50000 or -10000"
                       value={adjustAmount}
                       onChange={e => setAdjustAmount(e.target.value)}
                     />
                   </div>
-                  <div>
-                    <label className="form-label">Reason (required)</label>
+                  <div style={{ flex: 1, minWidth: '260px' }}>
+                    <label className="form-label" style={{ display: 'block', fontSize: '13px', fontWeight: 600, marginBottom: '6px' }}>Reason (required)</label>
                     <input
                       type="text"
-                      className="form-control"
+                      className="form-input"
+                      style={{ width: '100%', height: '40px', padding: '0 12px', borderRadius: 'var(--radius-md)' }}
                       placeholder="Provide a clear reason for this adjustment"
                       value={adjustReason}
                       onChange={e => setAdjustReason(e.target.value)}
                     />
                   </div>
                 </div>
-                {adjustAmount && (
-                  <div style={{ marginTop: '12px', padding: '10px', background: 'var(--bg-secondary)', borderRadius: '8px', fontSize: '13px' }}>
-                    <span style={{ fontWeight: 600 }}>Preview: </span>
-                    {fmt(pool.currentJackpot)} → {fmt(Math.max(0, Number(pool.currentJackpot) + Number(adjustAmount)))}
-                  </div>
-                )}
-                <div style={{ display: 'flex', gap: '10px', marginTop: '16px' }}>
+                <div style={{ display: 'flex', gap: '10px' }}>
                   <button
-                    className="btn btn-sm"
-                    style={{ background: '#ef4444', color: 'white' }}
+                    className="btn btn-danger btn-sm"
                     disabled={adjustMutation.isPending || !adjustAmount || !adjustReason || adjustReason.length < 5 || Number(adjustAmount) === 0}
                     onClick={() => adjustMutation.mutate({ amount: Number(adjustAmount), reason: adjustReason })}
+                    style={{ backgroundColor: '#ef4444', color: 'white', fontWeight: 600, padding: '8px 16px', borderRadius: 'var(--radius-md)' }}
                   >
                     {adjustMutation.isPending ? 'Applying...' : 'Apply Adjustment'}
                   </button>

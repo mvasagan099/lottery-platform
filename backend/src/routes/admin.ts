@@ -711,11 +711,15 @@ export default async function adminRoutes(app: FastifyInstance) {
   })
 
   app.get('/draws', async (request, reply) => {
-    const { page = '1', limit = '10', search, status, sortField = 'scheduledAt', sortDir = 'desc' } = request.query as Record<string, string>
+    const { page = '1', limit = '10', search, status, hideCompleted, sortField, sortDir } = request.query as Record<string, string>
     const skip = (Number(page) - 1) * Number(limit)
 
     const where: any = {}
-    if (status) where.status = status
+    if (status) {
+      where.status = status
+    } else if (hideCompleted === 'true') {
+      where.status = { not: 'COMPLETED' }
+    }
 
     if (search) {
       where.OR = [
@@ -724,12 +728,27 @@ export default async function adminRoutes(app: FastifyInstance) {
       ]
     }
 
+    let orderBy: any = []
+    if (sortField && sortDir) {
+      orderBy = [{ [sortField]: sortDir }]
+    } else if (status === 'SCHEDULED') {
+      orderBy = [{ scheduledAt: 'asc' }]
+    } else if (status === 'COMPLETED') {
+      orderBy = [{ scheduledAt: 'desc' }]
+    } else {
+      // Default order: SCHEDULED draws first (scheduledAt asc), then IN_PROGRESS, then COMPLETED (scheduledAt desc)
+      orderBy = [
+        { status: 'desc' }, // 'SCHEDULED' > 'IN_PROGRESS' > 'COMPLETED' in string comparison
+        { scheduledAt: 'asc' },
+      ]
+    }
+
     const [records, total, totalDraws, liveDraws, scheduledDraws, totalSales] = await Promise.all([
       prisma.draw.findMany({
         where,
         skip,
         take: Number(limit),
-        orderBy: { [sortField]: sortDir },
+        orderBy,
         include: {
           game: { select: { name: true, slug: true, badgeText: true } },
           _count: { select: { tickets: true } }

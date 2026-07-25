@@ -15,8 +15,9 @@ import toast from 'react-hot-toast'
 export default function DrawsAdminPage() {
   const queryClient = useQueryClient()
   
-  const [sorting, setSorting] = useState<SortingState>([{ id: 'scheduledAt', desc: true }])
+  const [sorting, setSorting] = useState<SortingState>([])
   const [rowSelection, setRowSelection] = useState({})
+  const [showCompleted, setShowCompleted] = useState(false)
   
   const [searchParams, setSearchParams] = useState({
     page: 1, limit: 10, search: '', status: ''
@@ -34,19 +35,19 @@ export default function DrawsAdminPage() {
   }, [searchInput])
 
   const { data, isLoading } = useQuery({
-    queryKey: ['admin', 'draws', searchParams, sorting],
+    queryKey: ['admin', 'draws', searchParams, sorting, showCompleted],
     queryFn: async () => {
-      const sortField = sorting.length > 0 ? sorting[0].id : 'scheduledAt'
-      const sortDir = sorting.length > 0 ? (sorting[0].desc ? 'desc' : 'asc') : 'desc'
-      
       const query = new URLSearchParams({
         page: String(searchParams.page),
         limit: String(searchParams.limit),
         search: searchParams.search,
         status: searchParams.status,
-        sortField,
-        sortDir
+        hideCompleted: String(!showCompleted),
       })
+      if (sorting.length > 0) {
+        query.append('sortField', sorting[0].id)
+        query.append('sortDir', sorting[0].desc ? 'desc' : 'asc')
+      }
       const res = await api.get(`/admin/draws?${query.toString()}`)
       return res.data
     },
@@ -179,26 +180,59 @@ export default function DrawsAdminPage() {
       <div className="card" style={{ marginBottom: 'var(--space-md)' }}>
         <div className="card-body" style={{ padding: 'var(--space-md)', display: 'flex', flexWrap: 'wrap', gap: 'var(--space-md)', alignItems: 'center', justifyContent: 'space-between' }}>
           
-          <div style={{ display: 'flex', gap: 'var(--space-md)', flex: 1 }}>
-            <div style={{ position: 'relative', width: '300px' }}>
-              <Search size={16} style={{ position: 'absolute', left: 12, top: 12, color: 'var(--text-secondary)' }} />
+          <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap', flex: 1 }}>
+            <div style={{ position: 'relative', width: '280px', display: 'flex', alignItems: 'center' }}>
+              <Search size={16} style={{ position: 'absolute', left: 12, color: 'var(--text-secondary)' }} />
               <input 
                 type="text" 
                 className="form-input" 
                 placeholder="Search by Draw ID or Game..." 
-                style={{ width: '100%', paddingLeft: 36, borderRadius: 'var(--radius-md)' }}
+                style={{ width: '100%', paddingLeft: 36, height: '40px', borderRadius: 'var(--radius-md)' }}
                 value={searchInput}
                 onChange={(e) => setSearchInput(e.target.value)}
               />
             </div>
 
-            <select className="form-select" style={{ borderRadius: 'var(--radius-md)', padding: '8px 12px' }} value={searchParams.status} onChange={e => setSearchParams({...searchParams, status: e.target.value, page: 1})}>
+            <select 
+              className="form-select" 
+              style={{ width: '180px', height: '40px', borderRadius: 'var(--radius-md)', padding: '0 12px' }} 
+              value={searchParams.status} 
+              onChange={e => setSearchParams({...searchParams, status: e.target.value, page: 1})}
+            >
               <option value="">All Statuses</option>
               <option value="SCHEDULED">Scheduled</option>
               <option value="IN_PROGRESS">In Progress (Live)</option>
               <option value="COMPLETED">Completed</option>
               <option value="CANCELLED">Cancelled</option>
             </select>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', backgroundColor: 'var(--bg-secondary)', padding: '6px 14px', borderRadius: '24px', border: '1px solid var(--border-color)' }}>
+            <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Show Completed:</span>
+            <button
+              type="button"
+              onClick={() => {
+                setShowCompleted(!showCompleted)
+                setSearchParams(prev => ({ ...prev, page: 1 }))
+              }}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '5px 14px',
+                borderRadius: '16px',
+                border: 'none',
+                cursor: 'pointer',
+                fontWeight: 700,
+                fontSize: '0.8rem',
+                backgroundColor: showCompleted ? '#10b981' : '#6b7280',
+                color: 'white',
+                boxShadow: showCompleted ? '0 2px 8px rgba(16,185,129,0.3)' : 'none',
+                transition: 'all 0.2s ease',
+              }}
+            >
+              {showCompleted ? 'ON' : 'OFF'}
+            </button>
           </div>
         </div>
       </div>

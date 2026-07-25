@@ -34,6 +34,9 @@ export const notificationsService = {
 }
 
 export const supportService = {
+  submitContact: (payload: { name: string; email: string; subject: string; message: string }) =>
+    api.post('/support/contact', payload),
+
   getFaqs: (category?: string) =>
     api.get('/support/faqs', { params: { category } }),
 

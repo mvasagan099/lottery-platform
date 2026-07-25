@@ -47,19 +47,19 @@ export function SecuritySettingsPage() {
       <div className="card" style={{ padding: '24px', marginBottom: '24px' }}>
         <h3 style={{ fontSize: '18px', fontWeight: 600, marginBottom: '24px', borderBottom: '1px solid var(--border-color)', paddingBottom: '12px' }}>Authentication & Sessions</h3>
         
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', marginBottom: '24px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '24px', marginBottom: '24px', maxWidth: '650px' }}>
           <div className="form-group">
             <label className="form-label">JWT Expiry (Hours)</label>
-            <input type="number" {...register('jwtExpiryHours', { valueAsNumber: true })} className={`form-input ${errors.jwtExpiryHours ? 'error' : ''}`} />
+            <input type="number" {...register('jwtExpiryHours', { valueAsNumber: true })} className={`form-input ${errors.jwtExpiryHours ? 'error' : ''}`} style={{ height: '40px' }} />
             {errors.jwtExpiryHours && <span style={{ color: 'var(--color-danger)', fontSize: '12px' }}>{errors.jwtExpiryHours.message}</span>}
           </div>
           <div className="form-group">
             <label className="form-label">Refresh Token Expiry (Days)</label>
-            <input type="number" {...register('refreshTokenExpiryDays', { valueAsNumber: true })} className={`form-input ${errors.refreshTokenExpiryDays ? 'error' : ''}`} />
+            <input type="number" {...register('refreshTokenExpiryDays', { valueAsNumber: true })} className={`form-input ${errors.refreshTokenExpiryDays ? 'error' : ''}`} style={{ height: '40px' }} />
           </div>
           <div className="form-group">
             <label className="form-label">Inactivity Session Timeout (Minutes)</label>
-            <input type="number" {...register('sessionTimeoutMinutes', { valueAsNumber: true })} className="form-input" />
+            <input type="number" {...register('sessionTimeoutMinutes', { valueAsNumber: true })} className="form-input" style={{ height: '40px' }} />
           </div>
         </div>
         

@@ -15,6 +15,15 @@ interface Props {
 export function DepositDetailsDrawer({ depositId, onClose }: Props) {
   const queryClient = useQueryClient()
   const [reviewNotes, setReviewNotes] = useState('')
+  const [showRefundConfirm, setShowRefundConfirm] = useState(false)
+
+  const handleConfirmRefund = () => {
+    statusMutation.mutate('CANCELLED', {
+      onSuccess: () => {
+        setShowRefundConfirm(false)
+      }
+    })
+  }
 
   const { data: deposit, isLoading } = useQuery({
     queryKey: ['admin', 'deposits', depositId],
@@ -240,13 +249,76 @@ export function DepositDetailsDrawer({ depositId, onClose }: Props) {
         
         {deposit.status === 'COMPLETED' && (
           <div style={{ padding: 'var(--space-lg) var(--space-xl)', borderTop: '1px solid var(--border-color)', backgroundColor: 'var(--bg-secondary)', display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
-            <button className="btn btn-outline" style={{ color: 'var(--error-color)', borderColor: 'var(--error-color)' }} onClick={() => statusMutation.mutate('CANCELLED')} disabled={statusMutation.isPending}>
+            <button className="btn btn-outline" style={{ color: 'var(--error-color)', borderColor: 'var(--error-color)' }} onClick={() => setShowRefundConfirm(true)} disabled={statusMutation.isPending}>
               <ArrowRightLeft size={18} style={{ marginRight: '6px' }}/> Refund & Debit Wallet
             </button>
           </div>
         )}
 
       </div>
+
+      {/* Refund Confirmation Modal */}
+      {showRefundConfirm && (
+        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.6)', zIndex: 1100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }}>
+          <div className="card" style={{ width: '100%', maxWidth: '480px', padding: '24px', borderRadius: '16px', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.3)', backgroundColor: 'var(--bg-primary)', position: 'relative' }}>
+            <button 
+              onClick={() => setShowRefundConfirm(false)} 
+              style={{ position: 'absolute', right: '16px', top: '16px', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)' }}
+            >
+              <X size={20} />
+            </button>
+            
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
+              <div style={{ width: '40px', height: '40px', borderRadius: '50%', backgroundColor: 'rgba(239,68,68,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <AlertTriangle size={22} color="#ef4444" />
+              </div>
+              <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 700 }}>Confirm Deposit Refund</h3>
+            </div>
+
+            <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '20px', lineHeight: 1.5 }}>
+              Are you sure you want to refund this deposit? This action will mark the deposit status as <strong style={{ color: '#ef4444' }}>CANCELLED</strong> and reverse the credited coins from the user's wallet.
+            </p>
+
+            {/* Refund Transaction Details Box */}
+            <div style={{ backgroundColor: 'var(--bg-secondary)', borderRadius: '12px', padding: '16px', marginBottom: '24px', border: '1px solid var(--border-color)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px', fontSize: '0.85rem' }}>
+                <span style={{ color: 'var(--text-secondary)' }}>Deposit ID:</span>
+                <span style={{ fontFamily: 'monospace', fontWeight: 600 }}>{deposit?.id?.substring(0, 12)}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px', fontSize: '0.85rem' }}>
+                <span style={{ color: 'var(--text-secondary)' }}>User Account:</span>
+                <span style={{ fontWeight: 600 }}>{user?.username || user?.email}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px', fontSize: '0.85rem' }}>
+                <span style={{ color: 'var(--text-secondary)' }}>Refund Amount:</span>
+                <span style={{ fontWeight: 700, color: '#ef4444' }}>🪙 {Number(deposit?.amount || 0).toLocaleString()} ({deposit?.currency})</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
+                <span style={{ color: 'var(--text-secondary)' }}>Wallet Available Balance:</span>
+                <span style={{ fontWeight: 600 }}>🪙 {Number(deposit?.wallet?.balance || 0).toLocaleString()}</span>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+              <button 
+                className="btn btn-outline" 
+                onClick={() => setShowRefundConfirm(false)}
+                disabled={statusMutation.isPending}
+              >
+                Cancel
+              </button>
+              <button 
+                className="btn btn-primary" 
+                style={{ backgroundColor: '#ef4444', borderColor: '#ef4444', color: 'white', fontWeight: 600 }} 
+                onClick={handleConfirmRefund}
+                disabled={statusMutation.isPending}
+              >
+                {statusMutation.isPending ? 'Processing Refund...' : 'Confirm & Refund'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   )
 }

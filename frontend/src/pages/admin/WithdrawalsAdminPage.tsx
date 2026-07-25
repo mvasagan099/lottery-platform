@@ -76,15 +76,16 @@ export default function WithdrawalsAdminPage() {
       accessorKey: 'wallet.user',
       header: 'User',
       cell: info => {
-        const user = info.getValue() as any
+        const user = (info.getValue() as any) || info.row.original.wallet?.user || {}
+        const username = user.username || user.email || 'User'
         return (
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <div style={{ width: '32px', height: '32px', borderRadius: '50%', backgroundColor: 'var(--bg-overlay)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', fontWeight: 600, color: 'var(--primary-color)' }}>
-              {user.username.charAt(0).toUpperCase()}
+              {username.charAt(0).toUpperCase()}
             </div>
             <div>
-              <div style={{ fontWeight: 600 }}>{user.username}</div>
-              <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{user.email}</div>
+              <div style={{ fontWeight: 600 }}>{username}</div>
+              {user.email && <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{user.email}</div>}
             </div>
           </div>
         )
@@ -93,12 +94,15 @@ export default function WithdrawalsAdminPage() {
     {
       accessorKey: 'amount',
       header: 'Amount',
-      cell: info => <strong style={{ color: 'var(--text-primary)' }}>🪙 {Number(info.getValue()).toLocaleString()}</strong>
+      cell: info => <strong style={{ color: 'var(--text-primary)' }}>🪙 {Number(info.getValue() || 0).toLocaleString()}</strong>
     },
     {
       accessorKey: 'gateway',
       header: 'Method',
-      cell: info => <span style={{ textTransform: 'capitalize' }}>{(info.getValue() as string).replace(/_/g, ' ').toLowerCase()}</span>
+      cell: info => {
+        const val = (info.getValue() as string) || info.row.original.method || 'Bank Transfer'
+        return <span style={{ textTransform: 'capitalize' }}>{val.replace(/_/g, ' ').toLowerCase()}</span>
+      }
     },
     {
       accessorKey: 'status',

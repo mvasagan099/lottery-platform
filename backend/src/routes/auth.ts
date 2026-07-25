@@ -13,6 +13,7 @@ import * as otplib from 'otplib'
 import { prisma, redis } from '../server'
 import { authenticate, auditLog } from '../middleware/auth'
 import { sendEmail } from '../services/email'
+import { processAffiliateCommission } from '../services/affiliate'
 import { generateQR } from '../utils/qr'
 
 // ── Validation schemas ────────────────────────────────────────────────────────
@@ -466,6 +467,9 @@ export default async function authRoutes(app: FastifyInstance) {
         return createdUser
       })
 
+      // Trigger referral signup tracking
+      processAffiliateCommission({ referredUserId: newUser.id, type: 'SIGNUP' }).catch(console.error)
+
       await auditLog(newUser.id, 'REGISTER', 'User', newUser.id, undefined, { email: newUser.email }, request)
       await redis.del(`pending_reg:${email}`)
     }
@@ -527,6 +531,9 @@ export default async function authRoutes(app: FastifyInstance) {
 
       return createdUser
     })
+
+    // Trigger referral signup tracking
+    processAffiliateCommission({ referredUserId: newUser.id, type: 'SIGNUP' }).catch(console.error)
 
     await auditLog(newUser.id, 'REGISTER_SKIPPED_VERIFY', 'User', newUser.id, undefined, { email: newUser.email }, request)
     await redis.del(`pending_reg:${email}`)
@@ -713,13 +720,28 @@ export default async function authRoutes(app: FastifyInstance) {
         id: true,
         ipAddress: true,
         userAgent: true,
+        deviceName: true,
         lastUsedAt: true,
         createdAt: true,
         expiresAt: true,
       },
     })
 
-    return reply.send({ success: true, data: sessions })
+    const formattedSessions = sessions.map(s => {
+      const parsedDevice = s.deviceName || parseDeviceName(s.userAgent || '')
+      const parsedBrowser = parseBrowserName(s.userAgent || '')
+      return {
+        id: s.id,
+        device: parsedDevice,
+        browser: parsedBrowser,
+        ipAddress: s.ipAddress || '127.0.0.1',
+        lastActiveAt: s.lastUsedAt || s.createdAt || new Date(),
+        createdAt: s.createdAt,
+        expiresAt: s.expiresAt,
+      }
+    })
+
+    return reply.send({ success: true, data: formattedSessions })
   })
 
   // DELETE /auth/sessions/:id
@@ -736,11 +758,22 @@ export default async function authRoutes(app: FastifyInstance) {
 }
 
 function parseDeviceName(userAgent?: string): string {
-  if (!userAgent) return 'Unknown Device'
-  if (userAgent.includes('Mobile')) return 'Mobile Browser'
-  if (userAgent.includes('iPad')) return 'iPad'
-  if (userAgent.includes('Macintosh')) return 'Mac'
-  if (userAgent.includes('Windows')) return 'Windows PC'
-  if (userAgent.includes('Linux')) return 'Linux PC'
-  return 'Browser'
+  if (!userAgent) return 'Desktop PC'
+  if (/Android/i.test(userAgent)) return 'Android Device'
+  if (/iPhone/i.test(userAgent)) return 'iPhone'
+  if (/iPad/i.test(userAgent)) return 'iPad'
+  if (/Windows/i.test(userAgent)) return 'Windows PC'
+  if (/Macintosh/i.test(userAgent)) return 'Mac Workstation'
+  if (/Linux/i.test(userAgent)) return 'Linux PC'
+  return 'Desktop Device'
+}
+
+function parseBrowserName(userAgent?: string): string {
+  if (!userAgent) return 'Web Browser'
+  if (/Brave/i.test(userAgent)) return 'Brave Browser'
+  if (/Chrome/i.test(userAgent) && !/Edg/i.test(userAgent)) return 'Google Chrome'
+  if (/Edg/i.test(userAgent)) return 'Microsoft Edge'
+  if (/Firefox/i.test(userAgent)) return 'Mozilla Firefox'
+  if (/Safari/i.test(userAgent) && !/Chrome/i.test(userAgent)) return 'Apple Safari'
+  return 'Web Browser'
 }

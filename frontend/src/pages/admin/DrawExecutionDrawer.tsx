@@ -231,37 +231,7 @@ export function DrawExecutionDrawer({ drawId, onClose }: Props) {
                     </div>
                   ) : (
                     <>
-                      <div className="card" style={{ padding: 'var(--space-xl)', textAlign: 'center', background: 'linear-gradient(180deg, var(--bg-secondary) 0%, var(--bg-primary) 100%)' }}>
-                        <h2 style={{ marginTop: 0 }}>Live Random Draw</h2>
-                        <p style={{ color: 'var(--text-secondary)', marginBottom: '32px' }}>This will simulate a live broadcast draw, generating random numbers one by one based on the game's pool size.</p>
-                        
-                        <div style={{ display: 'flex', gap: '16px', justifyContent: 'center', marginBottom: '32px', minHeight: '60px' }}>
-                          {drawnNumbers.map((n, i) => (
-                            <div key={i} style={{ width: 50, height: 50, borderRadius: '50%', backgroundColor: 'var(--primary-color)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: '1.5rem', animation: 'scaleIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)', boxShadow: '0 8px 16px rgba(59,130,246,0.3)' }}>
-                              {n}
-                            </div>
-                          ))}
-                          {isSimulating && drawnNumbers.length < (record?.game?.minNumbers || 6) && (
-                            <div style={{ width: 50, height: 50, borderRadius: '50%', backgroundColor: 'var(--bg-secondary)', border: '2px dashed var(--border-color)', display: 'flex', alignItems: 'center', justifyContent: 'center', animation: 'pulse 1s infinite' }}>
-                              <RefreshCw size={20} className="spin" color="var(--text-muted)" />
-                            </div>
-                          )}
-                          {drawnPowerball && (
-                            <div style={{ width: 50, height: 50, borderRadius: '50%', backgroundColor: '#ef4444', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: '1.5rem', animation: 'scaleIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)', boxShadow: '0 8px 16px rgba(239,68,68,0.3)', marginLeft: '16px' }}>
-                              {drawnPowerball}
-                            </div>
-                          )}
-                        </div>
-
-                        <button 
-                          className="btn btn-primary btn-lg" 
-                          onClick={startSimulation}
-                          disabled={isSimulating}
-                          style={{ minWidth: '200px' }}
-                        >
-                          {isSimulating ? 'Drawing in progress...' : <><Play size={20}/> Start Auto Draw</>}
-                        </button>
-                      </div>
+                      {/* Live Random Draw card removed as requested */}
 
                       <div className="card" style={{ padding: 'var(--space-lg)' }}>
                         <h3 style={{ marginTop: 0 }}>Manual Entry Override</h3>

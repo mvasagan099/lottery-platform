@@ -46,19 +46,19 @@ export function LotterySettingsPage() {
 
       <div className="card" style={{ padding: '24px', marginBottom: '24px' }}>
         <h3 style={{ fontSize: '18px', fontWeight: 600, marginBottom: '24px', borderBottom: '1px solid var(--border-color)', paddingBottom: '12px' }}>Ticket Configuration</h3>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '24px', maxWidth: '650px' }}>
           <div className="form-group">
             <label className="form-label">Minimum Ticket Price (🪙)</label>
-            <input type="number" step="0.01" {...register('minTicketPrice', { valueAsNumber: true })} className={`form-input ${errors.minTicketPrice ? 'error' : ''}`} />
+            <input type="number" step="0.01" {...register('minTicketPrice', { valueAsNumber: true })} className={`form-input ${errors.minTicketPrice ? 'error' : ''}`} style={{ height: '40px' }} />
             {errors.minTicketPrice && <span style={{ color: 'var(--color-danger)', fontSize: '12px' }}>{errors.minTicketPrice.message}</span>}
           </div>
           <div className="form-group">
             <label className="form-label">Maximum Ticket Price (🪙)</label>
-            <input type="number" step="0.01" {...register('maxTicketPrice', { valueAsNumber: true })} className="form-input" />
+            <input type="number" step="0.01" {...register('maxTicketPrice', { valueAsNumber: true })} className="form-input" style={{ height: '40px' }} />
           </div>
           <div className="form-group">
             <label className="form-label">Max Tickets Per User Per Draw</label>
-            <input type="number" {...register('ticketPurchaseLimit', { valueAsNumber: true })} className="form-input" />
+            <input type="number" {...register('ticketPurchaseLimit', { valueAsNumber: true })} className="form-input" style={{ height: '40px' }} />
           </div>
         </div>
       </div>
@@ -88,18 +88,19 @@ export function LotterySettingsPage() {
           </label>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', marginTop: '16px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '24px', marginTop: '16px', maxWidth: '650px' }}>
           <div className="form-group">
             <label className="form-label">Draw Timezone</label>
-            <select {...register('drawTimezone')} className="form-input">
-              <option value="UTC">UTC</option>
-              <option value="America/New_York">America/New_York</option>
-              <option value="Europe/London">Europe/London</option>
+            <select {...register('drawTimezone')} className="form-input" style={{ height: '40px' }}>
+              <option value="UTC">UTC (Coordinated Universal Time)</option>
+              <option value="America/New_York">America/New_York (EST)</option>
+              <option value="Europe/London">Europe/London (GMT)</option>
+              <option value="Asia/Tokyo">Asia/Tokyo (JST)</option>
             </select>
           </div>
           <div className="form-group">
             <label className="form-label">Result Publish Delay (Minutes)</label>
-            <input type="number" {...register('resultPublishDelay', { valueAsNumber: true })} className="form-input" />
+            <input type="number" {...register('resultPublishDelay', { valueAsNumber: true })} className="form-input" style={{ height: '40px' }} />
           </div>
         </div>
       </div>
@@ -129,9 +130,9 @@ export function LotterySettingsPage() {
           </label>
         </div>
         
-        <div className="form-group" style={{ marginTop: '16px' }}>
+        <div className="form-group" style={{ marginTop: '16px', maxWidth: '300px' }}>
           <label className="form-label">Prize Claim Expiry (Days)</label>
-          <input type="number" {...register('claimExpiryDays', { valueAsNumber: true })} className="form-input" />
+          <input type="number" {...register('claimExpiryDays', { valueAsNumber: true })} className="form-input" style={{ height: '40px' }} />
         </div>
       </div>
     </motion.div>

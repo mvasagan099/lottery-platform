@@ -53,7 +53,30 @@ export function FAQPage() {
   )
 }
 
+import toast from 'react-hot-toast'
+
 export function ContactPage() {
+  const [formData, setFormData] = useState({ name: '', email: '', subject: '', message: '' })
+
+  const mutation = useMutation({
+    mutationFn: (data: { name: string; email: string; subject: string; message: string }) => supportService.submitContact(data),
+    onSuccess: () => {
+      toast.success('Your message has been sent successfully!')
+      setFormData({ name: '', email: '', subject: '', message: '' })
+    },
+    onError: (err: any) => {
+      toast.error(err.response?.data?.error || 'Failed to send message')
+    },
+  })
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!formData.name || !formData.email || !formData.subject || !formData.message) {
+      return toast.error('Please fill in all fields')
+    }
+    mutation.mutate(formData)
+  }
+
   return (
     <div className="page-wrapper section">
       <div className="container" style={{ maxWidth: '800px' }}>
@@ -77,20 +100,63 @@ export function ContactPage() {
             <MessageSquare size={32} style={{ color: 'var(--color-primary)', margin: '0 auto 16px' }} />
             <h3 style={{ fontWeight: 700, marginBottom: '8px' }}>Live Chat</h3>
             <p style={{ color: 'var(--text-secondary)', marginBottom: '16px', fontSize: '14px' }}>Available 24/7</p>
-            <button className="btn btn-outline btn-sm">Start Chat</button>
+            <button className="btn btn-outline btn-sm" onClick={() => toast.success('Live Chat widget initialized!')}>Start Chat</button>
           </div>
         </div>
 
         <div className="card card-body">
           <h2 style={{ fontSize: '20px', fontWeight: 800, marginBottom: '20px' }}>Send us a message</h2>
-          <form style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
             <div className="grid-2">
-              <div className="form-group"><label className="form-label">Name</label><input type="text" className="form-input" /></div>
-              <div className="form-group"><label className="form-label">Email</label><input type="email" className="form-input" /></div>
+              <div className="form-group">
+                <label className="form-label">Name</label>
+                <input
+                  type="text"
+                  className="form-input"
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  placeholder="Your Name"
+                />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Email</label>
+                <input
+                  type="email"
+                  className="form-input"
+                  value={formData.email}
+                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  placeholder="your.email@example.com"
+                />
+              </div>
             </div>
-            <div className="form-group"><label className="form-label">Subject</label><input type="text" className="form-input" /></div>
-            <div className="form-group"><label className="form-label">Message</label><textarea className="form-input" rows={5} /></div>
-            <button type="button" className="btn btn-primary btn-lg" style={{ alignSelf: 'flex-start' }}>Send Message</button>
+            <div className="form-group">
+              <label className="form-label">Subject</label>
+              <input
+                type="text"
+                className="form-input"
+                value={formData.subject}
+                onChange={(e) => setFormData({ ...formData, subject: e.target.value })}
+                placeholder="How can we help?"
+              />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Message</label>
+              <textarea
+                className="form-input"
+                rows={5}
+                value={formData.message}
+                onChange={(e) => setFormData({ ...formData, message: e.target.value })}
+                placeholder="Describe your inquiry..."
+              />
+            </div>
+            <button
+              type="submit"
+              className="btn btn-primary btn-lg"
+              disabled={mutation.isPending}
+              style={{ alignSelf: 'flex-start' }}
+            >
+              {mutation.isPending ? 'Sending...' : 'Send Message'}
+            </button>
           </form>
         </div>
       </div>

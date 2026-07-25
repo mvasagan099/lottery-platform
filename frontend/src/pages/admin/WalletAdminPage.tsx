@@ -125,7 +125,14 @@ export default function WalletAdminPage() {
           <button 
             className="btn btn-outline" 
             style={{ padding: '6px 12px', fontSize: '13px' }}
-            onClick={() => setAdjustmentWallet({ id: row.original.walletId, userId: row.original.wallet.user.id, username: row.original.wallet.user.username })}
+            onClick={() => {
+              const userObj = row.original.wallet?.user || row.original.user || {}
+              setAdjustmentWallet({
+                id: row.original.walletId || row.original.wallet?.id,
+                userId: userObj.id || row.original.userId,
+                username: userObj.username || userObj.email || 'User'
+              })
+            }}
           >
             Adjust Wallet
           </button>

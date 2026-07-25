@@ -7,6 +7,7 @@ import { FastifyInstance } from 'fastify'
 import { z } from 'zod'
 import { prisma, redis } from '../server'
 import { authenticate, requireVerifiedEmail, auditLog } from '../middleware/auth'
+import { processAffiliateCommission } from '../services/affiliate'
 
 const depositSchema = z.object({
   amount: z.number().positive(),
@@ -260,6 +261,9 @@ export default async function walletRoutes(app: FastifyInstance) {
         message: `$${deposit.amount} USD has been added to your wallet.`,
       },
     })
+
+    // Process affiliate commission for deposit
+    processAffiliateCommission({ referredUserId: userId, type: 'DEPOSIT', amount: Number(deposit.amount) }).catch(console.error)
 
     return reply.send({ success: true, message: 'Deposit confirmed' })
   })
