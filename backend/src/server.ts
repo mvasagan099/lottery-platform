@@ -185,7 +185,7 @@ async function buildApp() {
 async function seedPermissionsIfNeeded() {
   try {
     const count = await prisma.permission.count()
-    if (count === 0) {
+    if (count < 231) {
       const MODULES = [
         'Dashboard', 'Reports', 'Users', 'KYC', 'Wallets', 'Deposits', 'Withdrawals', 
         'Games', 'Draws', 'Results', 'Jackpots', 'Affiliates', 'CMS', 'Promotions', 
@@ -208,9 +208,10 @@ async function seedPermissionsIfNeeded() {
       }
 
       await prisma.permission.createMany({
-        data: permissionsToCreate
+        data: permissionsToCreate,
+        skipDuplicates: true
       })
-      console.log(`[Startup] Seeded ${permissionsToCreate.length} system permissions.`)
+      console.log(`[Startup] Checked and seeded missing system permissions.`)
     }
   } catch (error) {
     console.error('[Startup] Failed to auto-seed permissions:', error)
