@@ -1,9 +1,42 @@
-/**
- * User Profile Routes
- */
 import { FastifyInstance } from 'fastify'
+import { z } from 'zod'
 import { prisma } from '../server'
 import { authenticate, auditLog } from '../middleware/auth'
+
+// HIGH-11: Safe URL validator for KYC documents
+const safeHttpsUrl = z.string().url().refine(
+  (url) => {
+    try {
+      const parsed = new URL(url)
+      if (parsed.protocol !== 'https:') return false
+      const host = parsed.hostname
+      // Block internal/private IPs
+      if (/^(127\.|10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.|169\.254\.|::1|localhost)/i.test(host)) return false
+      return true
+    } catch { return false }
+  },
+  { message: 'URL must be a secure HTTPS URL pointing to an external host' }
+)
+
+const kycSchema = z.object({
+  documentType: z.enum(['PASSPORT', 'DRIVERS_LICENSE', 'NATIONAL_ID', 'UTILITY_BILL']),
+  documentUrl: safeHttpsUrl,
+  selfieUrl: safeHttpsUrl,
+})
+
+// HIGH-02: Whitelist notification preference fields
+const notifPrefsSchema = z.object({
+  emailDeposits: z.boolean().optional(),
+  emailWithdrawals: z.boolean().optional(),
+  emailPromotions: z.boolean().optional(),
+  emailNewsletters: z.boolean().optional(),
+  pushDeposits: z.boolean().optional(),
+  pushWithdrawals: z.boolean().optional(),
+  pushPromotions: z.boolean().optional(),
+  smsDeposits: z.boolean().optional(),
+  smsWithdrawals: z.boolean().optional(),
+  smsPromotions: z.boolean().optional(),
+})
 
 export default async function userRoutes(app: FastifyInstance) {
 
@@ -57,10 +90,11 @@ export default async function userRoutes(app: FastifyInstance) {
   })
 
   app.patch('/me/notifications', { preHandler: authenticate }, async (request, reply) => {
+    const validated = notifPrefsSchema.partial().parse(request.body)
     const prefs = await prisma.notificationPreference.upsert({
       where: { userId: request.user.userId },
-      update: request.body as any,
-      create: { userId: request.user.userId, ...(request.body as any) },
+      update: validated as any,
+      create: { userId: request.user.userId, ...(validated as any) },
     })
     return reply.send({ success: true, data: prefs })
   })
@@ -73,9 +107,9 @@ export default async function userRoutes(app: FastifyInstance) {
     return reply.send({ success: true, data: devices })
   })
 
-  // Submit KYC document
+  // Submit KYC document — HIGH-11: validates URL safety
   app.post('/me/kyc', { preHandler: authenticate }, async (request, reply) => {
-    const { documentType, documentUrl, selfieUrl } = request.body as any
+    const { documentType, documentUrl, selfieUrl } = kycSchema.parse(request.body)
 
     await prisma.kYCRecord.create({
       data: {

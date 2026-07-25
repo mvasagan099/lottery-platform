@@ -107,7 +107,8 @@ async function walletRoutes(app) {
     // GET /wallet/transactions - Transaction history
     app.get('/transactions', { preHandler: auth_1.authenticate }, async (request, reply) => {
         const { page = '1', limit = '20', type, status } = request.query;
-        const skip = (Number(page) - 1) * Number(limit);
+        const limitNum = Math.min(Math.max(1, Number(limit) || 20), 100);
+        const skip = (Math.max(1, Number(page) || 1) - 1) * limitNum;
         const where = { userId: request.user.userId };
         if (type)
             where.type = type;
@@ -118,7 +119,7 @@ async function walletRoutes(app) {
                 where,
                 orderBy: { createdAt: 'desc' },
                 skip,
-                take: Number(limit),
+                take: limitNum,
                 select: {
                     id: true,
                     type: true,
@@ -138,10 +139,10 @@ async function walletRoutes(app) {
             success: true,
             data: transactions,
             pagination: {
-                page: Number(page),
-                limit: Number(limit),
+                page: Math.max(1, Number(page) || 1),
+                limit: limitNum,
                 total,
-                pages: Math.ceil(total / Number(limit)),
+                pages: Math.ceil(total / limitNum),
             },
         });
     });
@@ -215,8 +216,8 @@ async function walletRoutes(app) {
             data: { depositId: deposit.id, ...gatewayData },
         });
     });
-    // POST /wallet/deposit/:id/confirm - Confirm deposit (webhook or manual)
-    app.post('/deposit/:id/confirm', { preHandler: auth_1.authenticate }, async (request, reply) => {
+    // POST /wallet/deposit/:id/confirm - Confirm deposit (admin/webhook only — CRIT-05)
+    app.post('/deposit/:id/confirm', { preHandler: [auth_1.authenticate, auth_1.requireAdmin] }, async (request, reply) => {
         const { id } = request.params;
         const { gatewayRef } = request.body;
         const userId = request.user.userId;
@@ -288,7 +289,6 @@ async function walletRoutes(app) {
         const { randomInt } = require('crypto');
         const code = randomInt(100000, 1000000).toString();
         await server_1.redis.set(`email_otp:${userId}:withdraw`, code, 'EX', 300);
-        console.log(`\n\n🔑 [TESTING] WALLET WITHDRAW OTP CODE FOR ${user.email}: ${code}\n\n`);
         try {
             const { sendEmail } = require('../services/email');
             await sendEmail({
@@ -455,6 +455,7 @@ async function walletRoutes(app) {
                 code: 'KYC_REQUIRED',
             });
         }
+        // Fetch wallet for initial balance check (precise lock happens inside transaction)
         const wallet = await server_1.prisma.wallet.findUnique({
             where: { userId },
             select: { id: true, balance: true },
@@ -500,10 +501,17 @@ async function walletRoutes(app) {
                 code: transferData.code || 'TRANSFER_FAILED'
             });
         }
-        // 2. Deduct from game wallet on success
+        // 2. Deduct from game wallet with row-level lock to prevent double-spend (MED-04)
         try {
             await server_1.prisma.$transaction(async (tx) => {
-                const balBefore = Number(wallet.balance);
+                // Lock the wallet row to prevent concurrent deductions
+                const lockedWallet = await tx.$queryRaw `
+          SELECT id, balance FROM "Wallet" WHERE "userId" = ${userId} FOR UPDATE
+        `;
+                if (!lockedWallet[0] || Number(lockedWallet[0].balance) < body.amount) {
+                    throw new Error('Insufficient balance');
+                }
+                const balBefore = Number(lockedWallet[0].balance);
                 // Deduct wallet
                 await tx.wallet.update({
                     where: { id: wallet.id },

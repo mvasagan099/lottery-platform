@@ -1,1 +1,30 @@
 node_modules
+
+# Environment files — NEVER commit real credentials
+.env
+.env.*
+.env.local
+.env.production
+.env.staging
+*.env
+
+# Allow example/template files
+!.env.example
+!.env.*.example
+
+# Build artifacts
+dist
+build
+.next
+
+# Logs
+*.log
+logs/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/

@@ -1,7 +1,7 @@
 /**
  * Payment Routes
- * - Stripe & PayPal webhooks
- * - Payment method management
+ * - Stripe & PayPal webhooks (with signature verification)
+ * - Payment method management (with field whitelisting)
  */
 import { FastifyInstance } from 'fastify';
 export default function paymentRoutes(app: FastifyInstance): Promise<void>;

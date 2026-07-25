@@ -6,7 +6,7 @@
 import { FastifyInstance } from 'fastify'
 import { z } from 'zod'
 import { prisma, redis } from '../server'
-import { authenticate, requireVerifiedEmail, auditLog } from '../middleware/auth'
+import { authenticate, requireAdmin, requireVerifiedEmail, auditLog } from '../middleware/auth'
 import { processAffiliateCommission } from '../services/affiliate'
 
 const depositSchema = z.object({
@@ -81,7 +81,8 @@ export default async function walletRoutes(app: FastifyInstance) {
   // GET /wallet/transactions - Transaction history
   app.get('/transactions', { preHandler: authenticate }, async (request, reply) => {
     const { page = '1', limit = '20', type, status } = request.query as Record<string, string>
-    const skip = (Number(page) - 1) * Number(limit)
+    const limitNum = Math.min(Math.max(1, Number(limit) || 20), 100)
+    const skip = (Math.max(1, Number(page) || 1) - 1) * limitNum
 
     const where: any = { userId: request.user.userId }
     if (type) where.type = type
@@ -92,7 +93,7 @@ export default async function walletRoutes(app: FastifyInstance) {
         where,
         orderBy: { createdAt: 'desc' },
         skip,
-        take: Number(limit),
+        take: limitNum,
         select: {
           id: true,
           type: true,
@@ -113,10 +114,10 @@ export default async function walletRoutes(app: FastifyInstance) {
       success: true,
       data: transactions,
       pagination: {
-        page: Number(page),
-        limit: Number(limit),
+        page: Math.max(1, Number(page) || 1),
+        limit: limitNum,
         total,
-        pages: Math.ceil(total / Number(limit)),
+        pages: Math.ceil(total / limitNum),
       },
     })
   })
@@ -198,8 +199,8 @@ export default async function walletRoutes(app: FastifyInstance) {
     })
   })
 
-  // POST /wallet/deposit/:id/confirm - Confirm deposit (webhook or manual)
-  app.post('/deposit/:id/confirm', { preHandler: authenticate }, async (request, reply) => {
+  // POST /wallet/deposit/:id/confirm - Confirm deposit (admin/webhook only — CRIT-05)
+  app.post('/deposit/:id/confirm', { preHandler: [authenticate, requireAdmin] }, async (request, reply) => {
     const { id } = request.params as { id: string }
     const { gatewayRef } = request.body as { gatewayRef?: string }
     const userId = request.user.userId
@@ -281,7 +282,6 @@ export default async function walletRoutes(app: FastifyInstance) {
     const code = randomInt(100000, 1000000).toString()
     await redis.set(`email_otp:${userId}:withdraw`, code, 'EX', 300)
 
-    console.log(`\n\n🔑 [TESTING] WALLET WITHDRAW OTP CODE FOR ${user.email}: ${code}\n\n`)
 
     try {
       const { sendEmail } = require('../services/email')
@@ -468,11 +468,11 @@ export default async function walletRoutes(app: FastifyInstance) {
       })
     }
 
+    // Fetch wallet for initial balance check (precise lock happens inside transaction)
     const wallet = await prisma.wallet.findUnique({
       where: { userId },
       select: { id: true, balance: true },
     })
-
     if (!wallet) return reply.status(404).send({ success: false, error: 'Wallet not found' })
 
     if (Number(wallet.balance) < body.amount) {
@@ -518,10 +518,17 @@ export default async function walletRoutes(app: FastifyInstance) {
       })
     }
 
-    // 2. Deduct from game wallet on success
+    // 2. Deduct from game wallet with row-level lock to prevent double-spend (MED-04)
     try {
       await prisma.$transaction(async (tx) => {
-        const balBefore = Number(wallet.balance)
+        // Lock the wallet row to prevent concurrent deductions
+        const lockedWallet = await tx.$queryRaw<{balance: number}[]>`
+          SELECT id, balance FROM "Wallet" WHERE "userId" = ${userId} FOR UPDATE
+        `
+        if (!lockedWallet[0] || Number(lockedWallet[0].balance) < body.amount) {
+          throw new Error('Insufficient balance')
+        }
+        const balBefore = Number(lockedWallet[0].balance)
 
         // Deduct wallet
         await tx.wallet.update({

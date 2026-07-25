@@ -124,7 +124,12 @@ async function adminRoutes(app) {
     // ── User Management ───────────────────────────────────────────────────────
     app.get('/users', async (request, reply) => {
         const { page = '1', limit = '20', search, status, role, kycStatus, sortField = 'createdAt', sortDir = 'desc' } = request.query;
-        const skip = (Number(page) - 1) * Number(limit);
+        const limitNum = Math.min(Math.max(1, Number(limit) || 20), 100);
+        const skip = (Math.max(1, Number(page) || 1) - 1) * limitNum;
+        // HIGH-01: Whitelist allowed sort fields to prevent Prisma injection
+        const ALLOWED_SORT_FIELDS = ['createdAt', 'email', 'username', 'status', 'lastLoginAt', 'firstName', 'lastName'];
+        const safeSortField = ALLOWED_SORT_FIELDS.includes(sortField) ? sortField : 'createdAt';
+        const safeSortDir = sortDir === 'asc' ? 'asc' : 'desc';
         const where = {};
         if (search) {
             where.OR = [
@@ -141,12 +146,12 @@ async function adminRoutes(app) {
         if (kycStatus)
             where.kycStatus = kycStatus;
         const orderBy = {};
-        orderBy[sortField] = sortDir;
+        orderBy[safeSortField] = safeSortDir;
         const [users, total] = await Promise.all([
             server_1.prisma.user.findMany({
                 where,
                 skip,
-                take: Number(limit),
+                take: limitNum,
                 orderBy,
                 select: {
                     id: true,
@@ -169,7 +174,7 @@ async function adminRoutes(app) {
         return reply.send({
             success: true,
             data: users,
-            pagination: { page: Number(page), limit: Number(limit), total, pages: Math.ceil(total / Number(limit)) },
+            pagination: { page: Math.max(1, Number(page) || 1), limit: limitNum, total, pages: Math.ceil(total / limitNum) },
         });
     });
     app.get('/users/:id', async (request, reply) => {

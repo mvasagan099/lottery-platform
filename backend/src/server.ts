@@ -64,12 +64,35 @@ async function buildApp() {
 
   // ── Security plugins ──────────────────────────────────
   await app.register(helmet, {
-    contentSecurityPolicy: false,
+    // MED-02: Enable Content Security Policy
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'"],
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        imgSrc: ["'self'", 'data:', 'https:'],
+        connectSrc: ["'self'", 'https://api.stripe.com', 'https://www.paypal.com'],
+        frameSrc: ["'none'"],
+        objectSrc: ["'none'"],
+        upgradeInsecureRequests: [],
+      },
+    },
     crossOriginResourcePolicy: { policy: 'cross-origin' },
   })
 
+  // CRIT-06: Strict CORS — never reflect all origins in production
+  const allowedOrigins = process.env.NODE_ENV === 'production'
+    ? (process.env.ALLOWED_ORIGINS || 'https://megadraw.com').split(',')
+    : ['http://localhost:5173', 'http://localhost:5174', 'http://localhost:3000']
+
   await app.register(cors, {
-    origin: true,
+    origin: (origin, cb) => {
+      if (!origin || allowedOrigins.includes(origin)) {
+        cb(null, true)
+      } else {
+        cb(new Error('Not allowed by CORS'), false)
+      }
+    },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Refresh-Token'],
@@ -116,10 +139,13 @@ async function buildApp() {
     },
   })
 
-  await app.register(swaggerUi, {
-    routePrefix: '/docs',
-    uiConfig: { docExpansion: 'list' },
-  })
+  // MED-03: Only expose Swagger UI in non-production environments
+  if (process.env.NODE_ENV !== 'production') {
+    await app.register(swaggerUi, {
+      routePrefix: '/docs',
+      uiConfig: { docExpansion: 'list' },
+    })
+  }
 
   // ── Decorate with shared clients ──────────────────────
   app.decorate('prisma', prisma)
@@ -218,8 +244,42 @@ async function seedPermissionsIfNeeded() {
   }
 }
 
+// HIGH-03: Detect weak or default JWT secrets before accepting traffic
+function checkSecretStrength() {
+  const KNOWN_WEAK_SECRETS = [
+    'your-super-secret-jwt-key',
+    'fallback_secret_must_be_32_chars!',
+    'your_jwt_secret_min_32_chars',
+    'your_refresh_secret_min_32_chars',
+    'secret',
+    'jwt_secret',
+    '',
+  ]
+  const jwtSecret = process.env.JWT_SECRET || ''
+  const isWeak = KNOWN_WEAK_SECRETS.includes(jwtSecret) || jwtSecret.length < 32
+
+  if (isWeak) {
+    const msg = `
+╔══════════════════════════════════════════════════════════════╗
+║  ⚠️  CRITICAL SECURITY WARNING                                ║
+║  JWT_SECRET is weak, default, or missing!                    ║
+║  This allows attackers to forge admin tokens.                ║
+║  Generate a strong secret:                                   ║
+║  node -e "require('crypto').randomBytes(64).toString('hex')" ║
+║  Then set JWT_SECRET in your environment variables.          ║
+╚══════════════════════════════════════════════════════════════╝`
+    console.error(msg)
+    if (process.env.NODE_ENV === 'production') {
+      console.error('[FATAL] Refusing to start with weak JWT_SECRET in production.')
+      process.exit(1)
+    }
+  }
+}
+
 // Start server
 async function start() {
+  checkSecretStrength()
+
   const app = await buildApp()
   const port = Number(process.env.PORT) || 3001
   const host = process.env.HOST || '0.0.0.0'

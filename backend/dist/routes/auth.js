@@ -121,7 +121,6 @@ async function authRoutes(app) {
         // Send verification email
         const otp = (0, crypto_1.randomInt)(100000, 999999).toString();
         await server_1.redis.setex(`email_verify:${body.email}`, 300, otp); // 5m TTL
-        console.log(`\n\n🔑 [TESTING] OTP CODE FOR ${body.email}: ${otp}\n\n`);
         let emailSent = true;
         try {
             await (0, email_1.sendEmail)({
@@ -169,7 +168,6 @@ async function authRoutes(app) {
         }
         const otp = (0, crypto_1.randomInt)(100000, 999999).toString();
         await server_1.redis.setex(`email_verify:${email}`, 300, otp); // 5m TTL
-        console.log(`\n\n🔑 [TESTING] RESENT OTP CODE FOR ${email}: ${otp}\n\n`);
         let emailSent = true;
         try {
             await (0, email_1.sendEmail)({
@@ -329,7 +327,6 @@ async function authRoutes(app) {
             return reply.status(401).send({ success: false, error: 'Incorrect email or password' });
         const code = (0, crypto_1.randomInt)(100000, 1000000).toString();
         await server_1.redis.set(`email_otp:${user.id}:login`, code, 'EX', 300);
-        console.log(`\n\n🔑 [TESTING] LOGIN OTP CODE FOR ${user.email}: ${code}\n\n`);
         try {
             await (0, email_1.sendEmail)({
                 to: user.email,
@@ -382,10 +379,20 @@ async function authRoutes(app) {
     // POST /auth/verify-email
     app.post('/verify-email', async (request, reply) => {
         const { email, token } = verifyEmailSchema.parse(request.body);
+        // MED-06: Brute-force protection — max 5 attempts per email per 10 minutes
+        const attemptKey = `otp_attempts:${email}`;
+        const attempts = await server_1.redis.incr(attemptKey);
+        if (attempts === 1)
+            await server_1.redis.expire(attemptKey, 600); // 10 min window
+        if (attempts > 5) {
+            return reply.status(429).send({ success: false, error: 'Too many verification attempts. Please request a new code.' });
+        }
         const cachedOtp = await server_1.redis.get(`email_verify:${email}`);
         if (!cachedOtp || cachedOtp !== token) {
             return reply.status(400).send({ success: false, error: 'Invalid or expired verification code' });
         }
+        // Clear attempt counter on success
+        await server_1.redis.del(attemptKey);
         const user = await server_1.prisma.user.findUnique({ where: { email } });
         if (user) {
             // User exists but unverified (old flow compatibility)
@@ -433,7 +440,7 @@ async function authRoutes(app) {
                         phone: body.phone,
                         dateOfBirth: body.dateOfBirth ? new Date(body.dateOfBirth) : undefined,
                         referredById: referrerId,
-                        referralCode: Array.from({ length: 8 }, () => 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'[Math.floor(Math.random() * 36)]).join(''),
+                        referralCode: (0, crypto_1.randomBytes)(6).toString('base64url').toUpperCase().substring(0, 8),
                         emailVerified: true,
                         emailVerifiedAt: new Date(),
                         status: 'ACTIVE',
@@ -450,58 +457,6 @@ async function authRoutes(app) {
         }
         await server_1.redis.del(`email_verify:${email}`);
         return reply.send({ success: true, message: 'Email verified successfully' });
-    });
-    // POST /auth/skip-verification
-    app.post('/skip-verification', async (request, reply) => {
-        const { email } = forgotPasswordSchema.parse(request.body);
-        const pendingDataStr = await server_1.redis.get(`pending_reg:${email}`);
-        if (!pendingDataStr) {
-            return reply.status(404).send({ success: false, error: 'User registration not found or expired. Please register again.' });
-        }
-        const body = JSON.parse(pendingDataStr);
-        // Find referrer
-        let referrerId;
-        if (body.referralCode) {
-            const referrer = await server_1.prisma.user.findFirst({
-                where: { referralCode: body.referralCode },
-            });
-            referrerId = referrer?.id;
-        }
-        // Hash password
-        const passwordHash = await argon2_1.default.hash(body.password, {
-            type: argon2_1.default.argon2id,
-            memoryCost: 65536,
-            timeCost: 3,
-            parallelism: 4,
-        });
-        // Create user with wallet
-        const newUser = await server_1.prisma.$transaction(async (tx) => {
-            const createdUser = await tx.user.create({
-                data: {
-                    email: body.email,
-                    username: body.username,
-                    passwordHash,
-                    firstName: body.firstName,
-                    lastName: body.lastName,
-                    country: body.country,
-                    phone: body.phone,
-                    dateOfBirth: body.dateOfBirth ? new Date(body.dateOfBirth) : undefined,
-                    referredById: referrerId,
-                    referralCode: Array.from({ length: 8 }, () => 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'[Math.floor(Math.random() * 36)]).join(''),
-                    emailVerified: false,
-                    status: 'PENDING_VERIFICATION',
-                },
-            });
-            await tx.wallet.create({ data: { userId: createdUser.id } });
-            await tx.notificationPreference.create({ data: { userId: createdUser.id } });
-            return createdUser;
-        });
-        // Trigger referral signup tracking
-        (0, affiliate_1.processAffiliateCommission)({ referredUserId: newUser.id, type: 'SIGNUP' }).catch(console.error);
-        await (0, auth_1.auditLog)(newUser.id, 'REGISTER_SKIPPED_VERIFY', 'User', newUser.id, undefined, { email: newUser.email }, request);
-        await server_1.redis.del(`pending_reg:${email}`);
-        await server_1.redis.del(`email_verify:${email}`);
-        return reply.send({ success: true, message: 'Account created. Email verification skipped.' });
     });
     // POST /auth/forgot-password
     app.post('/forgot-password', {

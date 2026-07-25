@@ -1,8 +1,43 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.default = userRoutes;
+const zod_1 = require("zod");
 const server_1 = require("../server");
 const auth_1 = require("../middleware/auth");
+// HIGH-11: Safe URL validator for KYC documents
+const safeHttpsUrl = zod_1.z.string().url().refine((url) => {
+    try {
+        const parsed = new URL(url);
+        if (parsed.protocol !== 'https:')
+            return false;
+        const host = parsed.hostname;
+        // Block internal/private IPs
+        if (/^(127\.|10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.|169\.254\.|::1|localhost)/i.test(host))
+            return false;
+        return true;
+    }
+    catch {
+        return false;
+    }
+}, { message: 'URL must be a secure HTTPS URL pointing to an external host' });
+const kycSchema = zod_1.z.object({
+    documentType: zod_1.z.enum(['PASSPORT', 'DRIVERS_LICENSE', 'NATIONAL_ID', 'UTILITY_BILL']),
+    documentUrl: safeHttpsUrl,
+    selfieUrl: safeHttpsUrl,
+});
+// HIGH-02: Whitelist notification preference fields
+const notifPrefsSchema = zod_1.z.object({
+    emailDeposits: zod_1.z.boolean().optional(),
+    emailWithdrawals: zod_1.z.boolean().optional(),
+    emailPromotions: zod_1.z.boolean().optional(),
+    emailNewsletters: zod_1.z.boolean().optional(),
+    pushDeposits: zod_1.z.boolean().optional(),
+    pushWithdrawals: zod_1.z.boolean().optional(),
+    pushPromotions: zod_1.z.boolean().optional(),
+    smsDeposits: zod_1.z.boolean().optional(),
+    smsWithdrawals: zod_1.z.boolean().optional(),
+    smsPromotions: zod_1.z.boolean().optional(),
+});
 async function userRoutes(app) {
     app.get('/me', { preHandler: auth_1.authenticate }, async (request, reply) => {
         const user = await server_1.prisma.user.findUnique({
@@ -49,10 +84,11 @@ async function userRoutes(app) {
         return reply.send({ success: true, data: user });
     });
     app.patch('/me/notifications', { preHandler: auth_1.authenticate }, async (request, reply) => {
+        const validated = notifPrefsSchema.partial().parse(request.body);
         const prefs = await server_1.prisma.notificationPreference.upsert({
             where: { userId: request.user.userId },
-            update: request.body,
-            create: { userId: request.user.userId, ...request.body },
+            update: validated,
+            create: { userId: request.user.userId, ...validated },
         });
         return reply.send({ success: true, data: prefs });
     });
@@ -63,9 +99,9 @@ async function userRoutes(app) {
         });
         return reply.send({ success: true, data: devices });
     });
-    // Submit KYC document
+    // Submit KYC document — HIGH-11: validates URL safety
     app.post('/me/kyc', { preHandler: auth_1.authenticate }, async (request, reply) => {
-        const { documentType, documentUrl, selfieUrl } = request.body;
+        const { documentType, documentUrl, selfieUrl } = kycSchema.parse(request.body);
         await server_1.prisma.kYCRecord.create({
             data: {
                 userId: request.user.userId,
