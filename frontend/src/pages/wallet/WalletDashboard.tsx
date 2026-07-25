@@ -54,7 +54,7 @@ export function WalletDashboard() {
         </div>
 
         {/* Quick Stats */}
-        <div className="grid-4" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', marginBottom: '24px' }}>
+        <div className="grid-4" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', marginBottom: '24px' }}>
           {[
             { label: 'Total Deposited', value: `${Number(wallet?.totalDeposited || 0).toFixed(2)} Coins`, icon: <ArrowDownLeft size={20} /> },
             { label: 'Total Withdrawn', value: `${Number(wallet?.totalWithdrawn || 0).toFixed(2)} Coins`, icon: <ArrowUpRight size={20} /> },
