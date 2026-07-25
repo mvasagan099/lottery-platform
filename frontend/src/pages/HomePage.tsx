@@ -91,7 +91,7 @@ export default function HomePage() {
                   </>
                 )}
 
-                <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', justifyContent: 'center' }}>
+                <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
                   <Link to={`/games/${topGame.slug}`} className="oz-btn-yellow">Buy Tickets</Link>
                   <Link to={`/games/${topGame.slug}?quickpick=true`} className="oz-btn-white">QuickPick</Link>
                 </div>
