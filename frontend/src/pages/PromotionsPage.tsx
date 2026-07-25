@@ -1,15 +1,37 @@
+import React, { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Gift, Zap, ShieldCheck } from 'lucide-react'
+import { Gift, Zap, ShieldCheck, Copy, Check } from 'lucide-react'
+import { useAuthStore } from '@/store/authStore'
+import toast from 'react-hot-toast'
 
 export default function PromotionsPage() {
+  const { user } = useAuthStore()
+  const [copied, setCopied] = useState(false)
+  const [optedIn, setOptedIn] = useState(false)
+
+  const referralLink = user ? `${window.location.origin}/register?ref=${user.id}` : `${window.location.origin}/register`
+
+  const handleCopyReferral = () => {
+    navigator.clipboard.writeText(referralLink)
+    setCopied(true)
+    toast.success('Referral link copied to clipboard!')
+    setTimeout(() => setCopied(false), 3000)
+  }
+
+  const handleOptIn = () => {
+    setOptedIn(true)
+    toast.success('Successfully opted into Powerball Double Jackpots!')
+  }
+
   const promos = [
     {
       id: 1,
       title: '🪙10 Welcome Bonus',
       desc: 'Sign up today and get 🪙10 free credit added to your wallet. No deposit required.',
       icon: <Gift size={32} style={{ color: '#f5a623' }} />,
-      cta: 'Claim Bonus',
-      link: '/register',
+      cta: user ? 'Bonus Active in Wallet' : 'Claim Bonus',
+      link: user ? '/wallet' : '/register',
+      isButton: false,
       terms: 'New users only. Credit expires in 7 days.'
     },
     {
@@ -17,8 +39,9 @@ export default function PromotionsPage() {
       title: 'Refer a Friend, Get 🪙20',
       desc: 'Invite your friends to MegaDraw. When they make their first deposit, you both get 🪙20 bonus credit.',
       icon: <Zap size={32} style={{ color: 'var(--color-primary)' }} />,
-      cta: 'Get Referral Link',
-      link: '/profile/referral',
+      cta: copied ? 'Link Copied!' : 'Get Referral Link',
+      action: handleCopyReferral,
+      isButton: true,
       terms: 'Minimum 🪙20 deposit required by referred user.'
     },
     {
@@ -26,8 +49,10 @@ export default function PromotionsPage() {
       title: 'Powerball Double Jackpots',
       desc: 'For a limited time, all division 2-9 prizes in Powerball are doubled. Opt-in required.',
       icon: <ShieldCheck size={32} style={{ color: '#10b981' }} />,
-      cta: 'Opt In Now',
-      link: '/games/powerball',
+      cta: optedIn ? 'Opted In ✓' : 'Opt In Now',
+      action: handleOptIn,
+      disabled: optedIn,
+      isButton: true,
       terms: 'Valid for next 3 draws only.'
     }
   ]
@@ -46,7 +71,23 @@ export default function PromotionsPage() {
               <div style={{ marginBottom: '16px' }}>{p.icon}</div>
               <h3 style={{ fontSize: '20px', fontWeight: 800, marginBottom: '12px' }}>{p.title}</h3>
               <p style={{ color: 'var(--text-secondary)', marginBottom: '24px', flex: 1 }}>{p.desc}</p>
-              <Link to={p.link} className="btn btn-outline btn-full" style={{ marginBottom: '12px' }}>{p.cta}</Link>
+              
+              {p.isButton ? (
+                <button
+                  onClick={p.action}
+                  disabled={p.disabled}
+                  className="btn btn-outline btn-full"
+                  style={{ marginBottom: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
+                >
+                  {p.cta === 'Link Copied!' && <Check size={16} />}
+                  {p.cta}
+                </button>
+              ) : (
+                <Link to={p.link} className="btn btn-outline btn-full" style={{ marginBottom: '12px' }}>
+                  {p.cta}
+                </Link>
+              )}
+              
               <div style={{ fontSize: '11px', color: 'var(--text-muted)', textAlign: 'center' }}>T&Cs Apply. {p.terms}</div>
             </div>
           ))}
