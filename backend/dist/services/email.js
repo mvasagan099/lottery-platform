@@ -72,6 +72,21 @@ const templates = {
       </div>
     </div>
   `,
+    'email-otp': (d) => `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+      <div style="background: linear-gradient(135deg, #1a1f3c 0%, #2d3561 100%); padding: 40px; text-align: center;">
+        <h1 style="color: #f4b942; margin: 0; font-size: 28px;">MegaDraw Security</h1>
+      </div>
+      <div style="padding: 40px; background: #ffffff;">
+        <h2>Hi ${d.name},</h2>
+        <p>Here is your verification code to complete your <strong>${d.action}</strong>.</p>
+        <div style="margin: 30px 0; padding: 20px; background: #f8f9fa; border-radius: 8px; text-align: center;">
+          <span style="font-size: 32px; font-weight: bold; letter-spacing: 4px; color: #1a1f3c;">${d.code}</span>
+        </div>
+        <p style="color: #666; font-size: 14px;">This code expires in 5 minutes. If you did not request this, please ignore this email.</p>
+      </div>
+    </div>
+  `,
 };
 async function sendViaResend(to, subject, html, from) {
     const resend = new resend_1.Resend(process.env.RESEND_API_KEY);

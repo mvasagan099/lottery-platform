@@ -19,6 +19,38 @@ const addMessageSchema = zod_1.z.object({
     isInternal: zod_1.z.boolean().default(false),
 });
 async function supportRoutes(app) {
+    // POST /support/contact - Public contact form submission
+    app.post('/contact', async (request, reply) => {
+        const body = zod_1.z.object({
+            name: zod_1.z.string().min(2),
+            email: zod_1.z.string().email(),
+            subject: zod_1.z.string().min(3),
+            message: zod_1.z.string().min(5),
+        }).parse(request.body);
+        let categoryRecord = await server_1.prisma.ticketCategoryModel.findFirst({ where: { name: 'General Enquiries' } });
+        if (!categoryRecord) {
+            categoryRecord = await server_1.prisma.ticketCategoryModel.create({ data: { name: 'General Enquiries' } });
+        }
+        const ticket = await server_1.prisma.supportTicket.create({
+            data: {
+                subject: `[Contact Form] ${body.subject}`,
+                categoryId: categoryRecord.id,
+                priority: 'MEDIUM',
+                messages: {
+                    create: {
+                        senderId: 'GUEST',
+                        senderType: 'GUEST',
+                        message: `From: ${body.name} (${body.email})\n\n${body.message}`,
+                    },
+                },
+            },
+        });
+        return reply.status(201).send({
+            success: true,
+            message: 'Your message has been sent successfully. Our team will reply shortly.',
+            data: { ticketId: ticket.id },
+        });
+    });
     // GET /support/faqs - Public FAQ list
     app.get('/faqs', async (request, reply) => {
         const { category } = request.query;

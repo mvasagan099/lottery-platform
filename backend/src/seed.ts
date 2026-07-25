@@ -8,6 +8,7 @@ import { PrismaClient, UserRole } from '@prisma/client'
 import argon2 from 'argon2'
 import * as dotenv from 'dotenv'
 import * as path from 'path'
+import crypto from 'crypto'
 
 dotenv.config({ path: path.resolve(__dirname, '.env') })
 
@@ -363,6 +364,7 @@ async function main() {
     await prisma.prizeDivision.deleteMany({ where: { gameId: createdGame.id } })
     await prisma.prizeDivision.createMany({
       data: prizeDivisions.map((div) => ({
+        id: crypto.randomUUID(),
         ...div,
         gameId: createdGame.id,
       })),
@@ -477,7 +479,10 @@ async function main() {
     { question: 'Is my information secure?', answer: 'Yes. We use industry-standard encryption (SSL/TLS), two-factor authentication, and are fully compliant with global privacy laws.', category: 'Security', sortOrder: 1 },
   ]
 
-  await prisma.fAQ.createMany({ data: faqs, skipDuplicates: true })
+  await prisma.fAQ.createMany({
+    data: faqs.map(faq => ({ ...faq, id: crypto.randomUUID() })),
+    skipDuplicates: true
+  })
   console.log('✅ FAQs seeded')
 
   // ── CMS Pages ───────────────────────────────────────────────────────────────

@@ -120,8 +120,8 @@ export declare class SupportTicketService {
         } & {
             id: string;
             createdAt: Date;
-            message: string;
             ticketId: string;
+            message: string;
             readAt: Date | null;
             isInternal: boolean;
             senderId: string;
@@ -229,8 +229,8 @@ export declare class SupportTicketService {
     static replyToTicket(ticketId: string, senderId: string, senderType: 'USER' | 'AGENT', message: string, isInternal?: boolean): Promise<{
         id: string;
         createdAt: Date;
-        message: string;
         ticketId: string;
+        message: string;
         readAt: Date | null;
         isInternal: boolean;
         senderId: string;

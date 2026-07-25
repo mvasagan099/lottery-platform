@@ -45,6 +45,7 @@ const client_1 = require("@prisma/client");
 const argon2_1 = __importDefault(require("argon2"));
 const dotenv = __importStar(require("dotenv"));
 const path = __importStar(require("path"));
+const crypto_1 = __importDefault(require("crypto"));
 dotenv.config({ path: path.resolve(__dirname, '.env') });
 const prisma = new client_1.PrismaClient();
 async function main() {
@@ -391,6 +392,7 @@ async function main() {
         await prisma.prizeDivision.deleteMany({ where: { gameId: createdGame.id } });
         await prisma.prizeDivision.createMany({
             data: prizeDivisions.map((div) => ({
+                id: crypto_1.default.randomUUID(),
                 ...div,
                 gameId: createdGame.id,
             })),
@@ -495,7 +497,10 @@ async function main() {
         { question: 'How are prizes paid?', answer: 'Prizes are automatically credited to your wallet after a draw is completed. You can then withdraw to your bank account.', category: 'Prizes', sortOrder: 1 },
         { question: 'Is my information secure?', answer: 'Yes. We use industry-standard encryption (SSL/TLS), two-factor authentication, and are fully compliant with global privacy laws.', category: 'Security', sortOrder: 1 },
     ];
-    await prisma.fAQ.createMany({ data: faqs, skipDuplicates: true });
+    await prisma.fAQ.createMany({
+        data: faqs.map(faq => ({ ...faq, id: crypto_1.default.randomUUID() })),
+        skipDuplicates: true
+    });
     console.log('✅ FAQs seeded');
     // ── CMS Pages ───────────────────────────────────────────────────────────────
     const pages = [

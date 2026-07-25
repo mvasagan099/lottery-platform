@@ -1,5 +1,6 @@
 import { FastifyInstance } from 'fastify';
 import { prisma } from '../server';
+import crypto from 'crypto';
 
 export default async function rbacRoutes(app: FastifyInstance) {
   
@@ -145,6 +146,7 @@ export default async function rbacRoutes(app: FastifyInstance) {
           prisma.rolePermission.deleteMany({ where: { roleId: id } }),
           prisma.rolePermission.createMany({
             data: permissionIds.map(permId => ({
+              id: crypto.randomUUID(),
               roleId: id,
               permissionId: permId,
             })),

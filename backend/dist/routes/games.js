@@ -4,11 +4,16 @@
  * - Game listings, details, draws, prize divisions
  * - Ticket purchase flow
  */
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.default = gameRoutes;
 const zod_1 = require("zod");
 const server_1 = require("../server");
 const auth_1 = require("../middleware/auth");
+const affiliate_1 = require("../services/affiliate");
+const crypto_1 = __importDefault(require("crypto"));
 const purchaseSchema = zod_1.z.object({
     gameId: zod_1.z.string(),
     drawId: zod_1.z.string().optional(),
@@ -280,6 +285,8 @@ async function gameRoutes(app) {
                 data: { ticketId: ticket.id, gameSlug: game.slug },
             },
         });
+        // Process affiliate commission for ticket purchase
+        (0, affiliate_1.processAffiliateCommission)({ referredUserId: userId, type: 'TICKET_PURCHASE', amount: totalCost }).catch(console.error);
         return reply.status(201).send({
             success: true,
             message: 'Ticket purchased successfully',
@@ -310,7 +317,7 @@ async function gameRoutes(app) {
             const nums = shuffleArray(Array.from({ length: game.numberPool }, (_, i) => i + 1)).slice(0, game.minNumbers).sort((a, b) => a - b);
             const result = { numbers: nums };
             if (game.hasPowerball && game.powerballPool) {
-                result.powerball = Math.ceil(Math.random() * game.powerballPool);
+                result.powerball = crypto_1.default.randomInt(1, game.powerballPool + 1);
             }
             return result;
         });
@@ -319,12 +326,12 @@ async function gameRoutes(app) {
 }
 function generateTicketNumber() {
     const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-    return Array.from({ length: 12 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+    return Array.from({ length: 12 }, () => chars[crypto_1.default.randomInt(0, chars.length)]).join('');
 }
 function shuffleArray(arr) {
     const a = [...arr];
     for (let i = a.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
+        const j = crypto_1.default.randomInt(0, i + 1);
         [a[i], a[j]] = [a[j], a[i]];
     }
     return a;

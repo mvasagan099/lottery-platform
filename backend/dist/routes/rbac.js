@@ -1,7 +1,11 @@
 "use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.default = rbacRoutes;
 const server_1 = require("../server");
+const crypto_1 = __importDefault(require("crypto"));
 async function rbacRoutes(app) {
     // ── Roles ─────────────────────────────────────────────────────────────
     // Get all roles with their assigned users count and permission count
@@ -129,6 +133,7 @@ async function rbacRoutes(app) {
                 server_1.prisma.rolePermission.deleteMany({ where: { roleId: id } }),
                 server_1.prisma.rolePermission.createMany({
                     data: permissionIds.map(permId => ({
+                        id: crypto_1.default.randomUUID(),
                         roleId: id,
                         permissionId: permId,
                     })),

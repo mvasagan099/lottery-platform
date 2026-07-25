@@ -35,12 +35,16 @@ async function affiliateRoutes(app) {
             where: { id: userId },
             select: { referralCode: true },
         });
+        const realTotalSignups = await server_1.prisma.user.count({
+            where: { referredById: userId },
+        });
         return reply.send({
             success: true,
             data: {
                 ...affiliate,
+                totalSignups: Math.max(affiliate.totalSignups, realTotalSignups),
                 referralCode: user?.referralCode,
-                referralLink: `${process.env.FRONTEND_URL}?ref=${user?.referralCode}`,
+                referralLink: `${process.env.FRONTEND_URL}/register?ref=${user?.referralCode}`,
             },
         });
     });
@@ -130,6 +134,9 @@ async function affiliateRoutes(app) {
             }),
         ]);
         const monthlyEarnings = recentCommissions.reduce((s, c) => s + Number(c.amount), 0);
+        const realTotalSignups = await server_1.prisma.user.count({
+            where: { referredById: userId },
+        });
         return reply.send({
             success: true,
             data: {
@@ -137,7 +144,7 @@ async function affiliateRoutes(app) {
                 totalPaid: affiliate.totalPaid,
                 pendingAmount: affiliate.pendingAmount,
                 totalClicks: affiliate.totalClicks,
-                totalSignups: affiliate.totalSignups,
+                totalSignups: Math.max(affiliate.totalSignups, realTotalSignups),
                 totalDeposits: affiliate.totalDeposits,
                 commissionRate: affiliate.commissionRate,
                 monthlyEarnings,
@@ -147,7 +154,129 @@ async function affiliateRoutes(app) {
         });
     });
     // ── Admin Affiliate Management ─────────────────────────────────────────────
-    // GET /affiliates/admin/all - List all affiliates (admin)
+    // GET /affiliates/admin - List all affiliates & summary stats (admin)
+    app.get('/admin', {
+        preHandler: [auth_1.authenticate, auth_1.requireAdmin],
+    }, async (request, reply) => {
+        const { page = '1', limit = '10', search, status, sortField = 'createdAt', sortDir = 'desc' } = request.query;
+        const skip = (Number(page) - 1) * Number(limit);
+        const where = {};
+        if (status === 'ACTIVE')
+            where.isActive = true;
+        if (status === 'SUSPENDED')
+            where.isActive = false;
+        if (search) {
+            where.OR = [
+                { affiliateCode: { contains: search, mode: 'insensitive' } },
+                { user: { email: { contains: search, mode: 'insensitive' } } },
+                { user: { username: { contains: search, mode: 'insensitive' } } },
+            ];
+        }
+        const orderBy = {};
+        orderBy[sortField] = sortDir;
+        const [affiliates, total, totalCount, activeCount, aggregates] = await Promise.all([
+            server_1.prisma.affiliateAccount.findMany({
+                where,
+                skip,
+                take: Number(limit),
+                orderBy,
+                include: {
+                    user: { select: { email: true, username: true, firstName: true, lastName: true } },
+                },
+            }),
+            server_1.prisma.affiliateAccount.count({ where }),
+            server_1.prisma.affiliateAccount.count(),
+            server_1.prisma.affiliateAccount.count({ where: { isActive: true } }),
+            server_1.prisma.affiliateAccount.aggregate({
+                _sum: { totalEarned: true, pendingAmount: true },
+            }),
+        ]);
+        return reply.send({
+            success: true,
+            data: affiliates,
+            stats: {
+                totalAffiliates: totalCount,
+                activeAffiliates: activeCount,
+                totalEarned: Number(aggregates._sum.totalEarned || 0),
+                totalPending: Number(aggregates._sum.pendingAmount || 0),
+            },
+            pagination: {
+                page: Number(page),
+                limit: Number(limit),
+                total,
+                pages: Math.ceil(total / Number(limit)),
+            },
+        });
+    });
+    // GET /affiliates/admin/:id - Single affiliate details (admin)
+    app.get('/admin/:id', {
+        preHandler: [auth_1.authenticate, auth_1.requireAdmin],
+    }, async (request, reply) => {
+        const { id } = request.params;
+        const affiliate = await server_1.prisma.affiliateAccount.findUnique({
+            where: { id },
+            include: {
+                user: { select: { email: true, username: true, firstName: true, lastName: true, phone: true, country: true } },
+                commissions: {
+                    orderBy: { createdAt: 'desc' },
+                    take: 50,
+                },
+            },
+        });
+        if (!affiliate) {
+            return reply.status(404).send({ success: false, error: 'Affiliate not found' });
+        }
+        const realTotalSignups = await server_1.prisma.user.count({
+            where: { referredById: affiliate.userId },
+        });
+        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+        return reply.send({
+            success: true,
+            data: {
+                ...affiliate,
+                totalSignups: Math.max(affiliate.totalSignups, realTotalSignups),
+                referralLink: `${frontendUrl}/register?ref=${affiliate.affiliateCode}`,
+            },
+        });
+    });
+    // PATCH /affiliates/admin/:id - Update affiliate settings/status (admin)
+    app.patch('/admin/:id', {
+        preHandler: [auth_1.authenticate, auth_1.requireAdmin],
+    }, async (request, reply) => {
+        const { id } = request.params;
+        const { commissionRate, isActive } = request.body;
+        const data = {};
+        if (commissionRate !== undefined) {
+            if (commissionRate < 0 || commissionRate > 100) {
+                return reply.status(400).send({ success: false, error: 'Rate must be between 0 and 100' });
+            }
+            data.commissionRate = commissionRate;
+        }
+        if (isActive !== undefined) {
+            data.isActive = isActive;
+        }
+        const affiliate = await server_1.prisma.affiliateAccount.update({
+            where: { id },
+            data,
+        });
+        return reply.send({ success: true, message: 'Affiliate updated successfully', data: affiliate });
+    });
+    // POST /affiliates/admin/bulk-action - Bulk activate/suspend affiliates (admin)
+    app.post('/admin/bulk-action', {
+        preHandler: [auth_1.authenticate, auth_1.requireAdmin],
+    }, async (request, reply) => {
+        const { recordIds, action } = request.body;
+        if (!recordIds || recordIds.length === 0) {
+            return reply.status(400).send({ success: false, error: 'No records selected' });
+        }
+        const isActive = action === 'ACTIVATE';
+        await server_1.prisma.affiliateAccount.updateMany({
+            where: { id: { in: recordIds } },
+            data: { isActive },
+        });
+        return reply.send({ success: true, message: `Successfully updated ${recordIds.length} affiliates` });
+    });
+    // GET /affiliates/admin/all - List all affiliates (legacy admin route)
     app.get('/admin/all', {
         preHandler: [auth_1.authenticate, auth_1.requireAdmin],
     }, async (request, reply) => {

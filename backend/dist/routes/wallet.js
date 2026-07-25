@@ -3,18 +3,53 @@
  * Wallet Routes
  * - Balance, deposits, withdrawals, transaction history
  */
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.default = walletRoutes;
 const zod_1 = require("zod");
 const server_1 = require("../server");
 const auth_1 = require("../middleware/auth");
+const affiliate_1 = require("../services/affiliate");
 const depositSchema = zod_1.z.object({
-    amount: zod_1.z.number().positive().min(10).max(10000),
+    amount: zod_1.z.number().positive(),
     gateway: zod_1.z.enum(['STRIPE', 'PAYPAL', 'BANK_TRANSFER', 'CRYPTO']),
     paymentMethodId: zod_1.z.string().optional(),
 });
+const otplib = __importStar(require("otplib"));
 const withdrawalSchema = zod_1.z.object({
-    amount: zod_1.z.number().positive().min(10).max(50000),
+    amount: zod_1.z.number().positive(),
     gateway: zod_1.z.enum(['STRIPE', 'PAYPAL', 'BANK_TRANSFER']),
     accountDetails: zod_1.z.object({
         accountName: zod_1.z.string(),
@@ -22,10 +57,32 @@ const withdrawalSchema = zod_1.z.object({
         bsb: zod_1.z.string().optional(),
         paypalEmail: zod_1.z.string().email().optional(),
     }),
+    totp: zod_1.z.string().optional(),
 });
 const redeemSchema = zod_1.z.object({
     code: zod_1.z.string().min(3).max(50),
 });
+async function getWalletSettings() {
+    const defaultWallet = {
+        minDeposit: 10,
+        maxDeposit: 10000,
+        minWithdrawal: 10,
+        maxWithdrawal: 50000,
+        dailyDepositLimit: 20000,
+        dailyWithdrawalLimit: 100000,
+        bonusWalletEnabled: true,
+    };
+    try {
+        const setting = await server_1.prisma.systemSetting.findUnique({ where: { category: 'wallet' } });
+        if (setting && setting.data && typeof setting.data === 'object') {
+            return { ...defaultWallet, ...setting.data };
+        }
+    }
+    catch (err) {
+        console.error('Error fetching wallet settings:', err);
+    }
+    return defaultWallet;
+}
 async function walletRoutes(app) {
     // GET /wallet - Get wallet info
     app.get('/', { preHandler: auth_1.authenticate }, async (request, reply) => {
@@ -95,9 +152,33 @@ async function walletRoutes(app) {
     }, async (request, reply) => {
         const body = depositSchema.parse(request.body);
         const userId = request.user.userId;
+        const walletSettings = await getWalletSettings();
+        if (body.amount < walletSettings.minDeposit) {
+            return reply.status(400).send({ success: false, error: `Minimum deposit amount is $${walletSettings.minDeposit}` });
+        }
+        if (body.amount > walletSettings.maxDeposit) {
+            return reply.status(400).send({ success: false, error: `Maximum deposit amount per transaction is $${walletSettings.maxDeposit}` });
+        }
         const wallet = await server_1.prisma.wallet.findUnique({ where: { userId } });
         if (!wallet)
             return reply.status(404).send({ success: false, error: 'Wallet not found' });
+        // Check daily deposit limit (last 24h)
+        const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+        const dailyDepositSum = await server_1.prisma.deposit.aggregate({
+            where: {
+                walletId: wallet.id,
+                createdAt: { gte: oneDayAgo },
+                status: { in: ['COMPLETED', 'PENDING'] },
+            },
+            _sum: { amount: true },
+        });
+        const totalDepositedToday = Number(dailyDepositSum._sum.amount || 0);
+        if (totalDepositedToday + body.amount > walletSettings.dailyDepositLimit) {
+            return reply.status(400).send({
+                success: false,
+                error: `Daily deposit limit of $${walletSettings.dailyDepositLimit} exceeded. (Already deposited $${totalDepositedToday.toFixed(2)} in last 24h)`,
+            });
+        }
         // Create pending deposit
         const deposit = await server_1.prisma.deposit.create({
             data: {
@@ -191,7 +272,37 @@ async function walletRoutes(app) {
                 message: `$${deposit.amount} USD has been added to your wallet.`,
             },
         });
+        // Process affiliate commission for deposit
+        (0, affiliate_1.processAffiliateCommission)({ referredUserId: userId, type: 'DEPOSIT', amount: Number(deposit.amount) }).catch(console.error);
         return reply.send({ success: true, message: 'Deposit confirmed' });
+    });
+    // POST /wallet/request-email-otp - Request OTP for withdrawals/transfers
+    app.post('/request-email-otp', {
+        preHandler: [auth_1.authenticate, auth_1.requireVerifiedEmail],
+        config: { rateLimit: { max: 3, timeWindow: '5 minutes' } },
+    }, async (request, reply) => {
+        const userId = request.user.userId;
+        const user = await server_1.prisma.user.findUnique({ where: { id: userId } });
+        if (!user)
+            return reply.status(404).send({ success: false, error: 'User not found' });
+        const { randomInt } = require('crypto');
+        const code = randomInt(100000, 1000000).toString();
+        await server_1.redis.set(`email_otp:${userId}:withdraw`, code, 'EX', 300);
+        console.log(`\n\n🔑 [TESTING] WALLET WITHDRAW OTP CODE FOR ${user.email}: ${code}\n\n`);
+        try {
+            const { sendEmail } = require('../services/email');
+            await sendEmail({
+                to: user.email,
+                subject: 'MegaDraw Wallet Verification Code',
+                template: 'email-otp',
+                data: { name: user.firstName, action: 'wallet transfer or withdrawal', code },
+            });
+        }
+        catch (e) {
+            console.error('Failed to send OTP:', e);
+            return reply.status(500).send({ success: false, error: 'Failed to send verification email' });
+        }
+        return reply.send({ success: true, message: 'Verification code sent to email' });
     });
     // POST /wallet/withdraw - Request withdrawal
     app.post('/withdraw', {
@@ -200,6 +311,37 @@ async function walletRoutes(app) {
     }, async (request, reply) => {
         const body = withdrawalSchema.parse(request.body);
         const userId = request.user.userId;
+        const walletSettings = await getWalletSettings();
+        if (body.amount < walletSettings.minWithdrawal) {
+            return reply.status(400).send({ success: false, error: `Minimum withdrawal amount is $${walletSettings.minWithdrawal}` });
+        }
+        if (body.amount > walletSettings.maxWithdrawal) {
+            return reply.status(400).send({ success: false, error: `Maximum withdrawal amount per transaction is $${walletSettings.maxWithdrawal}` });
+        }
+        const user = await server_1.prisma.user.findUnique({
+            where: { id: userId },
+            select: { email: true, kycStatus: true, twoFactorEnabled: true, twoFactorSecret: true }
+        });
+        if (!user)
+            return reply.status(404).send({ success: false, error: 'User not found' });
+        let valid = false;
+        const cachedOtp = await server_1.redis.get(`email_otp:${userId}:withdraw`);
+        if (cachedOtp && cachedOtp === body.totp) {
+            valid = true;
+            await server_1.redis.del(`email_otp:${userId}:withdraw`);
+        }
+        else if (user.twoFactorEnabled && user.twoFactorSecret) {
+            if (!body.totp) {
+                return reply.status(400).send({ success: false, error: '2FA code is required', code: '2FA_REQUIRED' });
+            }
+            valid = otplib.authenticator.verify({ token: body.totp, secret: user.twoFactorSecret });
+        }
+        else {
+            return reply.status(403).send({ success: false, error: 'You must enable 2-Step Verification or request an Email OTP before withdrawing funds.', code: '2FA_SETUP_REQUIRED' });
+        }
+        if (!valid) {
+            return reply.status(400).send({ success: false, error: 'Invalid verification code' });
+        }
         const wallet = await server_1.prisma.wallet.findUnique({
             where: { userId },
             select: { id: true, balance: true },
@@ -212,12 +354,25 @@ async function walletRoutes(app) {
                 error: 'Insufficient balance for withdrawal',
             });
         }
-        // Check KYC
-        const user = await server_1.prisma.user.findUnique({
-            where: { id: userId },
-            select: { kycStatus: true },
+        // Check daily withdrawal limit (last 24h)
+        const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+        const dailyWithdrawalSum = await server_1.prisma.withdrawal.aggregate({
+            where: {
+                walletId: wallet.id,
+                createdAt: { gte: oneDayAgo },
+                status: { in: ['COMPLETED', 'PENDING'] },
+            },
+            _sum: { amount: true },
         });
-        if (user?.kycStatus !== 'APPROVED') {
+        const totalWithdrawnToday = Number(dailyWithdrawalSum._sum.amount || 0);
+        if (totalWithdrawnToday + body.amount > walletSettings.dailyWithdrawalLimit) {
+            return reply.status(400).send({
+                success: false,
+                error: `Daily withdrawal limit of $${walletSettings.dailyWithdrawalLimit} exceeded. (Already requested $${totalWithdrawnToday.toFixed(2)} in last 24h)`,
+            });
+        }
+        // Check KYC
+        if (user.kycStatus !== 'APPROVED') {
             return reply.status(403).send({
                 success: false,
                 error: 'Please complete KYC verification before withdrawing funds',
@@ -265,15 +420,34 @@ async function walletRoutes(app) {
     }, async (request, reply) => {
         const transferSchema = zod_1.z.object({
             amount: zod_1.z.number().positive().min(1),
+            totp: zod_1.z.string().optional(),
         });
         const body = transferSchema.parse(request.body);
         const userId = request.user.userId;
         const user = await server_1.prisma.user.findUnique({
             where: { id: userId },
-            select: { email: true, kycStatus: true }
+            select: { email: true, kycStatus: true, twoFactorEnabled: true, twoFactorSecret: true }
         });
         if (!user)
             return reply.status(404).send({ success: false, error: 'User not found' });
+        let valid = false;
+        const cachedOtp = await server_1.redis.get(`email_otp:${userId}:withdraw`);
+        if (cachedOtp && cachedOtp === body.totp) {
+            valid = true;
+            await server_1.redis.del(`email_otp:${userId}:withdraw`);
+        }
+        else if (user.twoFactorEnabled && user.twoFactorSecret) {
+            if (!body.totp) {
+                return reply.status(400).send({ success: false, error: '2FA code is required', code: '2FA_REQUIRED' });
+            }
+            valid = otplib.authenticator.verify({ token: body.totp, secret: user.twoFactorSecret });
+        }
+        else {
+            return reply.status(403).send({ success: false, error: 'You must enable 2-Step Verification or request an Email OTP before transferring funds.', code: '2FA_SETUP_REQUIRED' });
+        }
+        if (!valid) {
+            return reply.status(400).send({ success: false, error: 'Invalid verification code' });
+        }
         if (user.kycStatus !== 'APPROVED') {
             return reply.status(403).send({
                 success: false,
@@ -476,6 +650,17 @@ async function walletRoutes(app) {
                     data: {
                         balance: { increment: amount },
                         totalDeposited: { increment: amount },
+                    },
+                });
+                // Create deposit record so it appears on Admin Wallet & Deposits page
+                await tx.deposit.create({
+                    data: {
+                        walletId: wallet.id,
+                        amount,
+                        gateway: 'STRIPE',
+                        gatewayRef: `CPN-${codeUpper}`,
+                        status: 'COMPLETED',
+                        processedAt: new Date(),
                     },
                 });
                 // Log transaction

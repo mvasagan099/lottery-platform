@@ -1,7 +1,11 @@
 "use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 const client_1 = require("@prisma/client");
 const auth_1 = require("../middleware/auth");
+const crypto_1 = __importDefault(require("crypto"));
 const prisma = new client_1.PrismaClient();
 const cmsRoutes = async (app) => {
     // ── Pages Management ──────────────────────────────────────────────────────
@@ -139,8 +143,8 @@ const cmsRoutes = async (app) => {
             d.setDate(d.getDate() - (6 - i));
             return {
                 date: d.toLocaleDateString('en-US', { weekday: 'short' }),
-                views: Math.floor(Math.random() * 5000) + 1000,
-                conversions: Math.floor(Math.random() * 200) + 50
+                views: crypto_1.default.randomInt(1000, 6000),
+                conversions: crypto_1.default.randomInt(50, 250)
             };
         });
         return reply.send({

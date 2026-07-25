@@ -1006,6 +1006,7 @@ export default async function adminRoutes(app: FastifyInstance) {
       if (divisions && divisions.length > 0) {
         await tx.prizeDivision.createMany({
           data: divisions.map((div, i) => ({
+            id: crypto.randomUUID(),
             gameId: id,
             divisionName: div.divisionName,
             divisionOrder: div.divisionOrder ?? i + 1,

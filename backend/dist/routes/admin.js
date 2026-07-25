@@ -14,6 +14,7 @@ const auth_1 = require("../middleware/auth");
 const cms_1 = __importDefault(require("./cms"));
 const adminSupport_1 = __importDefault(require("./adminSupport"));
 const jackpot_1 = __importDefault(require("./jackpot"));
+const crypto_1 = __importDefault(require("crypto"));
 async function adminRoutes(app) {
     // All admin routes require authentication + admin role
     app.addHook('preHandler', auth_1.authenticate);
@@ -597,7 +598,7 @@ async function adminRoutes(app) {
                     amount: type === 'DEBIT' ? -amount : amount,
                     balanceBefore,
                     balanceAfter,
-                    reference: `ADJ-${Math.random().toString(36).substring(2, 10).toUpperCase()}`,
+                    reference: `ADJ-${crypto_1.default.randomBytes(4).toString('hex').toUpperCase()}`,
                     description: `Admin Adjustment: ${reason}`
                 }
             });
@@ -624,15 +625,36 @@ async function adminRoutes(app) {
         return reply.send({ success: true, message: 'Draw scheduled successfully', data: draw });
     });
     app.get('/draws', async (request, reply) => {
-        const { page = '1', limit = '10', search, status, sortField = 'scheduledAt', sortDir = 'desc' } = request.query;
+        const { page = '1', limit = '10', search, status, hideCompleted, sortField, sortDir } = request.query;
         const skip = (Number(page) - 1) * Number(limit);
         const where = {};
-        if (status)
+        if (status) {
             where.status = status;
+        }
+        else if (hideCompleted === 'true') {
+            where.status = { not: 'COMPLETED' };
+        }
         if (search) {
             where.OR = [
                 { id: { contains: search, mode: 'insensitive' } },
                 { game: { name: { contains: search, mode: 'insensitive' } } },
+            ];
+        }
+        let orderBy = [];
+        if (sortField && sortDir) {
+            orderBy = [{ [sortField]: sortDir }];
+        }
+        else if (status === 'SCHEDULED') {
+            orderBy = [{ scheduledAt: 'asc' }];
+        }
+        else if (status === 'COMPLETED') {
+            orderBy = [{ scheduledAt: 'desc' }];
+        }
+        else {
+            // Default order: SCHEDULED draws first (scheduledAt asc), then IN_PROGRESS, then COMPLETED (scheduledAt desc)
+            orderBy = [
+                { status: 'desc' }, // 'SCHEDULED' > 'IN_PROGRESS' > 'COMPLETED' in string comparison
+                { scheduledAt: 'asc' },
             ];
         }
         const [records, total, totalDraws, liveDraws, scheduledDraws, totalSales] = await Promise.all([
@@ -640,7 +662,7 @@ async function adminRoutes(app) {
                 where,
                 skip,
                 take: Number(limit),
-                orderBy: { [sortField]: sortDir },
+                orderBy,
                 include: {
                     game: { select: { name: true, slug: true, badgeText: true } },
                     _count: { select: { tickets: true } }
@@ -877,6 +899,7 @@ async function adminRoutes(app) {
             if (divisions && divisions.length > 0) {
                 await tx.prizeDivision.createMany({
                     data: divisions.map((div, i) => ({
+                        id: crypto_1.default.randomUUID(),
                         gameId: id,
                         divisionName: div.divisionName,
                         divisionOrder: div.divisionOrder ?? i + 1,
