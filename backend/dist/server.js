@@ -54,6 +54,7 @@ const swagger_1 = __importDefault(require("@fastify/swagger"));
 const swagger_ui_1 = __importDefault(require("@fastify/swagger-ui"));
 const client_1 = require("@prisma/client");
 const ioredis_1 = __importDefault(require("ioredis"));
+const crypto_1 = __importDefault(require("crypto"));
 // Route imports
 const auth_1 = __importDefault(require("./routes/auth"));
 const users_1 = __importDefault(require("./routes/users"));
@@ -197,6 +198,39 @@ async function buildApp() {
     });
     return app;
 }
+async function seedPermissionsIfNeeded() {
+    try {
+        const count = await exports.prisma.permission.count();
+        if (count === 0) {
+            const MODULES = [
+                'Dashboard', 'Reports', 'Users', 'KYC', 'Wallets', 'Deposits', 'Withdrawals',
+                'Games', 'Draws', 'Results', 'Jackpots', 'Affiliates', 'CMS', 'Promotions',
+                'Support', 'Audit Logs', 'Analytics', 'Notifications', 'Settings', 'API Keys', 'Backups'
+            ];
+            const ACTIONS = [
+                'View', 'Create', 'Edit', 'Delete', 'Approve', 'Reject', 'Export', 'Import', 'Manage', 'Assign', 'Configure'
+            ];
+            const permissionsToCreate = [];
+            for (const module of MODULES) {
+                for (const action of ACTIONS) {
+                    permissionsToCreate.push({
+                        id: crypto_1.default.randomUUID(),
+                        module,
+                        action,
+                        description: `Allows ${action} on ${module}`
+                    });
+                }
+            }
+            await exports.prisma.permission.createMany({
+                data: permissionsToCreate
+            });
+            console.log(`[Startup] Seeded ${permissionsToCreate.length} system permissions.`);
+        }
+    }
+    catch (error) {
+        console.error('[Startup] Failed to auto-seed permissions:', error);
+    }
+}
 // Start server
 async function start() {
     const app = await buildApp();
@@ -204,6 +238,7 @@ async function start() {
     const host = process.env.HOST || '0.0.0.0';
     try {
         await exports.redis.connect();
+        await seedPermissionsIfNeeded();
         await app.listen({ port, host });
         app.log.info(`🚀 Server running on http://${host}:${port}`);
         app.log.info(`📚 API docs: http://${host}:${port}/docs`);

@@ -17,6 +17,7 @@ import swagger from '@fastify/swagger'
 import swaggerUi from '@fastify/swagger-ui'
 import { PrismaClient } from '@prisma/client'
 import Redis from 'ioredis'
+import crypto from 'crypto'
 
 // Route imports
 import authRoutes from './routes/auth'
@@ -181,6 +182,41 @@ async function buildApp() {
   return app
 }
 
+async function seedPermissionsIfNeeded() {
+  try {
+    const count = await prisma.permission.count()
+    if (count === 0) {
+      const MODULES = [
+        'Dashboard', 'Reports', 'Users', 'KYC', 'Wallets', 'Deposits', 'Withdrawals', 
+        'Games', 'Draws', 'Results', 'Jackpots', 'Affiliates', 'CMS', 'Promotions', 
+        'Support', 'Audit Logs', 'Analytics', 'Notifications', 'Settings', 'API Keys', 'Backups'
+      ]
+      const ACTIONS = [
+        'View', 'Create', 'Edit', 'Delete', 'Approve', 'Reject', 'Export', 'Import', 'Manage', 'Assign', 'Configure'
+      ]
+      
+      const permissionsToCreate = []
+      for (const module of MODULES) {
+        for (const action of ACTIONS) {
+          permissionsToCreate.push({
+            id: crypto.randomUUID(),
+            module,
+            action,
+            description: `Allows ${action} on ${module}`
+          })
+        }
+      }
+
+      await prisma.permission.createMany({
+        data: permissionsToCreate
+      })
+      console.log(`[Startup] Seeded ${permissionsToCreate.length} system permissions.`)
+    }
+  } catch (error) {
+    console.error('[Startup] Failed to auto-seed permissions:', error)
+  }
+}
+
 // Start server
 async function start() {
   const app = await buildApp()
@@ -189,6 +225,7 @@ async function start() {
 
   try {
     await redis.connect()
+    await seedPermissionsIfNeeded()
     await app.listen({ port, host })
     app.log.info(`🚀 Server running on http://${host}:${port}`)
     app.log.info(`📚 API docs: http://${host}:${port}/docs`)
