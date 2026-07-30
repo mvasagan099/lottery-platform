@@ -13,6 +13,32 @@ import adminSupportRoutes from './adminSupport'
 import jackpotRoutes from './jackpot'
 import crypto from 'crypto'
 
+// MED-1: Explicit Zod whitelist for Banner fields — prevents mass-assignment
+// against any unexpected columns on the Prisma Banner model.
+const bannerSchema = z.object({
+  title:       z.string().min(1).max(200),
+  subtitle:    z.string().max(500).optional(),
+  imageUrl:    z.string().url().optional(),
+  linkUrl:     z.string().url().optional(),
+  buttonText:  z.string().max(50).optional(),
+  isActive:    z.boolean().optional(),
+  sortOrder:   z.number().int().min(0).optional(),
+  type:        z.string().max(50).optional(),
+})
+
+// MED-1: Allowed setting keys for PATCH /settings.
+// Any key not in this list will be silently ignored, preventing an operator
+// from writing arbitrary configuration into the settings store.
+const ALLOWED_SETTING_KEYS = new Set([
+  'siteName', 'siteUrl', 'supportEmail', 'maintenanceMode',
+  'minDeposit', 'maxDeposit', 'minWithdrawal', 'maxWithdrawal',
+  'dailyDepositLimit', 'dailyWithdrawalLimit', 'bonusWalletEnabled',
+  'kycRequired', 'defaultCurrency', 'maxTicketsPerDraw',
+  'referralBonusAmount', 'welcomeBonusAmount', 'emailNotifications',
+  'smsNotifications', 'pushNotifications', 'affiliateEnabled',
+  'registrationEnabled', 'twoFactorRequired',
+])
+
 export default async function adminRoutes(app: FastifyInstance) {
 
   // All admin routes require authentication + admin role/permissions check
@@ -48,10 +74,19 @@ export default async function adminRoutes(app: FastifyInstance) {
     }
 
     // 3. Resolve action from HTTP method
+    // MED-3 FIX: Non-CRUD POST routes (approve, reject, bulk actions, etc.) are
+    // semantically 'Edit' operations, not 'Create'. Map them by URL pattern before
+    // falling back to the generic verb->action mapping.
     let action = 'View'
-    if (request.method === 'POST') action = 'Create'
-    else if (request.method === 'PUT' || request.method === 'PATCH') action = 'Edit'
-    else if (request.method === 'DELETE') action = 'Delete'
+    if (request.method === 'PUT' || request.method === 'PATCH') {
+      action = 'Edit'
+    } else if (request.method === 'DELETE') {
+      action = 'Delete'
+    } else if (request.method === 'POST') {
+      // Routes that act on existing resources (not creating new ones)
+      const nonCrudPostPatterns = /\/(approve|reject|bulk|enable|disable|toggle|cancel|process|review|resolve|close|escalate|assign|ban|unban|suspend|activate)(\/?|\/.+)?$/i
+      action = nonCrudPostPatterns.test(request.url) ? 'Edit' : 'Create'
+    }
 
     // 4. Check database for permission
     const userMappings = await prisma.userRoleMapping.findMany({
@@ -1161,15 +1196,23 @@ export default async function adminRoutes(app: FastifyInstance) {
     return reply.send({ success: true, data: settings })
   })
 
+  // MED-1: Filter request body to only allowed keys before upserting.
+  // An operator with Settings:Edit cannot inject arbitrary configuration entries.
   app.patch('/settings', async (request, reply) => {
     const updates = request.body as Record<string, string>
 
+    const allowedUpdates = Object.entries(updates).filter(([key]) => ALLOWED_SETTING_KEYS.has(key))
+
+    if (allowedUpdates.length === 0) {
+      return reply.status(400).send({ success: false, error: 'No valid setting keys provided' })
+    }
+
     await Promise.all(
-      Object.entries(updates).map(([key, value]) =>
+      allowedUpdates.map(([key, value]) =>
         prisma.setting.upsert({
           where: { key },
-          update: { value },
-          create: { key, value },
+          update: { value: String(value) },
+          create: { key, value: String(value) },
         })
       )
     )
@@ -1184,15 +1227,17 @@ export default async function adminRoutes(app: FastifyInstance) {
     return reply.send({ success: true, data: banners })
   })
 
+  // MED-1: Validate banner body against an explicit whitelist schema.
   app.post('/banners', async (request, reply) => {
-    const data = request.body as any
-    const banner = await prisma.banner.create({ data })
+    const data = bannerSchema.parse(request.body)
+    const banner = await prisma.banner.create({ data: data as any })
     return reply.status(201).send({ success: true, data: banner })
   })
 
   app.patch('/banners/:id', async (request, reply) => {
     const { id } = request.params as { id: string }
-    const banner = await prisma.banner.update({ where: { id }, data: request.body as any })
+    const data = bannerSchema.partial().parse(request.body)
+    const banner = await prisma.banner.update({ where: { id }, data: data as any })
     return reply.send({ success: true, data: banner })
   })
 

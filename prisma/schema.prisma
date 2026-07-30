@@ -146,18 +146,21 @@ model User {
 }
 
 model Session {
-  id           String   @id @default(cuid())
-  userId       String
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  token        String   @unique
-  refreshToken String   @unique
-  ipAddress    String?
-  userAgent    String?
-  deviceName   String?
-  isActive     Boolean  @default(true)
-  expiresAt    DateTime
-  createdAt    DateTime @default(now())
-  lastUsedAt   DateTime @default(now())
+  id                String   @id @default(cuid())
+  userId            String
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // HIGH-2: refreshToken is stored as a SHA-256 hash (never plaintext).
+  // The raw token is sent to the client via HttpOnly cookie; only the hash lives in DB.
+  // The redundant plaintext `token` (JWT) column has been dropped — JWTs are
+  // self-verifying and session validity is checked via sessionId in the JWT payload.
+  refreshTokenHash  String   @unique
+  ipAddress         String?
+  userAgent         String?
+  deviceName        String?
+  isActive          Boolean  @default(true)
+  expiresAt         DateTime
+  createdAt         DateTime @default(now())
+  lastUsedAt        DateTime @default(now())
 
   @@map("sessions")
 }
@@ -243,7 +246,10 @@ model Deposit {
   amount      Decimal           @db.Decimal(18, 2)
   currency    String            @default("USD")
   gateway     PaymentGateway
-  gatewayRef  String?
+  // CRIT-2: gatewayRef is unique to prevent double-credit on coupon redemptions.
+  // For coupon redemptions this is set to "CPN-<couponId>" so that a retry or
+  // race condition hits the unique constraint instead of crediting twice.
+  gatewayRef  String?           @unique
   status      TransactionStatus @default(PENDING)
   metadata    Json?
   processedAt DateTime?

@@ -38,6 +38,21 @@ const notifPrefsSchema = z.object({
   smsPromotions: z.boolean().optional(),
 })
 
+// MED-2: Validate PATCH /me body — prevents untyped/oversized fields reaching Prisma.
+// Scoped to the caller's own row only (no IDOR risk), but consistent Zod
+// validation avoids Prisma-level 500s from wrong types and defends in depth.
+const patchMeSchema = z.object({
+  firstName:   z.string().min(1).max(50).optional(),
+  lastName:    z.string().min(1).max(50).optional(),
+  phone:       z.string().max(20).optional().nullable(),
+  country:     z.string().max(80).optional().nullable(),
+  state:       z.string().max(80).optional().nullable(),
+  city:        z.string().max(80).optional().nullable(),
+  address:     z.string().max(200).optional().nullable(),
+  postcode:    z.string().max(20).optional().nullable(),
+  dateOfBirth: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Must be YYYY-MM-DD').optional().nullable(),
+})
+
 export default async function userRoutes(app: FastifyInstance) {
 
   app.get('/me', { preHandler: authenticate }, async (request, reply) => {
@@ -67,12 +82,21 @@ export default async function userRoutes(app: FastifyInstance) {
   })
 
   app.patch('/me', { preHandler: authenticate }, async (request, reply) => {
-    const { firstName, lastName, phone, country, state, city, address, postcode, dateOfBirth } =
-      request.body as any
+    // MED-2: Validate and whitelist all fields before writing to Prisma.
+    const body = patchMeSchema.parse(request.body)
 
-    const updateData: any = { firstName, lastName, phone, country, state, city, address, postcode }
-    if (dateOfBirth) {
-      updateData.dateOfBirth = new Date(dateOfBirth)
+    const updateData: any = {
+      ...(body.firstName   !== undefined && { firstName: body.firstName }),
+      ...(body.lastName    !== undefined && { lastName:  body.lastName  }),
+      ...(body.phone       !== undefined && { phone:     body.phone     }),
+      ...(body.country     !== undefined && { country:   body.country   }),
+      ...(body.state       !== undefined && { state:     body.state     }),
+      ...(body.city        !== undefined && { city:      body.city      }),
+      ...(body.address     !== undefined && { address:   body.address   }),
+      ...(body.postcode    !== undefined && { postcode:  body.postcode  }),
+    }
+    if (body.dateOfBirth) {
+      updateData.dateOfBirth = new Date(body.dateOfBirth)
     }
 
     const user = await prisma.user.update({

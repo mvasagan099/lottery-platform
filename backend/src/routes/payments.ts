@@ -217,29 +217,41 @@ export default async function paymentRoutes(app: FastifyInstance) {
   })
 
   // POST /payments/withdrawals/:id/approve - Approve withdrawal (admin)
+  // HIGH-1 FIX: Use atomic conditional update (updateMany + count check) so that
+  // two concurrent approve clicks cannot both pass the PENDING guard and
+  // double-decrement pendingBalance or inflate totalWithdrawn.
   app.post('/withdrawals/:id/approve', {
     preHandler: [authenticate, requireAdmin],
   }, async (request, reply) => {
     const { id } = request.params as { id: string }
 
+    // Fetch wallet info needed for the transaction log (still outside the tx —
+    // this is just metadata, the atomic guard is inside the transaction).
     const withdrawal = await prisma.withdrawal.findUnique({
       where: { id },
       include: { wallet: true },
     })
 
-    if (!withdrawal || withdrawal.status !== 'PENDING') {
-      return reply.status(400).send({ success: false, error: 'Withdrawal not found or not pending' })
+    if (!withdrawal) {
+      return reply.status(404).send({ success: false, error: 'Withdrawal not found' })
     }
 
     await prisma.$transaction(async (tx) => {
-      await tx.withdrawal.update({
-        where: { id },
+      // Atomic conditional update: only succeeds if status is still PENDING.
+      // If two requests race, only one will find count === 1; the other gets 0
+      // and the transaction is aborted before any wallet mutation.
+      const { count } = await tx.withdrawal.updateMany({
+        where: { id, status: 'PENDING' },
         data: {
           status: 'COMPLETED',
           reviewedById: request.user.userId,
           processedAt: new Date(),
         },
       })
+
+      if (count === 0) {
+        throw Object.assign(new Error('ALREADY_PROCESSED'), { statusCode: 400 })
+      }
 
       const balBefore = Number(withdrawal.wallet.balance) + Number(withdrawal.wallet.pendingBalance)
       const amount = Number(withdrawal.amount)
@@ -265,6 +277,11 @@ export default async function paymentRoutes(app: FastifyInstance) {
           description: `Withdrawal via ${withdrawal.gateway}`,
         },
       })
+    }).catch((err) => {
+      if (err.message === 'ALREADY_PROCESSED') {
+        return reply.status(400).send({ success: false, error: 'Withdrawal is not in PENDING state — already processed or cancelled' })
+      }
+      throw err
     })
 
     await prisma.notification.create({
@@ -278,7 +295,9 @@ export default async function paymentRoutes(app: FastifyInstance) {
     return reply.send({ success: true, message: 'Withdrawal approved and processed' })
   })
 
+
   // POST /payments/withdrawals/:id/reject - Reject withdrawal (admin)
+  // HIGH-1 FIX: Same atomic pattern as approve — no read-then-write TOCTOU.
   app.post('/withdrawals/:id/reject', {
     preHandler: [authenticate, requireAdmin],
   }, async (request, reply) => {
@@ -290,19 +309,24 @@ export default async function paymentRoutes(app: FastifyInstance) {
       include: { wallet: true },
     })
 
-    if (!withdrawal || withdrawal.status !== 'PENDING') {
-      return reply.status(400).send({ success: false, error: 'Withdrawal not found or not pending' })
+    if (!withdrawal) {
+      return reply.status(404).send({ success: false, error: 'Withdrawal not found' })
     }
 
     await prisma.$transaction(async (tx) => {
-      await tx.withdrawal.update({
-        where: { id },
+      // Atomic: only succeeds if withdrawal is still PENDING.
+      const { count } = await tx.withdrawal.updateMany({
+        where: { id, status: 'PENDING' },
         data: {
           status: 'CANCELLED',
           reviewedById: request.user.userId,
           reviewNotes: reason,
         },
       })
+
+      if (count === 0) {
+        throw Object.assign(new Error('ALREADY_PROCESSED'), { statusCode: 400 })
+      }
 
       // Return funds to main balance
       await tx.wallet.update({
@@ -312,6 +336,11 @@ export default async function paymentRoutes(app: FastifyInstance) {
           pendingBalance: { decrement: Number(withdrawal.amount) },
         },
       })
+    }).catch((err) => {
+      if (err.message === 'ALREADY_PROCESSED') {
+        return reply.status(400).send({ success: false, error: 'Withdrawal is not in PENDING state — already processed or cancelled' })
+      }
+      throw err
     })
 
     await prisma.notification.create({

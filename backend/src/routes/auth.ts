@@ -8,13 +8,38 @@
 import { FastifyInstance } from 'fastify'
 import { z } from 'zod'
 import argon2 from 'argon2'
-import { randomBytes, randomInt } from 'crypto'
+import { randomBytes, randomInt, createHash } from 'crypto'
 import * as otplib from 'otplib'
 import { prisma, redis } from '../server'
 import { authenticate, auditLog } from '../middleware/auth'
 import { sendEmail } from '../services/email'
 import { processAffiliateCommission } from '../services/affiliate'
 import { generateQR } from '../utils/qr'
+
+// ── Security helpers ──────────────────────────────────────────────────────────
+
+/**
+ * HIGH-2: Hash a raw token (refresh token) before storing it in the DB.
+ * We store only the SHA-256 digest so that a DB leak does not hand an attacker
+ * ready-to-use 30-day session credentials.
+ */
+function hashToken(raw: string): string {
+  return createHash('sha256').update(raw).digest('hex')
+}
+
+/**
+ * MED-4: Centralized argon2id hashing with consistent work-factor parameters.
+ * Used for all password-set paths (register, reset-password, change-password)
+ * so that tuning in one place is reflected everywhere.
+ */
+async function hashPassword(plaintext: string): Promise<string> {
+  return argon2.hash(plaintext, {
+    type: argon2.argon2id,
+    memoryCost: 65536,  // 64 MiB
+    timeCost: 3,
+    parallelism: 4,
+  })
+}
 
 // ── Validation schemas ────────────────────────────────────────────────────────
 
@@ -265,13 +290,16 @@ export default async function authRoutes(app: FastifyInstance) {
       sessionId,
     })
     const refreshToken = randomBytes(64).toString('hex')
+    // HIGH-2: Store only the SHA-256 hash of the refresh token.
+    // The raw token is sent to the client via HttpOnly cookie; only the hash lives in DB.
+    const refreshTokenHash = hashToken(refreshToken)
 
     await prisma.session.create({
       data: {
         id: sessionId,
         userId: user.id,
-        token: accessToken,
-        refreshToken,
+        // HIGH-2: token (plaintext JWT) column removed — JWTs are self-verifying
+        refreshTokenHash,
         ipAddress: request.ip,
         userAgent: request.headers['user-agent'],
         expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days
@@ -378,8 +406,9 @@ export default async function authRoutes(app: FastifyInstance) {
       return reply.status(401).send({ success: false, error: 'Refresh token required' })
     }
 
+    // HIGH-2: Hash the cookie value before DB lookup so we never store/compare plaintext.
     const session = await prisma.session.findUnique({
-      where: { refreshToken },
+      where: { refreshTokenHash: hashToken(refreshToken) },
       include: { user: { select: { id: true, role: true, status: true } } },
     })
 
@@ -399,7 +428,8 @@ export default async function authRoutes(app: FastifyInstance) {
 
     await prisma.session.update({
       where: { id: session.id },
-      data: { token: newAccessToken, lastUsedAt: new Date() },
+      // HIGH-2: Update lastUsedAt only; no plaintext token stored.
+      data: { lastUsedAt: new Date() },
     })
 
     return reply.send({ success: true, data: { accessToken: newAccessToken } })
@@ -467,13 +497,8 @@ export default async function authRoutes(app: FastifyInstance) {
         referrerId = referrer?.id
       }
 
-      // Hash password
-      const passwordHash = await argon2.hash(body.password, {
-        type: argon2.argon2id,
-        memoryCost: 65536,
-        timeCost: 3,
-        parallelism: 4,
-      })
+      // Hash password using the centralized helper (MED-4)
+      const passwordHash = await hashPassword(body.password)
 
       // Create user with wallet
       const newUser = await prisma.$transaction(async (tx) => {
@@ -553,11 +578,8 @@ export default async function authRoutes(app: FastifyInstance) {
       return reply.status(400).send({ success: false, error: 'Invalid or expired reset link' })
     }
 
-    const passwordHash = await argon2.hash(password, {
-      type: argon2.argon2id,
-      memoryCost: 65536,
-      timeCost: 3,
-    })
+    // MED-4: Use the centralized hashPassword helper for consistent argon2id params
+    const passwordHash = await hashPassword(password)
 
     await prisma.user.update({ where: { id: userId }, data: { passwordHash } })
 
@@ -586,7 +608,8 @@ export default async function authRoutes(app: FastifyInstance) {
       return reply.status(401).send({ success: false, error: 'Current password is incorrect' })
     }
 
-    const passwordHash = await argon2.hash(newPassword, { type: argon2.argon2id })
+    // MED-4: Use centralized hashPassword helper (consistent argon2id params)
+    const passwordHash = await hashPassword(newPassword)
     await prisma.user.update({ where: { id: userId }, data: { passwordHash } })
 
     // Invalidate other sessions

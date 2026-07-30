@@ -707,7 +707,7 @@ export default async function walletRoutes(app: FastifyInstance) {
 
     const codeUpper = body.code.trim().toUpperCase()
 
-    // 1. Verify coupon via external API
+    // STEP 1: Verify coupon exists and is valid (read-only, does not lock)
     const verifyUrl = `${process.env.COUPON_API_URL}/coupons/verify`
     const verifyRes = await fetch(verifyUrl, {
       method: 'POST',
@@ -721,8 +721,13 @@ export default async function walletRoutes(app: FastifyInstance) {
         gameId: 'lottery-platform'
       })
     })
-    
-    const verifyData = await verifyRes.json()
+
+    let verifyData: any
+    try {
+      verifyData = await verifyRes.json()
+    } catch {
+      return reply.status(502).send({ success: false, error: 'Bad Gateway: Coupon service returned invalid response.' })
+    }
 
     if (!verifyRes.ok || !verifyData.success) {
       return reply.status(verifyRes.status === 404 ? 404 : 400).send({
@@ -735,54 +740,10 @@ export default async function walletRoutes(app: FastifyInstance) {
     const amount = Number(verifyData.amount)
     const couponId = verifyData.couponId
 
-    // 2. Credit Wallet
-    let walletTransactionId = '';
-    try {
-      await prisma.$transaction(async (tx) => {
-        const balBefore = Number(wallet.balance)
-
-        // Credit wallet
-        await tx.wallet.update({
-          where: { id: wallet.id },
-          data: {
-            balance: { increment: amount },
-            totalDeposited: { increment: amount },
-          },
-        })
-
-        // Create deposit record so it appears on Admin Wallet & Deposits page
-        await tx.deposit.create({
-          data: {
-            walletId: wallet.id,
-            amount,
-            gateway: 'STRIPE',
-            gatewayRef: `CPN-${codeUpper}`,
-            status: 'COMPLETED',
-            processedAt: new Date(),
-          },
-        })
-
-        // Log transaction
-        const txn = await tx.transaction.create({
-          data: {
-            userId,
-            walletId: wallet.id,
-            type: 'DEPOSIT',
-            status: 'COMPLETED',
-            amount,
-            balanceBefore: balBefore,
-            balanceAfter: balBefore + amount,
-            reference: `CPN-${codeUpper}-${Date.now()}`,
-            description: 'Coupon Redemption',
-          },
-        })
-        walletTransactionId = txn.id;
-      })
-    } catch (err) {
-      return reply.status(500).send({ success: false, error: 'Failed to credit wallet' })
-    }
-
-    // 3. Redeem Coupon on Coupon Service
+    // CRIT-2 FIX: STEP 2 — Atomically redeem on the coupon service FIRST.
+    // The coupon service does SELECT ... FOR UPDATE internally, so only one
+    // concurrent request succeeds; the other gets a clear error here before
+    // we touch the local wallet at all. This is the safe direction to fail in.
     const redeemUrl = `${process.env.COUPON_API_URL}/coupons/redeem`
     const redeemRes = await fetch(redeemUrl, {
       method: 'POST',
@@ -794,24 +755,85 @@ export default async function walletRoutes(app: FastifyInstance) {
         couponId,
         userId,
         gameId: 'lottery-platform',
-        walletTransactionId
+        // walletTransactionId is not available yet — the coupon service uses
+        // couponId for idempotency, not walletTransactionId
       })
     })
 
-    const redeemData = await redeemRes.json()
-
-    if (!redeemRes.ok || !redeemData.success) {
-      // In a robust system, we would queue a compensation transaction here to reverse the wallet credit.
-      // For now, log critically.
-      console.error('CRITICAL: Wallet credited but coupon redemption failed on Coupon Service', {
-        userId, couponId, walletTransactionId, error: redeemData
-      })
-      return reply.status(500).send({ success: false, error: 'Redemption failed during finalization. Contact support.' })
+    let redeemData: any
+    try {
+      redeemData = await redeemRes.json()
+    } catch {
+      return reply.status(502).send({ success: false, error: 'Bad Gateway: Coupon service returned invalid response during redemption.' })
     }
 
-    await auditLog(userId, 'COUPON_REDEEMED', 'Deposit', undefined, undefined, { code: codeUpper, amount }, request)
+    if (!redeemRes.ok || !redeemData.success) {
+      // Nothing was credited locally yet — safe to just return the error.
+      return reply.status(redeemRes.status === 409 ? 409 : 400).send({
+        success: false,
+        code: redeemData.code || 'REDEMPTION_FAILED',
+        error: redeemData.message || 'Coupon could not be redeemed. It may have already been used.'
+      })
+    }
 
-    // Notify user
+    // STEP 3: Credit wallet locally, guarded by a unique constraint on
+    // gatewayRef = "CPN-<couponId>" so a retried or raced request hits
+    // the DB unique constraint and cannot double-credit.
+    const gatewayRef = `CPN-${couponId}`
+    try {
+      await prisma.$transaction(async (tx) => {
+        const balBefore = Number(wallet.balance)
+
+        // This insert will throw a unique-constraint error if the same couponId
+        // was already processed, preventing any double-credit.
+        await tx.deposit.create({
+          data: {
+            walletId: wallet.id,
+            amount,
+            gateway: 'BANK_TRANSFER',
+            gatewayRef,           // unique: prevents double-credit on retry/race
+            status: 'COMPLETED',
+            processedAt: new Date(),
+          },
+        })
+
+        await tx.wallet.update({
+          where: { id: wallet.id },
+          data: {
+            balance: { increment: amount },
+            totalDeposited: { increment: amount },
+          },
+        })
+
+        await tx.transaction.create({
+          data: {
+            userId,
+            walletId: wallet.id,
+            type: 'DEPOSIT',
+            status: 'COMPLETED',
+            amount,
+            balanceBefore: balBefore,
+            balanceAfter: balBefore + amount,
+            reference: `${gatewayRef}-${Date.now()}`,
+            description: 'Coupon Redemption',
+          },
+        })
+      })
+    } catch (err: any) {
+      // Unique constraint violation on gatewayRef means this coupon was already
+      // credited (idempotent safety net). Return success to avoid confusing the user.
+      if (err?.code === 'P2002' || err?.message?.includes('unique')) {
+        console.warn('WARN: Duplicate coupon credit attempt caught by unique constraint', { userId, couponId, gatewayRef })
+        return reply.send({ success: true, message: 'Coupon already redeemed — your balance is up to date.', data: { amount } })
+      }
+      console.error('CRITICAL: Coupon redeemed on coupon service but local wallet credit failed', { userId, couponId, gatewayRef, err })
+      // At this point the coupon IS consumed. The credit failure is retryable;
+      // support can manually credit using the gatewayRef as the audit key.
+      return reply.status(500).send({ success: false, error: 'Redemption recorded but wallet credit failed. Contact support with code: ' + gatewayRef })
+    }
+
+    await auditLog(userId, 'COUPON_REDEEMED', 'Deposit', undefined, undefined, { code: codeUpper, couponId, amount, gatewayRef }, request)
+
     await prisma.notification.create({
       data: {
         userId,
