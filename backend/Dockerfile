@@ -1,4 +1,7 @@
 # Backend Dockerfile - Multi-stage production build
+# NOTE: Build context must be the monorepo ROOT (lottery-platform/),
+#       not the backend/ subdirectory, because package.json and tsconfig.json
+#       live at the root level.
 
 FROM node:20-alpine AS base
 WORKDIR /app
@@ -6,9 +9,10 @@ RUN apk add --no-cache openssl curl
 
 # ── Dependencies stage ──────────────────────────────────────────────────────
 FROM base AS deps
+# Root-level package.json contains ALL dependencies
 COPY package*.json ./
 COPY prisma ./prisma/
-RUN npm ci --only=production && npm install -g prisma
+RUN npm ci --omit=dev
 RUN npx prisma generate
 
 # ── Build stage ─────────────────────────────────────────────────────────────
@@ -29,7 +33,7 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY --from=deps /app/prisma ./prisma
 COPY --from=build /app/backend/dist ./backend/dist
 
-# Copy package.json for runtime
+# Copy root package.json for the start script reference
 COPY package.json ./
 
 # Health check
