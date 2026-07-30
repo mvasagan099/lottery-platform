@@ -490,41 +490,7 @@ export default async function walletRoutes(app: FastifyInstance) {
 
     const transactionId = `TRF-${userId.substring(0, 8)}-${Date.now()}`
 
-    // 1. Send authenticated request to Coupon Platform
-    const transferUrl = `${process.env.COUPON_API_URL}/wallet/transfer`
-    const transferRes = await fetch(transferUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': process.env.COUPON_API_KEY || ''
-      },
-      body: JSON.stringify({
-        userId: userId,
-        userEmail: user.email,
-        amount: body.amount,
-        transactionId: transactionId
-      })
-    })
-
-    let transferData;
-    try {
-      transferData = await transferRes.json();
-    } catch (e) {
-      console.error('Failed to parse Coupon API response:', transferRes.status);
-      return reply.status(502).send({ success: false, error: 'Bad Gateway: Coupon API returned invalid response.' });
-    }
-
-    // Handle idempotency (409 Conflict) or failure
-    if (!transferRes.ok && transferRes.status !== 409) {
-      console.error('Transfer to Coupon Wallet failed:', transferData)
-      return reply.status(400).send({
-        success: false,
-        error: transferData.message || 'Failed to transfer to Coupon Wallet',
-        code: transferData.code || 'TRANSFER_FAILED'
-      })
-    }
-
-    // 2. Deduct from game wallet with row-level lock to prevent double-spend (MED-04)
+    // 1. Deduct from game wallet FIRST to ensure funds exist and lock them
     try {
       await prisma.$transaction(async (tx) => {
         // Lock the wallet row to prevent concurrent deductions
@@ -545,13 +511,13 @@ export default async function walletRoutes(app: FastifyInstance) {
           },
         })
 
-        // Log transaction
+        // Log transaction as PENDING
         await tx.transaction.create({
           data: {
             userId,
             walletId: wallet.id,
             type: 'WITHDRAWAL',
-            status: 'COMPLETED',
+            status: 'PENDING',
             amount: body.amount,
             balanceBefore: balBefore,
             balanceAfter: balBefore - body.amount,
@@ -561,11 +527,71 @@ export default async function walletRoutes(app: FastifyInstance) {
         })
       })
     } catch (err) {
-      console.error('CRITICAL: Transfer credited in Coupon Wallet but failed to deduct from Game Wallet', {
-        userId, transactionId, amount: body.amount, error: err
-      })
-      return reply.status(500).send({ success: false, error: 'Transfer failed during finalization. Contact support.' })
+      console.error('Wallet deduction failed:', err)
+      return reply.status(400).send({ success: false, error: 'Insufficient balance or wallet error.' })
     }
+
+    const refundWallet = async () => {
+      try {
+        await prisma.$transaction(async (tx) => {
+          await tx.wallet.update({
+            where: { id: wallet.id },
+            data: {
+              balance: { increment: body.amount },
+              totalWithdrawn: { decrement: body.amount },
+            },
+          })
+          await tx.transaction.updateMany({
+            where: { reference: transactionId },
+            data: { status: 'FAILED' }
+          })
+        })
+      } catch (refundErr) {
+        console.error('CRITICAL: Failed to refund wallet after Coupon API failure', { userId, transactionId, refundErr })
+      }
+    }
+
+    // 2. Send authenticated request to Coupon Platform
+    const transferUrl = `${process.env.COUPON_API_URL}/wallet/transfer`
+    const transferRes = await fetch(transferUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': process.env.COUPON_API_KEY || ''
+      },
+      body: JSON.stringify({
+        userId: userId,
+        userEmail: user.email,
+        amount: body.amount,
+        transactionId: transactionId
+      })
+    })
+
+    let transferData;
+    try {
+      transferData = await transferRes.json();
+    } catch (e) {
+      console.error('Failed to parse Coupon API response:', transferRes.status);
+      await refundWallet();
+      return reply.status(502).send({ success: false, error: 'Bad Gateway: Coupon API returned invalid response.' });
+    }
+
+    // Handle idempotency (409 Conflict) or failure
+    if (!transferRes.ok && transferRes.status !== 409) {
+      console.error('Transfer to Coupon Wallet failed:', transferData)
+      await refundWallet();
+      return reply.status(400).send({
+        success: false,
+        error: transferData.message || 'Failed to transfer to Coupon Wallet',
+        code: transferData.code || 'TRANSFER_FAILED'
+      })
+    }
+
+    // 3. Mark transaction as COMPLETED
+    await prisma.transaction.updateMany({
+      where: { reference: transactionId },
+      data: { status: 'COMPLETED' }
+    })
 
     await auditLog(userId, 'WALLET_TRANSFER', 'Withdrawal', undefined, undefined, { amount: body.amount, transactionId }, request)
 
