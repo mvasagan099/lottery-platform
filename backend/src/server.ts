@@ -82,7 +82,7 @@ async function buildApp() {
 
   // CRIT-06: Strict CORS — never reflect all origins in production
   const allowedOrigins = process.env.NODE_ENV === 'production'
-    ? (process.env.ALLOWED_ORIGINS || 'https://megadraw.com').split(',')
+    ? (process.env.ALLOWED_ORIGINS || 'https://megadraw.com,https://lottery-frontend-xpxd.onrender.com').split(',')
     : ['http://localhost:5173', 'http://localhost:5174', 'http://localhost:3000']
 
   await app.register(cors, {
