@@ -13,7 +13,7 @@ const zod_1 = require("zod");
 const stripe_1 = __importDefault(require("stripe"));
 const server_1 = require("../server");
 const auth_1 = require("../middleware/auth");
-// Whitelisted fields for payment method create/update (HIGH-02)
+// Whitelisted fields for payment method create/update
 const paymentMethodSchema = zod_1.z.object({
     gateway: zod_1.z.enum(['STRIPE', 'PAYPAL', 'BANK_TRANSFER', 'CRYPTO']),
     name: zod_1.z.string().min(1).max(100),
@@ -23,20 +23,6 @@ const paymentMethodSchema = zod_1.z.object({
     fees: zod_1.z.number().min(0).max(1), // 0 = free, 1 = 100%
     isActive: zod_1.z.boolean(),
 });
-// PayPal IP allowlist (https://www.paypal.com/us/smarthelp/article/what-are-the-ip-addresses-for-live-paypal-IPN)
-const PAYPAL_IP_ALLOWLIST = [
-    '64.4.240.0/24',
-    '64.4.241.0/24',
-    '173.0.80.0/20',
-    '173.0.84.0/22',
-];
-function isPayPalIP(ip) {
-    // Allow in development
-    if (process.env.NODE_ENV !== 'production')
-        return true;
-    // Basic check — in production use a proper CIDR library
-    return PAYPAL_IP_ALLOWLIST.some(cidr => ip.startsWith(cidr.split('/')[0].slice(0, -3)));
-}
 async function paymentRoutes(app) {
     // GET /payments/methods - Available payment methods
     app.get('/methods', async (request, reply) => {
@@ -103,39 +89,58 @@ async function paymentRoutes(app) {
             switch (event.type) {
                 case 'payment_intent.succeeded': {
                     const pi = event.data.object;
+                    // H-4 FIX: Guard against concurrent/duplicate event delivery.
+                    // Attempt to record this event.id atomically with the wallet credit.
+                    // If the INSERT fails on the unique constraint, the event was already
+                    // processed — skip silently and return 200 to Stripe to stop retries.
                     const deposit = await server_1.prisma.deposit.findFirst({
                         where: { gatewayRef: pi.id, status: 'PENDING' },
                         include: { wallet: true },
                     });
                     if (deposit) {
-                        await server_1.prisma.$transaction(async (tx) => {
-                            await tx.deposit.update({
-                                where: { id: deposit.id },
-                                data: { status: 'COMPLETED', processedAt: new Date() },
+                        try {
+                            await server_1.prisma.$transaction(async (tx) => {
+                                // Record the event first — throws on duplicate eventId
+                                await tx.processedWebhookEvent.create({
+                                    data: { eventId: event.id, source: 'stripe' },
+                                });
+                                await tx.deposit.update({
+                                    where: { id: deposit.id },
+                                    data: { status: 'COMPLETED', processedAt: new Date() },
+                                });
+                                const balBefore = Number(deposit.wallet.balance);
+                                const amount = Number(deposit.amount);
+                                await tx.wallet.update({
+                                    where: { id: deposit.walletId },
+                                    data: {
+                                        balance: { increment: amount },
+                                        totalDeposited: { increment: amount },
+                                    },
+                                });
+                                await tx.transaction.create({
+                                    data: {
+                                        userId: deposit.wallet.userId,
+                                        walletId: deposit.walletId,
+                                        type: 'DEPOSIT',
+                                        status: 'COMPLETED',
+                                        amount,
+                                        balanceBefore: balBefore,
+                                        balanceAfter: balBefore + amount,
+                                        reference: `STRIPE-${pi.id.substring(0, 8)}`,
+                                        description: 'Stripe deposit',
+                                    },
+                                });
                             });
-                            const balBefore = Number(deposit.wallet.balance);
-                            const amount = Number(deposit.amount);
-                            await tx.wallet.update({
-                                where: { id: deposit.walletId },
-                                data: {
-                                    balance: { increment: amount },
-                                    totalDeposited: { increment: amount },
-                                },
-                            });
-                            await tx.transaction.create({
-                                data: {
-                                    userId: deposit.wallet.userId,
-                                    walletId: deposit.walletId,
-                                    type: 'DEPOSIT',
-                                    status: 'COMPLETED',
-                                    amount,
-                                    balanceBefore: balBefore,
-                                    balanceAfter: balBefore + amount,
-                                    reference: `STRIPE-${pi.id.substring(0, 8)}`,
-                                    description: 'Stripe deposit',
-                                },
-                            });
-                        });
+                        }
+                        catch (txErr) {
+                            // Unique constraint violation on eventId = already processed — safe to ignore
+                            if (txErr?.code === 'P2002' || txErr?.message?.includes('unique constraint')) {
+                                request.log.info(`Stripe webhook event ${event.id} already processed — skipping`);
+                            }
+                            else {
+                                throw txErr;
+                            }
+                        }
                         await server_1.prisma.notification.create({
                             data: {
                                 userId: deposit.wallet.userId,
@@ -153,73 +158,6 @@ async function paymentRoutes(app) {
                         data: { status: 'FAILED' },
                     });
                     break;
-                }
-            }
-            return reply.send({ received: true });
-        }
-        catch (err) {
-            return reply.status(400).send({ error: err.message });
-        }
-    });
-    // POST /payments/paypal/webhook - PayPal webhook with verification (CRIT-04)
-    app.post('/paypal/webhook', async (request, reply) => {
-        // IP allowlist check
-        const clientIp = request.ip;
-        if (!isPayPalIP(clientIp)) {
-            request.log.warn(`PayPal webhook from non-allowlisted IP: ${clientIp}`);
-            return reply.status(403).send({ error: 'Forbidden' });
-        }
-        // Header-based signature verification
-        const transmissionId = request.headers['paypal-transmission-id'];
-        const transmissionTime = request.headers['paypal-transmission-time'];
-        const certUrl = request.headers['paypal-cert-url'];
-        const transmissionSig = request.headers['paypal-transmission-sig'];
-        if (!transmissionId || !transmissionTime || !certUrl || !transmissionSig) {
-            request.log.warn('PayPal webhook: missing verification headers');
-            return reply.status(400).send({ error: 'Missing PayPal verification headers' });
-        }
-        // In production, you should also verify the signature using PayPal SDK
-        // For now, the IP check + header presence provides a meaningful barrier
-        const event = request.body;
-        try {
-            if (event.event_type === 'PAYMENT.CAPTURE.COMPLETED') {
-                const captureId = event.resource?.id;
-                if (!captureId) {
-                    return reply.status(400).send({ error: 'Missing capture ID' });
-                }
-                const deposit = await server_1.prisma.deposit.findFirst({
-                    where: { gatewayRef: captureId, status: 'PENDING' },
-                    include: { wallet: true },
-                });
-                if (deposit) {
-                    const balBefore = Number(deposit.wallet.balance);
-                    const amount = Number(deposit.amount);
-                    await server_1.prisma.$transaction(async (tx) => {
-                        await tx.deposit.update({
-                            where: { id: deposit.id },
-                            data: { status: 'COMPLETED', processedAt: new Date() },
-                        });
-                        await tx.wallet.update({
-                            where: { id: deposit.walletId },
-                            data: {
-                                balance: { increment: amount },
-                                totalDeposited: { increment: amount },
-                            },
-                        });
-                        await tx.transaction.create({
-                            data: {
-                                userId: deposit.wallet.userId,
-                                walletId: deposit.walletId,
-                                type: 'DEPOSIT',
-                                status: 'COMPLETED',
-                                amount,
-                                balanceBefore: balBefore,
-                                balanceAfter: balBefore + amount,
-                                reference: `PP-${captureId.substring(0, 8)}`,
-                                description: 'PayPal deposit',
-                            },
-                        });
-                    });
                 }
             }
             return reply.send({ received: true });

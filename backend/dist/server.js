@@ -92,6 +92,8 @@ async function buildApp() {
             } : undefined,
         },
         trustProxy: true,
+        // LOW-05: Prevent large-payload DoS on all JSON routes
+        bodyLimit: 1_048_576, // 1 MB
     });
     // ── Security plugins ──────────────────────────────────
     await app.register(helmet_1.default, {
@@ -112,7 +114,7 @@ async function buildApp() {
     });
     // CRIT-06: Strict CORS — never reflect all origins in production
     const allowedOrigins = process.env.NODE_ENV === 'production'
-        ? (process.env.ALLOWED_ORIGINS || 'https://megadraw.com').split(',')
+        ? (process.env.ALLOWED_ORIGINS || 'https://megadraw.com,https://lottery-frontend-xpxd.onrender.com').split(',')
         : ['http://localhost:5173', 'http://localhost:5174', 'http://localhost:3000'];
     await app.register(cors_1.default, {
         origin: (origin, cb) => {
@@ -173,15 +175,17 @@ async function buildApp() {
     // ── Decorate with shared clients ──────────────────────
     app.decorate('prisma', exports.prisma);
     app.decorate('redis', exports.redis);
-    // ── Health check ──────────────────────────────────────
-    app.get('/health', async () => {
+    // ── Health check ──────────────────────────────────────────
+    // MED-03: Never return internal error details (connection strings, hostnames, etc.) publicly
+    app.get('/health', async (request, reply) => {
         try {
             await exports.prisma.$queryRaw `SELECT 1`;
             await exports.redis.ping();
             return { status: 'healthy', timestamp: new Date().toISOString() };
         }
         catch (err) {
-            return { status: 'degraded', error: String(err) };
+            request.log.error(err, 'Health check failed'); // log internally only
+            return reply.status(503).send({ status: 'degraded', timestamp: new Date().toISOString() });
         }
     });
     // ── Routes ────────────────────────────────────────────
@@ -282,8 +286,19 @@ function checkSecretStrength() {
 ║  Then set JWT_SECRET in your environment variables.          ║
 ╚══════════════════════════════════════════════════════════════╝`;
         console.error(msg);
-        if (process.env.NODE_ENV === 'production') {
-            console.error('[FATAL] Refusing to start with weak JWT_SECRET in production.');
+        // HIGH-06: Refuse to start with a weak secret in ANY environment.
+        // Development DBs often contain partial production data and weak
+        // secrets are trivially exploitable when the source is public.
+        console.error('[FATAL] Refusing to start with weak or missing JWT_SECRET.');
+        process.exit(1);
+    }
+}
+// H-2: Refuse to start in production if ALLOWED_ORIGINS is misconfigured or wildcard
+function checkCORSOrigins() {
+    if (process.env.NODE_ENV === 'production') {
+        const origins = process.env.ALLOWED_ORIGINS || 'https://megadraw.com,https://lottery-frontend-xpxd.onrender.com';
+        if (!origins || origins.trim() === '' || origins.includes('*')) {
+            console.error('[FATAL] Refusing to start in production with weak, missing, or wildcard ALLOWED_ORIGINS.');
             process.exit(1);
         }
     }
@@ -291,6 +306,7 @@ function checkSecretStrength() {
 // Start server
 async function start() {
     checkSecretStrength();
+    checkCORSOrigins();
     const app = await buildApp();
     const port = Number(process.env.PORT) || 3001;
     const host = process.env.HOST || '0.0.0.0';

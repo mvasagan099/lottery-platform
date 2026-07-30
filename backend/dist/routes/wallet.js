@@ -326,52 +326,27 @@ async function walletRoutes(app) {
             return reply.status(404).send({ success: false, error: 'User not found' });
         let valid = false;
         const cachedOtp = await server_1.redis.get(`email_otp:${userId}:withdraw`);
-        if (cachedOtp && cachedOtp === body.totp) {
-            valid = true;
-            await server_1.redis.del(`email_otp:${userId}:withdraw`);
-        }
-        else if (user.twoFactorEnabled && user.twoFactorSecret) {
-            if (!body.totp) {
-                return reply.status(400).send({ success: false, error: '2FA code is required', code: '2FA_REQUIRED' });
+        if (body.totp) {
+            if (cachedOtp && cachedOtp === body.totp) {
+                valid = true;
+                await server_1.redis.del(`email_otp:${userId}:withdraw`);
             }
-            valid = otplib.authenticator.verify({ token: body.totp, secret: user.twoFactorSecret });
+            else if (user.twoFactorEnabled && user.twoFactorSecret) {
+                valid = otplib.authenticator.verify({ token: body.totp, secret: user.twoFactorSecret });
+            }
+            if (!valid) {
+                return reply.status(400).send({ success: false, error: 'Invalid verification code' });
+            }
         }
         else {
-            return reply.status(403).send({ success: false, error: 'You must enable 2-Step Verification or request an Email OTP before withdrawing funds.', code: '2FA_SETUP_REQUIRED' });
+            if (user.twoFactorEnabled && user.twoFactorSecret) {
+                return reply.status(400).send({ success: false, error: '2FA code is required', code: '2FA_REQUIRED' });
+            }
+            else {
+                return reply.status(403).send({ success: false, error: 'You must enable 2-Step Verification or request an Email OTP before withdrawing funds.', code: '2FA_SETUP_REQUIRED' });
+            }
         }
-        if (!valid) {
-            return reply.status(400).send({ success: false, error: 'Invalid verification code' });
-        }
-        const wallet = await server_1.prisma.wallet.findUnique({
-            where: { userId },
-            select: { id: true, balance: true },
-        });
-        if (!wallet)
-            return reply.status(404).send({ success: false, error: 'Wallet not found' });
-        if (Number(wallet.balance) < body.amount) {
-            return reply.status(400).send({
-                success: false,
-                error: 'Insufficient balance for withdrawal',
-            });
-        }
-        // Check daily withdrawal limit (last 24h)
-        const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
-        const dailyWithdrawalSum = await server_1.prisma.withdrawal.aggregate({
-            where: {
-                walletId: wallet.id,
-                createdAt: { gte: oneDayAgo },
-                status: { in: ['COMPLETED', 'PENDING'] },
-            },
-            _sum: { amount: true },
-        });
-        const totalWithdrawnToday = Number(dailyWithdrawalSum._sum.amount || 0);
-        if (totalWithdrawnToday + body.amount > walletSettings.dailyWithdrawalLimit) {
-            return reply.status(400).send({
-                success: false,
-                error: `Daily withdrawal limit of $${walletSettings.dailyWithdrawalLimit} exceeded. (Already requested $${totalWithdrawnToday.toFixed(2)} in last 24h)`,
-            });
-        }
-        // Check KYC
+        // KYC gate — checked before the expensive transaction
         if (user.kycStatus !== 'APPROVED') {
             return reply.status(403).send({
                 success: false,
@@ -379,26 +354,70 @@ async function walletRoutes(app) {
                 code: 'KYC_REQUIRED',
             });
         }
-        await server_1.prisma.$transaction(async (tx) => {
-            // Create withdrawal request
-            await tx.withdrawal.create({
-                data: {
-                    walletId: wallet.id,
-                    amount: body.amount,
-                    gateway: body.gateway,
-                    accountDetails: body.accountDetails,
-                    status: 'PENDING',
-                },
+        // C-1 FIX: Wrap balance check + reserve inside a single transaction with
+        // SELECT ... FOR UPDATE to prevent concurrent-request race conditions.
+        // Two simultaneous withdrawal requests can no longer both pass the balance
+        // check — the second will block until the first commits, then re-read the
+        // decremented balance.
+        try {
+            await server_1.prisma.$transaction(async (tx) => {
+                // Lock the wallet row — identical pattern to the transfer endpoint
+                const locked = await tx.$queryRaw `
+          SELECT id, balance FROM "wallets" WHERE "userId" = ${userId} FOR UPDATE
+        `;
+                if (!locked[0]) {
+                    throw Object.assign(new Error('Wallet not found'), { code: 'NOT_FOUND' });
+                }
+                const currentBalance = Number(locked[0].balance);
+                if (currentBalance < body.amount) {
+                    throw Object.assign(new Error('Insufficient balance for withdrawal'), { code: 'INSUFFICIENT' });
+                }
+                // Re-check daily withdrawal limit inside the lock to prevent limit bypass
+                const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+                const dailyWithdrawalSum = await tx.withdrawal.aggregate({
+                    where: {
+                        walletId: locked[0].id,
+                        createdAt: { gte: oneDayAgo },
+                        status: { in: ['COMPLETED', 'PENDING'] },
+                    },
+                    _sum: { amount: true },
+                });
+                const totalWithdrawnToday = Number(dailyWithdrawalSum._sum.amount || 0);
+                if (totalWithdrawnToday + body.amount > walletSettings.dailyWithdrawalLimit) {
+                    throw Object.assign(new Error(`Daily withdrawal limit of $${walletSettings.dailyWithdrawalLimit} exceeded. (Already requested $${totalWithdrawnToday.toFixed(2)} in last 24h)`), { code: 'DAILY_LIMIT' });
+                }
+                // Create withdrawal and atomically reserve funds
+                await tx.withdrawal.create({
+                    data: {
+                        walletId: locked[0].id,
+                        amount: body.amount,
+                        gateway: body.gateway,
+                        accountDetails: body.accountDetails,
+                        status: 'PENDING',
+                    },
+                });
+                await tx.wallet.update({
+                    where: { id: locked[0].id },
+                    data: {
+                        balance: { decrement: body.amount },
+                        pendingBalance: { increment: body.amount },
+                    },
+                });
             });
-            // Reserve funds
-            await tx.wallet.update({
-                where: { id: wallet.id },
-                data: {
-                    balance: { decrement: body.amount },
-                    pendingBalance: { increment: body.amount },
-                },
-            });
-        });
+        }
+        catch (err) {
+            if (err.code === 'NOT_FOUND') {
+                return reply.status(404).send({ success: false, error: 'Wallet not found' });
+            }
+            if (err.code === 'INSUFFICIENT') {
+                return reply.status(400).send({ success: false, error: err.message });
+            }
+            if (err.code === 'DAILY_LIMIT') {
+                return reply.status(400).send({ success: false, error: err.message });
+            }
+            console.error('Withdrawal transaction failed:', err);
+            return reply.status(500).send({ success: false, error: 'Withdrawal failed. Please try again.' });
+        }
         await (0, auth_1.auditLog)(userId, 'WITHDRAWAL_REQUESTED', 'Withdrawal', undefined, undefined, { amount: body.amount }, request);
         // Notify user
         await server_1.prisma.notification.create({
@@ -416,7 +435,8 @@ async function walletRoutes(app) {
     // POST /wallet/transfer - Transfer winnings to Coupon Wallet
     app.post('/transfer', {
         preHandler: [auth_1.authenticate, auth_1.requireVerifiedEmail],
-        config: { rateLimit: { max: 50, timeWindow: '1 hour' } },
+        // MED-05: Financial endpoints need very tight rate limits — 5/hour prevents automated drain
+        config: { rateLimit: { max: 5, timeWindow: '1 hour' } },
     }, async (request, reply) => {
         const transferSchema = zod_1.z.object({
             amount: zod_1.z.number().positive().min(1),
@@ -432,21 +452,25 @@ async function walletRoutes(app) {
             return reply.status(404).send({ success: false, error: 'User not found' });
         let valid = false;
         const cachedOtp = await server_1.redis.get(`email_otp:${userId}:withdraw`);
-        if (cachedOtp && cachedOtp === body.totp) {
-            valid = true;
-            await server_1.redis.del(`email_otp:${userId}:withdraw`);
-        }
-        else if (user.twoFactorEnabled && user.twoFactorSecret) {
-            if (!body.totp) {
-                return reply.status(400).send({ success: false, error: '2FA code is required', code: '2FA_REQUIRED' });
+        if (body.totp) {
+            if (cachedOtp && cachedOtp === body.totp) {
+                valid = true;
+                await server_1.redis.del(`email_otp:${userId}:withdraw`);
             }
-            valid = otplib.authenticator.verify({ token: body.totp, secret: user.twoFactorSecret });
+            else if (user.twoFactorEnabled && user.twoFactorSecret) {
+                valid = otplib.authenticator.verify({ token: body.totp, secret: user.twoFactorSecret });
+            }
+            if (!valid) {
+                return reply.status(400).send({ success: false, error: 'Invalid verification code' });
+            }
         }
         else {
-            return reply.status(403).send({ success: false, error: 'You must enable 2-Step Verification or request an Email OTP before transferring funds.', code: '2FA_SETUP_REQUIRED' });
-        }
-        if (!valid) {
-            return reply.status(400).send({ success: false, error: 'Invalid verification code' });
+            if (user.twoFactorEnabled && user.twoFactorSecret) {
+                return reply.status(400).send({ success: false, error: '2FA code is required', code: '2FA_REQUIRED' });
+            }
+            else {
+                return reply.status(403).send({ success: false, error: 'You must enable 2-Step Verification or request an Email OTP before transferring funds.', code: '2FA_SETUP_REQUIRED' });
+            }
         }
         if (user.kycStatus !== 'APPROVED') {
             return reply.status(403).send({
@@ -469,7 +493,66 @@ async function walletRoutes(app) {
             });
         }
         const transactionId = `TRF-${userId.substring(0, 8)}-${Date.now()}`;
-        // 1. Send authenticated request to Coupon Platform
+        // 1. Deduct from game wallet FIRST to ensure funds exist and lock them
+        try {
+            await server_1.prisma.$transaction(async (tx) => {
+                // Lock the wallet row to prevent concurrent deductions
+                const lockedWallet = await tx.$queryRaw `
+          SELECT id, balance FROM "wallets" WHERE "userId" = ${userId} FOR UPDATE
+        `;
+                if (!lockedWallet[0] || Number(lockedWallet[0].balance) < body.amount) {
+                    throw new Error('Insufficient balance');
+                }
+                const balBefore = Number(lockedWallet[0].balance);
+                // Deduct wallet
+                await tx.wallet.update({
+                    where: { id: wallet.id },
+                    data: {
+                        balance: { decrement: body.amount },
+                        totalWithdrawn: { increment: body.amount },
+                    },
+                });
+                // Log transaction as PENDING
+                await tx.transaction.create({
+                    data: {
+                        userId,
+                        walletId: wallet.id,
+                        type: 'WITHDRAWAL',
+                        status: 'PENDING',
+                        amount: body.amount,
+                        balanceBefore: balBefore,
+                        balanceAfter: balBefore - body.amount,
+                        reference: transactionId,
+                        description: 'Transfer to Coupon Wallet',
+                    },
+                });
+            });
+        }
+        catch (err) {
+            console.error('Wallet deduction failed:', err);
+            return reply.status(400).send({ success: false, error: 'Insufficient balance or wallet error.' });
+        }
+        const refundWallet = async () => {
+            try {
+                await server_1.prisma.$transaction(async (tx) => {
+                    await tx.wallet.update({
+                        where: { id: wallet.id },
+                        data: {
+                            balance: { increment: body.amount },
+                            totalWithdrawn: { decrement: body.amount },
+                        },
+                    });
+                    await tx.transaction.updateMany({
+                        where: { reference: transactionId },
+                        data: { status: 'FAILED' }
+                    });
+                });
+            }
+            catch (refundErr) {
+                console.error('CRITICAL: Failed to refund wallet after Coupon API failure', { userId, transactionId, refundErr });
+            }
+        };
+        // 2. Send authenticated request to Coupon Platform
         const transferUrl = `${process.env.COUPON_API_URL}/wallet/transfer`;
         const transferRes = await fetch(transferUrl, {
             method: 'POST',
@@ -490,58 +573,24 @@ async function walletRoutes(app) {
         }
         catch (e) {
             console.error('Failed to parse Coupon API response:', transferRes.status);
+            await refundWallet();
             return reply.status(502).send({ success: false, error: 'Bad Gateway: Coupon API returned invalid response.' });
         }
         // Handle idempotency (409 Conflict) or failure
         if (!transferRes.ok && transferRes.status !== 409) {
             console.error('Transfer to Coupon Wallet failed:', transferData);
+            await refundWallet();
             return reply.status(400).send({
                 success: false,
                 error: transferData.message || 'Failed to transfer to Coupon Wallet',
                 code: transferData.code || 'TRANSFER_FAILED'
             });
         }
-        // 2. Deduct from game wallet with row-level lock to prevent double-spend (MED-04)
-        try {
-            await server_1.prisma.$transaction(async (tx) => {
-                // Lock the wallet row to prevent concurrent deductions
-                const lockedWallet = await tx.$queryRaw `
-          SELECT id, balance FROM "Wallet" WHERE "userId" = ${userId} FOR UPDATE
-        `;
-                if (!lockedWallet[0] || Number(lockedWallet[0].balance) < body.amount) {
-                    throw new Error('Insufficient balance');
-                }
-                const balBefore = Number(lockedWallet[0].balance);
-                // Deduct wallet
-                await tx.wallet.update({
-                    where: { id: wallet.id },
-                    data: {
-                        balance: { decrement: body.amount },
-                        totalWithdrawn: { increment: body.amount },
-                    },
-                });
-                // Log transaction
-                await tx.transaction.create({
-                    data: {
-                        userId,
-                        walletId: wallet.id,
-                        type: 'WITHDRAWAL',
-                        status: 'COMPLETED',
-                        amount: body.amount,
-                        balanceBefore: balBefore,
-                        balanceAfter: balBefore - body.amount,
-                        reference: transactionId,
-                        description: 'Transfer to Coupon Wallet',
-                    },
-                });
-            });
-        }
-        catch (err) {
-            console.error('CRITICAL: Transfer credited in Coupon Wallet but failed to deduct from Game Wallet', {
-                userId, transactionId, amount: body.amount, error: err
-            });
-            return reply.status(500).send({ success: false, error: 'Transfer failed during finalization. Contact support.' });
-        }
+        // 3. Mark transaction as COMPLETED
+        await server_1.prisma.transaction.updateMany({
+            where: { reference: transactionId },
+            data: { status: 'COMPLETED' }
+        });
         await (0, auth_1.auditLog)(userId, 'WALLET_TRANSFER', 'Withdrawal', undefined, undefined, { amount: body.amount, transactionId }, request);
         // Notify user
         await server_1.prisma.notification.create({

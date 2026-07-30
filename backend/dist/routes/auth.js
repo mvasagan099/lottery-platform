@@ -185,14 +185,19 @@ async function authRoutes(app) {
             emailSent = false;
             console.error('Resend verification email failed after retries:', emailErr);
         }
-        return reply.send({
-            success: true,
-            message: emailSent ? 'Verification email resent' : 'Failed to send email due to Resend tier limits, but OTP is in terminal logs.'
-        });
+        // HIGH-05: Never leak OTP or confirm it exists in logs — return a generic error
+        if (!emailSent) {
+            return reply.status(503).send({
+                success: false,
+                error: 'Email service temporarily unavailable. Please try again in a few minutes.',
+            });
+        }
+        return reply.send({ success: true, message: 'Verification email resent' });
     });
     // POST /auth/login
     app.post('/login', {
-        config: { rateLimit: devLimit(10, '15 minutes') },
+        // H-5: Tightened from 10 → 5 attempts per 15 min to reduce credential stuffing window
+        config: { rateLimit: devLimit(5, '15 minutes') },
     }, async (request, reply) => {
         const body = loginSchema.parse(request.body);
         const user = await server_1.prisma.user.findUnique({
@@ -293,11 +298,22 @@ async function authRoutes(app) {
             },
         });
         await (0, auth_1.auditLog)(user.id, 'LOGIN', 'User', user.id, undefined, undefined, request);
+        // MED-01: Set refresh token as HttpOnly cookie — never expose in response body.
+        // Access token is returned in the body and stored in memory only (not localStorage).
+        const cookieOptions = [
+            `refreshToken=${refreshToken}`,
+            'HttpOnly',
+            'SameSite=Strict',
+            'Path=/auth/refresh',
+            `Max-Age=${30 * 24 * 60 * 60}`, // 30 days
+            ...(process.env.NODE_ENV === 'production' ? ['Secure'] : []),
+        ].join('; ');
+        reply.header('Set-Cookie', cookieOptions);
         return reply.send({
             success: true,
             data: {
                 accessToken,
-                refreshToken,
+                // refreshToken intentionally omitted — delivered via HttpOnly cookie
                 user: {
                     id: user.id,
                     email: user.email,
@@ -343,7 +359,13 @@ async function authRoutes(app) {
     });
     // POST /auth/refresh
     app.post('/refresh', async (request, reply) => {
-        const { refreshToken } = request.body;
+        // MED-01: Read refresh token from HttpOnly cookie (not request body)
+        const cookieHeader = request.headers['cookie'] || '';
+        const refreshToken = cookieHeader
+            .split(';')
+            .map((c) => c.trim())
+            .find((c) => c.startsWith('refreshToken='))
+            ?.split('=')[1];
         if (!refreshToken) {
             return reply.status(401).send({ success: false, error: 'Refresh token required' });
         }
@@ -374,6 +396,8 @@ async function authRoutes(app) {
             where: { id: request.user.sessionId },
             data: { isActive: false },
         });
+        // MED-01: Clear the HttpOnly refresh token cookie
+        reply.header('Set-Cookie', 'refreshToken=; HttpOnly; SameSite=Strict; Path=/auth/refresh; Max-Age=0');
         return reply.send({ success: true, message: 'Logged out successfully' });
     });
     // POST /auth/verify-email

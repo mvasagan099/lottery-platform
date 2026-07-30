@@ -50,8 +50,10 @@ dotenv.config({ path: path.resolve(__dirname, '.env') });
 const prisma = new client_1.PrismaClient();
 async function main() {
     console.log('🌱 Starting database seed...');
-    // ── Admin User ──────────────────────────────────────────────────────────────
-    const adminPasswordHash = await argon2_1.default.hash('Admin@123456', {
+    // ── Admin User ───────────────────────────────────────────────────────────────
+    // Use environment variable if set, otherwise fallback to default for easier development
+    const adminPassword = process.env.ADMIN_SEED_PASSWORD || 'Admin@123456';
+    const adminPasswordHash = await argon2_1.default.hash(adminPassword, {
         type: argon2_1.default.argon2id,
         memoryCost: 65536,
         timeCost: 3,
@@ -557,8 +559,8 @@ async function main() {
     });
     console.log('✅ Sample banner seeded');
     console.log('\n🎉 Seed completed successfully!');
-    console.log('📧 Admin login: admin@MegaDraw.com');
-    console.log('🔑 Admin password: Admin@123456');
+    console.log('📧 Admin login: admin@megadraw.com');
+    console.log(`🔑 Admin password: ${process.env.ADMIN_SEED_PASSWORD ? '<set via environment>' : 'Admin@123456'}`);
 }
 main()
     .catch((e) => {
