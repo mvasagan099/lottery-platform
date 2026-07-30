@@ -183,7 +183,8 @@ export default async function authRoutes(app: FastifyInstance) {
 
   // POST /auth/login
   app.post('/login', {
-    config: { rateLimit: devLimit(10, '15 minutes') },
+    // H-5: Tightened from 10 → 5 attempts per 15 min to reduce credential stuffing window
+    config: { rateLimit: devLimit(5, '15 minutes') },
   }, async (request, reply) => {
     const body = loginSchema.parse(request.body)
 

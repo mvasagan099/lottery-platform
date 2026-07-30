@@ -100,43 +100,62 @@ export default async function paymentRoutes(app: FastifyInstance) {
       switch (event.type) {
         case 'payment_intent.succeeded': {
           const pi = event.data.object as Stripe.PaymentIntent
+
+          // H-4 FIX: Guard against concurrent/duplicate event delivery.
+          // Attempt to record this event.id atomically with the wallet credit.
+          // If the INSERT fails on the unique constraint, the event was already
+          // processed — skip silently and return 200 to Stripe to stop retries.
           const deposit = await prisma.deposit.findFirst({
             where: { gatewayRef: pi.id, status: 'PENDING' },
             include: { wallet: true },
           })
 
           if (deposit) {
-            await prisma.$transaction(async (tx) => {
-              await tx.deposit.update({
-                where: { id: deposit.id },
-                data: { status: 'COMPLETED', processedAt: new Date() },
-              })
+            try {
+              await prisma.$transaction(async (tx) => {
+                // Record the event first — throws on duplicate eventId
+                await tx.processedWebhookEvent.create({
+                  data: { eventId: event.id, source: 'stripe' },
+                })
 
-              const balBefore = Number(deposit.wallet.balance)
-              const amount = Number(deposit.amount)
+                await tx.deposit.update({
+                  where: { id: deposit.id },
+                  data: { status: 'COMPLETED', processedAt: new Date() },
+                })
 
-              await tx.wallet.update({
-                where: { id: deposit.walletId },
-                data: {
-                  balance: { increment: amount },
-                  totalDeposited: { increment: amount },
-                },
-              })
+                const balBefore = Number(deposit.wallet.balance)
+                const amount = Number(deposit.amount)
 
-              await tx.transaction.create({
-                data: {
-                  userId: deposit.wallet.userId,
-                  walletId: deposit.walletId,
-                  type: 'DEPOSIT',
-                  status: 'COMPLETED',
-                  amount,
-                  balanceBefore: balBefore,
-                  balanceAfter: balBefore + amount,
-                  reference: `STRIPE-${pi.id.substring(0, 8)}`,
-                  description: 'Stripe deposit',
-                },
+                await tx.wallet.update({
+                  where: { id: deposit.walletId },
+                  data: {
+                    balance: { increment: amount },
+                    totalDeposited: { increment: amount },
+                  },
+                })
+
+                await tx.transaction.create({
+                  data: {
+                    userId: deposit.wallet.userId,
+                    walletId: deposit.walletId,
+                    type: 'DEPOSIT',
+                    status: 'COMPLETED',
+                    amount,
+                    balanceBefore: balBefore,
+                    balanceAfter: balBefore + amount,
+                    reference: `STRIPE-${pi.id.substring(0, 8)}`,
+                    description: 'Stripe deposit',
+                  },
+                })
               })
-            })
+            } catch (txErr: any) {
+              // Unique constraint violation on eventId = already processed — safe to ignore
+              if (txErr?.code === 'P2002' || txErr?.message?.includes('unique constraint')) {
+                request.log.info(`Stripe webhook event ${event.id} already processed — skipping`)
+              } else {
+                throw txErr
+              }
+            }
 
             await prisma.notification.create({
               data: {

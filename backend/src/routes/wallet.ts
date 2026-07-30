@@ -344,39 +344,7 @@ export default async function walletRoutes(app: FastifyInstance) {
       }
     }
 
-    const wallet = await prisma.wallet.findUnique({
-      where: { userId },
-      select: { id: true, balance: true },
-    })
-
-    if (!wallet) return reply.status(404).send({ success: false, error: 'Wallet not found' })
-
-    if (Number(wallet.balance) < body.amount) {
-      return reply.status(400).send({
-        success: false,
-        error: 'Insufficient balance for withdrawal',
-      })
-    }
-
-    // Check daily withdrawal limit (last 24h)
-    const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000)
-    const dailyWithdrawalSum = await prisma.withdrawal.aggregate({
-      where: {
-        walletId: wallet.id,
-        createdAt: { gte: oneDayAgo },
-        status: { in: ['COMPLETED', 'PENDING'] },
-      },
-      _sum: { amount: true },
-    })
-    const totalWithdrawnToday = Number(dailyWithdrawalSum._sum.amount || 0)
-    if (totalWithdrawnToday + body.amount > walletSettings.dailyWithdrawalLimit) {
-      return reply.status(400).send({
-        success: false,
-        error: `Daily withdrawal limit of $${walletSettings.dailyWithdrawalLimit} exceeded. (Already requested $${totalWithdrawnToday.toFixed(2)} in last 24h)`,
-      })
-    }
-
-    // Check KYC
+    // KYC gate — checked before the expensive transaction
     if (user.kycStatus !== 'APPROVED') {
       return reply.status(403).send({
         success: false,
@@ -385,27 +353,78 @@ export default async function walletRoutes(app: FastifyInstance) {
       })
     }
 
-    await prisma.$transaction(async (tx) => {
-      // Create withdrawal request
-      await tx.withdrawal.create({
-        data: {
-          walletId: wallet.id,
-          amount: body.amount,
-          gateway: body.gateway,
-          accountDetails: body.accountDetails,
-          status: 'PENDING',
-        },
-      })
+    // C-1 FIX: Wrap balance check + reserve inside a single transaction with
+    // SELECT ... FOR UPDATE to prevent concurrent-request race conditions.
+    // Two simultaneous withdrawal requests can no longer both pass the balance
+    // check — the second will block until the first commits, then re-read the
+    // decremented balance.
+    try {
+      await prisma.$transaction(async (tx) => {
+        // Lock the wallet row — identical pattern to the transfer endpoint
+        const locked = await tx.$queryRaw<{ id: string; balance: string }[]>`
+          SELECT id, balance FROM "wallets" WHERE "userId" = ${userId} FOR UPDATE
+        `
 
-      // Reserve funds
-      await tx.wallet.update({
-        where: { id: wallet.id },
-        data: {
-          balance: { decrement: body.amount },
-          pendingBalance: { increment: body.amount },
-        },
+        if (!locked[0]) {
+          throw Object.assign(new Error('Wallet not found'), { code: 'NOT_FOUND' })
+        }
+
+        const currentBalance = Number(locked[0].balance)
+
+        if (currentBalance < body.amount) {
+          throw Object.assign(new Error('Insufficient balance for withdrawal'), { code: 'INSUFFICIENT' })
+        }
+
+        // Re-check daily withdrawal limit inside the lock to prevent limit bypass
+        const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000)
+        const dailyWithdrawalSum = await tx.withdrawal.aggregate({
+          where: {
+            walletId: locked[0].id,
+            createdAt: { gte: oneDayAgo },
+            status: { in: ['COMPLETED', 'PENDING'] },
+          },
+          _sum: { amount: true },
+        })
+        const totalWithdrawnToday = Number(dailyWithdrawalSum._sum.amount || 0)
+        if (totalWithdrawnToday + body.amount > walletSettings.dailyWithdrawalLimit) {
+          throw Object.assign(
+            new Error(`Daily withdrawal limit of $${walletSettings.dailyWithdrawalLimit} exceeded. (Already requested $${totalWithdrawnToday.toFixed(2)} in last 24h)`),
+            { code: 'DAILY_LIMIT' },
+          )
+        }
+
+        // Create withdrawal and atomically reserve funds
+        await tx.withdrawal.create({
+          data: {
+            walletId: locked[0].id,
+            amount: body.amount,
+            gateway: body.gateway,
+            accountDetails: body.accountDetails,
+            status: 'PENDING',
+          },
+        })
+
+        await tx.wallet.update({
+          where: { id: locked[0].id },
+          data: {
+            balance: { decrement: body.amount },
+            pendingBalance: { increment: body.amount },
+          },
+        })
       })
-    })
+    } catch (err: any) {
+      if (err.code === 'NOT_FOUND') {
+        return reply.status(404).send({ success: false, error: 'Wallet not found' })
+      }
+      if (err.code === 'INSUFFICIENT') {
+        return reply.status(400).send({ success: false, error: err.message })
+      }
+      if (err.code === 'DAILY_LIMIT') {
+        return reply.status(400).send({ success: false, error: err.message })
+      }
+      console.error('Withdrawal transaction failed:', err)
+      return reply.status(500).send({ success: false, error: 'Withdrawal failed. Please try again.' })
+    }
 
     await auditLog(userId, 'WITHDRAWAL_REQUESTED', 'Withdrawal', undefined, undefined, { amount: body.amount }, request)
 

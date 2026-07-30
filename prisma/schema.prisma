@@ -271,6 +271,19 @@ model Withdrawal {
   @@map("withdrawals")
 }
 
+// H-4 FIX: Stripe webhook idempotency ledger.
+// Keyed on Stripe's event.id. The INSERT inside the payment_intent.succeeded
+// transaction will fail on the unique constraint if the event was already
+// processed, preventing duplicate wallet credits under concurrent delivery.
+model ProcessedWebhookEvent {
+  id          String   @id @default(cuid())
+  eventId     String   @unique // Stripe event.id, e.g. "evt_1ABC..."
+  source      String   @default("stripe") // "stripe" | "paypal" etc.
+  processedAt DateTime @default(now())
+
+  @@map("processed_webhook_events")
+}
+
 model Game {
   id               String   @id @default(cuid())
   slug             String   @unique
