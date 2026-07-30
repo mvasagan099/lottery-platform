@@ -63,7 +63,7 @@ export default function SupportTicketModal({ ticketId, onClose }: Props) {
                 <div style={{ fontSize: '11px', opacity: 0.7, marginBottom: '4px' }}>
                   {msg.senderType === 'USER' ? 'You' : 'Support Team'} • {new Date(msg.createdAt).toLocaleString()}
                 </div>
-                <div dangerouslySetInnerHTML={{ __html: msg.message }} />
+                <div>{msg.message}</div>
               </div>
             ))}
           </div>

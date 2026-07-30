@@ -253,7 +253,7 @@ export function TicketDetailsDrawer({ ticket, onClose }: Props) {
                         maxWidth: '80%',
                         fontSize: '14px',
                         lineHeight: '1.5'
-                      }} dangerouslySetInnerHTML={{ __html: msg.message || msg.content || '' }} />
+                      }}>{msg.message || msg.content || ''}</div>
                     </div>
                   ))
                 )}

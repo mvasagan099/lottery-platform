@@ -281,9 +281,21 @@ function checkSecretStrength() {
   }
 }
 
+// H-2: Refuse to start in production if ALLOWED_ORIGINS is misconfigured or wildcard
+function checkCORSOrigins() {
+  if (process.env.NODE_ENV === 'production') {
+    const origins = process.env.ALLOWED_ORIGINS || ''
+    if (!origins || origins.trim() === '' || origins.includes('*')) {
+      console.error('[FATAL] Refusing to start in production with weak, missing, or wildcard ALLOWED_ORIGINS.')
+      process.exit(1)
+    }
+  }
+}
+
 // Start server
 async function start() {
   checkSecretStrength()
+  checkCORSOrigins()
 
   const app = await buildApp()
   const port = Number(process.env.PORT) || 3001
