@@ -427,7 +427,8 @@ export default async function walletRoutes(app: FastifyInstance) {
   // POST /wallet/transfer - Transfer winnings to Coupon Wallet
   app.post('/transfer', {
     preHandler: [authenticate, requireVerifiedEmail],
-    config: { rateLimit: { max: 50, timeWindow: '1 hour' } },
+    // MED-05: Financial endpoints need very tight rate limits — 5/hour prevents automated drain
+    config: { rateLimit: { max: 5, timeWindow: '1 hour' } },
   }, async (request, reply) => {
     const transferSchema = z.object({
       amount: z.number().positive().min(1),

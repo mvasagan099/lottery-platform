@@ -60,6 +60,8 @@ async function buildApp() {
       } : undefined,
     },
     trustProxy: true,
+    // LOW-05: Prevent large-payload DoS on all JSON routes
+    bodyLimit: 1_048_576, // 1 MB
   })
 
   // ── Security plugins ──────────────────────────────────
@@ -151,14 +153,16 @@ async function buildApp() {
   app.decorate('prisma', prisma)
   app.decorate('redis', redis)
 
-  // ── Health check ──────────────────────────────────────
-  app.get('/health', async () => {
+  // ── Health check ──────────────────────────────────────────
+  // MED-03: Never return internal error details (connection strings, hostnames, etc.) publicly
+  app.get('/health', async (request, reply) => {
     try {
       await prisma.$queryRaw`SELECT 1`
       await redis.ping()
       return { status: 'healthy', timestamp: new Date().toISOString() }
     } catch (err) {
-      return { status: 'degraded', error: String(err) }
+      request.log.error(err, 'Health check failed') // log internally only
+      return reply.status(503).send({ status: 'degraded', timestamp: new Date().toISOString() })
     }
   })
 
@@ -269,10 +273,11 @@ function checkSecretStrength() {
 ║  Then set JWT_SECRET in your environment variables.          ║
 ╚══════════════════════════════════════════════════════════════╝`
     console.error(msg)
-    if (process.env.NODE_ENV === 'production') {
-      console.error('[FATAL] Refusing to start with weak JWT_SECRET in production.')
-      process.exit(1)
-    }
+    // HIGH-06: Refuse to start with a weak secret in ANY environment.
+    // Development DBs often contain partial production data and weak
+    // secrets are trivially exploitable when the source is public.
+    console.error('[FATAL] Refusing to start with weak or missing JWT_SECRET.')
+    process.exit(1)
   }
 }
 

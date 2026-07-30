@@ -9,7 +9,8 @@ services:
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-lottery_db}
       POSTGRES_USER: ${POSTGRES_USER:-lottery_user}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-secure_password}
+      # HIGH-02: No default password — startup FAILS if this is not explicitly set
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in your environment. Never use a default.}
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./docker/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
@@ -26,13 +27,14 @@ services:
     image: redis:7-alpine
     container_name: lottery_redis
     restart: unless-stopped
-    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-redis_secret}
+    # HIGH-02: No default password — startup FAILS if this is not explicitly set
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:?REDIS_PASSWORD must be set in your environment}
     volumes:
       - redis_data:/data
     networks:
       - lottery_net
     healthcheck:
-      test: ["CMD", "redis-cli", "--auth", "${REDIS_PASSWORD:-redis_secret}", "ping"]
+      test: ["CMD", "redis-cli", "--auth", "${REDIS_PASSWORD}", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -46,10 +48,11 @@ services:
     restart: unless-stopped
     environment:
       NODE_ENV: ${NODE_ENV:-production}
-      DATABASE_URL: postgresql://${POSTGRES_USER:-lottery_user}:${POSTGRES_PASSWORD:-secure_password}@postgres:5432/${POSTGRES_DB:-lottery_db}
-      REDIS_URL: redis://:${REDIS_PASSWORD:-redis_secret}@redis:6379
-      JWT_SECRET: ${JWT_SECRET:-your_jwt_secret_min_32_chars}
-      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-your_refresh_secret_min_32_chars}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-lottery_user}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-lottery_db}
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
+      # HIGH-02: No default JWT secrets — startup FAILS if not set
+      JWT_SECRET: "${JWT_SECRET:?JWT_SECRET must be set. Run: node -e 'require(\"crypto\").randomBytes(64).toString(\"hex\")' }"
+      JWT_REFRESH_SECRET: "${JWT_REFRESH_SECRET:?JWT_REFRESH_SECRET must be set. Run: node -e 'require(\"crypto\").randomBytes(64).toString(\"hex\")' }"
       PORT: 3001
       SMTP_HOST: ${SMTP_HOST}
       SMTP_PORT: ${SMTP_PORT:-587}

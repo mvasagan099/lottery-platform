@@ -17,8 +17,16 @@ const prisma = new PrismaClient()
 async function main() {
   console.log('🌱 Starting database seed...')
 
-  // ── Admin User ──────────────────────────────────────────────────────────────
-  const adminPasswordHash = await argon2.hash('Admin@123456', {
+  // ── Admin User ───────────────────────────────────────────────────────────────
+  // HIGH-01: Admin password is sourced from env, never hardcoded.
+  // Set ADMIN_SEED_PASSWORD before running: ADMIN_SEED_PASSWORD=... npm run db:seed
+  const adminPassword = process.env.ADMIN_SEED_PASSWORD
+  if (!adminPassword || adminPassword.length < 12) {
+    console.error('❌ ADMIN_SEED_PASSWORD environment variable is required and must be at least 12 characters.')
+    console.error('   Set it before running the seed: ADMIN_SEED_PASSWORD="your-strong-password" npm run db:seed')
+    process.exit(1)
+  }
+  const adminPasswordHash = await argon2.hash(adminPassword, {
     type: argon2.argon2id,
     memoryCost: 65536,
     timeCost: 3,
@@ -543,8 +551,9 @@ async function main() {
   console.log('✅ Sample banner seeded')
 
   console.log('\n🎉 Seed completed successfully!')
-  console.log('📧 Admin login: admin@MegaDraw.com')
-  console.log('🔑 Admin password: Admin@123456')
+  console.log('📧 Admin login: admin@megadraw.com')
+  // HIGH-01: Never print credentials to the console — they appear in CI/CD logs and log aggregators
+  console.log('🔑 Admin password was set via ADMIN_SEED_PASSWORD environment variable')
 }
 
 main()

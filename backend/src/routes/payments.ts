@@ -7,10 +7,12 @@
 import { FastifyInstance } from 'fastify'
 import { z } from 'zod'
 import Stripe from 'stripe'
+import crypto from 'crypto'
+import https from 'https'
 import { prisma } from '../server'
 import { authenticate, requireAdmin } from '../middleware/auth'
 
-// Whitelisted fields for payment method create/update (HIGH-02)
+// Whitelisted fields for payment method create/update
 const paymentMethodSchema = z.object({
   gateway: z.enum(['STRIPE', 'PAYPAL', 'BANK_TRANSFER', 'CRYPTO']),
   name: z.string().min(1).max(100),
@@ -21,19 +23,102 @@ const paymentMethodSchema = z.object({
   isActive: z.boolean(),
 })
 
-// PayPal IP allowlist (https://www.paypal.com/us/smarthelp/article/what-are-the-ip-addresses-for-live-paypal-IPN)
-const PAYPAL_IP_ALLOWLIST = [
-  '64.4.240.0/24',
-  '64.4.241.0/24',
-  '173.0.80.0/20',
-  '173.0.84.0/22',
+// ── PayPal IP allowlist ────────────────────────────────────────────────────────
+// Source: https://www.paypal.com/us/smarthelp/article/what-are-the-ip-addresses-for-live-paypal-IPN
+const PAYPAL_IP_RANGES: Array<[number, number, number]> = [
+  [0x40_04_F0_00, 24, 0],  // 64.4.240.0/24
+  [0x40_04_F1_00, 24, 0],  // 64.4.241.0/24
+  [0xAD_00_50_00, 20, 0],  // 173.0.80.0/20
+  [0xAD_00_54_00, 22, 0],  // 173.0.84.0/22
 ]
 
+/** Correct CIDR membership test using bitwise arithmetic */
 function isPayPalIP(ip: string): boolean {
-  // Allow in development
   if (process.env.NODE_ENV !== 'production') return true
-  // Basic check — in production use a proper CIDR library
-  return PAYPAL_IP_ALLOWLIST.some(cidr => ip.startsWith(cidr.split('/')[0].slice(0, -3)))
+  const parts = ip.split('.').map(Number)
+  if (parts.length !== 4 || parts.some(p => isNaN(p) || p < 0 || p > 255)) return false
+  const ipInt = (parts[0] << 24) | (parts[1] << 16) | (parts[2] << 8) | parts[3]
+  return PAYPAL_IP_RANGES.some(([network, prefix]) => {
+    const mask = prefix === 0 ? 0 : (~0 << (32 - prefix)) >>> 0
+    return (ipInt >>> 0 & mask) === (network & mask)
+  })
+}
+
+// ── PayPal webhook signature verification (CRIT-06) ───────────────────────────
+/** In-memory cert cache with TTL to avoid repeated HTTPS fetches */
+const certCache = new Map<string, { pem: string; expiresAt: number }>()
+const CERT_TTL_MS = 60 * 60 * 1000 // 1 hour
+
+/** Fetch PayPal's public signing certificate (with in-memory cache) */
+async function fetchPayPalCert(certUrl: string): Promise<string> {
+  const cached = certCache.get(certUrl)
+  if (cached && cached.expiresAt > Date.now()) return cached.pem
+
+  // Only allow PayPal's own cert domain
+  if (!certUrl.startsWith('https://api.paypal.com/') && !certUrl.startsWith('https://api.sandbox.paypal.com/')) {
+    throw new Error('Invalid PayPal cert URL — must be from api.paypal.com')
+  }
+
+  return new Promise((resolve, reject) => {
+    https.get(certUrl, (res) => {
+      if (res.statusCode !== 200) {
+        return reject(new Error(`Failed to fetch PayPal cert: HTTP ${res.statusCode}`))
+      }
+      let data = ''
+      res.on('data', (chunk: Buffer) => { data += chunk.toString() })
+      res.on('end', () => {
+        certCache.set(certUrl, { pem: data, expiresAt: Date.now() + CERT_TTL_MS })
+        resolve(data)
+      })
+    }).on('error', reject)
+  })
+}
+
+/**
+ * Verify PayPal webhook signature using RSA-SHA256.
+ * PayPal signs: transmissionId|transmissionTime|webhookId|crc32(rawBody)
+ */
+async function verifyPayPalSignature(headers: Record<string, string | string[] | undefined>, rawBody: string): Promise<boolean> {
+  const webhookId = process.env.PAYPAL_WEBHOOK_ID
+  if (!webhookId) throw new Error('PAYPAL_WEBHOOK_ID environment variable is not set')
+
+  const transmissionId  = headers['paypal-transmission-id'] as string
+  const transmissionTime = headers['paypal-transmission-time'] as string
+  const certUrl         = headers['paypal-cert-url'] as string
+  const transmissionSig = headers['paypal-transmission-sig'] as string
+  const authAlgo        = (headers['paypal-auth-algo'] as string) || 'SHA256withRSA'
+
+  if (!transmissionId || !transmissionTime || !certUrl || !transmissionSig) {
+    throw new Error('Missing required PayPal signature headers')
+  }
+
+  // Compute CRC32 of the raw body
+  const crc32 = computeCrc32(rawBody)
+
+  // Build the message PayPal signed
+  const message = `${transmissionId}|${transmissionTime}|${webhookId}|${crc32}`
+
+  const cert = await fetchPayPalCert(certUrl)
+
+  // Map PayPal algo names to Node crypto names
+  const nodeAlgo = authAlgo.replace('withRSA', '').replace('SHA', 'SHA-').replace('SHA-256', 'SHA256')
+
+  const verify = crypto.createVerify(nodeAlgo || 'SHA256')
+  verify.update(message)
+  return verify.verify(cert, transmissionSig, 'base64')
+}
+
+/** Standard CRC-32 implementation (IEEE 802.3 polynomial) */
+function computeCrc32(str: string): number {
+  const buf = Buffer.from(str, 'utf8')
+  let crc = 0xFFFFFFFF
+  for (const byte of buf) {
+    crc ^= byte
+    for (let i = 0; i < 8; i++) {
+      crc = (crc & 1) ? (crc >>> 1) ^ 0xEDB88320 : crc >>> 1
+    }
+  }
+  return (crc ^ 0xFFFFFFFF) >>> 0
 }
 
 export default async function paymentRoutes(app: FastifyInstance) {
@@ -179,28 +264,39 @@ export default async function paymentRoutes(app: FastifyInstance) {
     }
   })
 
-  // POST /payments/paypal/webhook - PayPal webhook with verification (CRIT-04)
-  app.post('/paypal/webhook', async (request, reply) => {
-    // IP allowlist check
+  // POST /payments/paypal/webhook - PayPal webhook with RSA-SHA256 signature verification (CRIT-06)
+  app.post('/paypal/webhook', {
+    config: { rawBody: true },
+  }, async (request, reply) => {
+    // Layer 1: IP allowlist
     const clientIp = request.ip
     if (!isPayPalIP(clientIp)) {
       request.log.warn(`PayPal webhook from non-allowlisted IP: ${clientIp}`)
       return reply.status(403).send({ error: 'Forbidden' })
     }
 
-    // Header-based signature verification
-    const transmissionId = request.headers['paypal-transmission-id']
-    const transmissionTime = request.headers['paypal-transmission-time']
-    const certUrl = request.headers['paypal-cert-url']
-    const transmissionSig = request.headers['paypal-transmission-sig']
+    // Layer 2: Cryptographic RSA-SHA256 signature verification
+    try {
+      const rawBody = (request as any).rawBody as Buffer | undefined
+      if (!rawBody) {
+        return reply.status(400).send({ error: 'Raw body not available — ensure rawBody plugin is enabled' })
+      }
 
-    if (!transmissionId || !transmissionTime || !certUrl || !transmissionSig) {
-      request.log.warn('PayPal webhook: missing verification headers')
-      return reply.status(400).send({ error: 'Missing PayPal verification headers' })
+      const isValid = await verifyPayPalSignature(
+        request.headers as Record<string, string | string[] | undefined>,
+        rawBody.toString('utf8'),
+      )
+
+      if (!isValid) {
+        request.log.warn('PayPal webhook: signature verification failed')
+        return reply.status(400).send({ error: 'Invalid PayPal webhook signature' })
+      }
+    } catch (sigErr: any) {
+      request.log.warn(`PayPal webhook signature error: ${sigErr.message}`)
+      return reply.status(400).send({ error: 'Webhook signature verification failed' })
     }
 
-    // In production, you should also verify the signature using PayPal SDK
-    // For now, the IP check + header presence provides a meaningful barrier
+    // Layer 3: Process the verified event
     const event = request.body as any
 
     try {
