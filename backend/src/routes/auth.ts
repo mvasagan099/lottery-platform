@@ -329,14 +329,16 @@ export default async function authRoutes(app: FastifyInstance) {
 
     // MED-01: Set refresh token as HttpOnly cookie — never expose in response body.
     // Access token is returned in the body and stored in memory only (not localStorage).
+    // Cross-site cookie settings for production/Render (SameSite=None; Secure)
+    const isProd = process.env.NODE_ENV === 'production'
     const cookieOptions = [
       `refreshToken=${refreshToken}`,
       'HttpOnly',
-      'SameSite=Strict',
-      'Path=/auth/refresh',
+      isProd ? 'SameSite=None' : 'SameSite=Lax',
+      isProd ? 'Secure' : '',
+      'Path=/',
       `Max-Age=${30 * 24 * 60 * 60}`, // 30 days
-      ...(process.env.NODE_ENV === 'production' ? ['Secure'] : []),
-    ].join('; ')
+    ].filter(Boolean).join('; ')
     reply.header('Set-Cookie', cookieOptions)
 
     return reply.send({
@@ -443,7 +445,16 @@ export default async function authRoutes(app: FastifyInstance) {
     })
 
     // MED-01: Clear the HttpOnly refresh token cookie
-    reply.header('Set-Cookie', 'refreshToken=; HttpOnly; SameSite=Strict; Path=/auth/refresh; Max-Age=0')
+    const isProd = process.env.NODE_ENV === 'production'
+    const clearCookieOptions = [
+      'refreshToken=',
+      'HttpOnly',
+      isProd ? 'SameSite=None' : 'SameSite=Lax',
+      isProd ? 'Secure' : '',
+      'Path=/',
+      'Max-Age=0',
+    ].filter(Boolean).join('; ')
+    reply.header('Set-Cookie', clearCookieOptions)
 
     return reply.send({ success: true, message: 'Logged out successfully' })
   })

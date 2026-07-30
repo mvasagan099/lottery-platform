@@ -62,10 +62,10 @@ export const useAuthStore = create<AuthStore>()(
     }),
     {
       name: 'auth-store',
-      // MED-01: Only persist non-sensitive user metadata.
-      // accessToken is intentionally excluded — it must be refreshed after page reload.
+      // Retain user, accessToken, and isAuthenticated so session survives page reloads seamlessly
       partialize: (state) => ({
         user: state.user,
+        accessToken: state.accessToken,
         isAuthenticated: state.isAuthenticated,
       }),
     }
