@@ -80,6 +80,8 @@ export default function Header() {
               id="mobile-nav-toggle"
               onClick={() => setMobileNavOpen(!mobileNavOpen)}
               style={{ padding: '4px', marginLeft: '-8px' }}
+              aria-label="Toggle mobile navigation"
+              aria-expanded={mobileNavOpen}
             >
               {mobileNavOpen ? <X size={24} /> : <Menu size={24} />}
             </button>
@@ -110,6 +112,7 @@ export default function Header() {
               className="btn btn-ghost btn-icon desktop-only"
               onClick={toggleTheme}
               title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
+              aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
             >
               {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
             </button>
@@ -124,7 +127,7 @@ export default function Header() {
                 </Link>
 
                 {/* Notifications */}
-                <Link to="/notifications" className="btn btn-ghost btn-icon desktop-only" style={{ position: 'relative' }}>
+                <Link to="/notifications" className="btn btn-ghost btn-icon desktop-only" style={{ position: 'relative' }} aria-label="View notifications">
                   <Bell size={18} />
                   {(unreadData ?? 0) > 0 && (
                     <span style={{

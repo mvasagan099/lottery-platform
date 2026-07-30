@@ -3,8 +3,6 @@
    Australian lottery aesthetic: Deep navy + Gold + Emerald
    ============================================================ */
 
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Poppins:ital,wght@0,400;0,500;0,600;0,700;0,800;0,900;1,900&display=swap');
-
 @keyframes float-jackpot {
   0%, 100% { transform: translateY(0); text-shadow: 0 4px 10px rgba(0,0,0,0.15); }
   50% { transform: translateY(-6px); text-shadow: 0 12px 24px rgba(0,0,0,0.25); }
@@ -41,7 +39,7 @@
   /* Text */
   --text-primary: #0f172a;
   --text-secondary: #475569;
-  --text-muted: #94a3b8;
+  --text-muted: #5c6e82; /* Improved contrast for accessibility */
   --text-inverse: #ffffff;
   --text-brand: #1a3a8f;
   --text-gold: #f5a623;
@@ -121,7 +119,7 @@
 
   --text-primary: #f1f5f9;
   --text-secondary: #94a3b8;
-  --text-muted: #64748b;
+  --text-muted: #8fa0b5; /* Improved contrast for accessibility */
   --text-brand: #6b9ef8;
 
   --border-color: rgba(255, 255, 255, 0.08);
