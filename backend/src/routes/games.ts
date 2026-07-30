@@ -255,15 +255,15 @@ export default async function gameRoutes(app: FastifyInstance) {
       ticket = await prisma.$transaction(async (tx) => {
         // MED-02: Lock the wallet row so no concurrent transaction can read the
         // same balance and both pass the insufficient-funds check.
-        const [lockedWallet] = await tx.$queryRaw<Array<{ id: string; balance: any; bonus_balance: any }>>`
-          SELECT id, balance, bonus_balance as "bonusBalance"
+        const [lockedWallet] = await tx.$queryRaw<Array<{ id: string; balance: any; bonusBalance: any }>>`
+          SELECT id, balance, "bonusBalance"
           FROM wallets
           WHERE id = ${wallet.id}
           FOR UPDATE
         `
 
         const balance      = Number(lockedWallet.balance)
-        const bonusBalance = Number(lockedWallet.bonus_balance ?? 0)
+        const bonusBalance = Number(lockedWallet.bonusBalance ?? 0)
 
         if (balance + bonusBalance < totalCost) {
           throw Object.assign(
