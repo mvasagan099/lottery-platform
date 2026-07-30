@@ -82,8 +82,8 @@ export function WalletDashboard() {
                 {(recent || []).map((tx: any) => (
                   <tr key={tx.id}>
                     <td style={{ fontWeight: 600 }}>{tx.type.replace(/_/g, ' ')}</td>
-                    <td style={{ fontWeight: 700, color: tx.amount > 0 ? '#10b981' : '#ef4444' }}>
-                      {tx.amount > 0 ? '+' : ''}{Math.abs(tx.amount).toFixed(2)} Coins
+                    <td style={{ fontWeight: 700, color: !['WITHDRAWAL', 'TICKET_PURCHASE'].includes(tx.type) ? '#10b981' : '#ef4444' }}>
+                      {!['WITHDRAWAL', 'TICKET_PURCHASE'].includes(tx.type) ? '+' : '-'}{Math.abs(tx.amount).toFixed(2)} Coins
                     </td>
                     <td><span className={`badge badge-${tx.status === 'COMPLETED' ? 'success' : tx.status === 'PENDING' ? 'warning' : 'danger'}`}>{tx.status}</span></td>
                     <td style={{ color: 'var(--text-muted)', fontSize: '13px' }}>{new Date(tx.createdAt).toLocaleDateString()}</td>
