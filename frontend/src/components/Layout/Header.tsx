@@ -87,13 +87,13 @@ export default function Header() {
             </button>
 
             {/* Logo */}
-            <Link to="/" className="logo">
-              <img src="/logo.png" alt="MegaDraw" style={{ height: '40px' }} />
+            <Link to="/" className="logo" aria-label="MegaDraw Homepage">
+              <img src="/logo.png" alt="MegaDraw Logo" width="160" height="40" style={{ height: '40px', width: 'auto' }} />
             </Link>
           </div>
 
           {/* Desktop Nav */}
-          <nav className="nav">
+          <nav className="nav" aria-label="Main Navigation">
             {navLinks.map((link) => (
               <Link
                 key={link.href}
@@ -144,6 +144,8 @@ export default function Header() {
                     className="btn btn-ghost"
                     style={{ gap: '8px', padding: '7px 12px' }}
                     onClick={() => setUserMenuOpen(!userMenuOpen)}
+                    aria-label="User Account Menu"
+                    aria-expanded={userMenuOpen}
                   >
                     <div className="avatar avatar-sm">
                       {user?.firstName?.[0]}{user?.lastName?.[0]}

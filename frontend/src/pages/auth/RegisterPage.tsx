@@ -180,61 +180,61 @@ export default function RegisterPage() {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                   <div className="grid-2">
                     <div className="form-group">
-                      <label className="form-label">First Name<span className="required">*</span></label>
+                      <label className="form-label" htmlFor="firstName">First Name<span className="required" aria-hidden="true">*</span></label>
                       <div className="input-wrapper has-icon-left">
                         <span className="input-icon"><User size={16} /></span>
                         <input {...register('firstName')} className={`form-input ${errors.firstName ? 'error' : ''}`} placeholder="Jane" id="firstName" />
                       </div>
-                      {errors.firstName && <span className="form-error">{errors.firstName.message}</span>}
+                      {errors.firstName && <span className="form-error" role="alert">{errors.firstName.message}</span>}
                     </div>
                     <div className="form-group">
-                      <label className="form-label">Last Name<span className="required">*</span></label>
+                      <label className="form-label" htmlFor="lastName">Last Name<span className="required" aria-hidden="true">*</span></label>
                       <input {...register('lastName')} className={`form-input ${errors.lastName ? 'error' : ''}`} placeholder="Smith" id="lastName" />
-                      {errors.lastName && <span className="form-error">{errors.lastName.message}</span>}
+                      {errors.lastName && <span className="form-error" role="alert">{errors.lastName.message}</span>}
                     </div>
                   </div>
 
                   <div className="grid-2">
                     <div className="form-group">
-                      <label className="form-label">Country<span className="required">*</span></label>
+                      <label className="form-label" htmlFor="country">Country<span className="required" aria-hidden="true">*</span></label>
                       <div className="input-wrapper has-icon-left">
                         <span className="input-icon"><Globe size={16} /></span>
-                        <select {...register('country')} className={`form-input ${errors.country ? 'error' : ''}`} style={{ paddingLeft: '40px', appearance: 'none' }}>
+                        <select {...register('country')} className={`form-input ${errors.country ? 'error' : ''}`} style={{ paddingLeft: '40px', appearance: 'none' }} id="country">
                           <option value="">Select country...</option>
                           {COUNTRIES.map(c => (
                             <option key={c.code} value={c.code}>{c.name}</option>
                           ))}
                         </select>
                       </div>
-                      {errors.country && <span className="form-error">{errors.country.message}</span>}
+                      {errors.country && <span className="form-error" role="alert">{errors.country.message}</span>}
                     </div>
 
                     <div className="form-group">
-                      <label className="form-label">Mobile Number<span className="required">*</span></label>
+                      <label className="form-label" htmlFor="phone">Mobile Number<span className="required" aria-hidden="true">*</span></label>
                       <div className="input-wrapper has-icon-left">
                         <span className="input-icon"><Phone size={16} /></span>
-                        <input {...register('phone')} type="tel" className={`form-input ${errors.phone ? 'error' : ''}`} placeholder="+61 400 000 000" />
+                        <input {...register('phone')} type="tel" className={`form-input ${errors.phone ? 'error' : ''}`} placeholder="+61 400 000 000" id="phone" />
                       </div>
-                      {errors.phone && <span className="form-error">{errors.phone.message}</span>}
+                      {errors.phone && <span className="form-error" role="alert">{errors.phone.message}</span>}
                     </div>
                   </div>
 
                   <div className="form-group">
-                    <label className="form-label">Email Address<span className="required">*</span></label>
+                    <label className="form-label" htmlFor="email">Email Address<span className="required" aria-hidden="true">*</span></label>
                     <div className="input-wrapper has-icon-left">
                       <span className="input-icon"><Mail size={16} /></span>
                       <input {...register('email')} type="email" className={`form-input ${errors.email ? 'error' : ''}`} placeholder="jane@example.com" id="email" />
                     </div>
-                    {errors.email && <span className="form-error">{errors.email.message}</span>}
+                    {errors.email && <span className="form-error" role="alert">{errors.email.message}</span>}
                   </div>
 
                   <div className="form-group">
-                    <label className="form-label">Date of Birth<span className="required">*</span></label>
+                    <label className="form-label" htmlFor="dateOfBirth">Date of Birth<span className="required" aria-hidden="true">*</span></label>
                     <div className="input-wrapper has-icon-left">
                       <span className="input-icon"><Calendar size={16} /></span>
                       <input {...register('dateOfBirth')} type="date" className={`form-input ${errors.dateOfBirth ? 'error' : ''}`} id="dateOfBirth" />
                     </div>
-                    {errors.dateOfBirth && <span className="form-error">{errors.dateOfBirth.message}</span>}
+                    {errors.dateOfBirth && <span className="form-error" role="alert">{errors.dateOfBirth.message}</span>}
                   </div>
 
                   <button type="button" className="btn btn-primary btn-lg btn-full" onClick={handleNext}>
@@ -244,21 +244,21 @@ export default function RegisterPage() {
               ) : step === 2 ? (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                   <div className="form-group">
-                    <label className="form-label">Username<span className="required">*</span></label>
+                    <label className="form-label" htmlFor="username">Username<span className="required" aria-hidden="true">*</span></label>
                     <input {...register('username')} className={`form-input ${errors.username ? 'error' : ''}`} placeholder="jane_smith" id="username" autoComplete="username" />
-                    {errors.username && <span className="form-error">{errors.username.message}</span>}
+                    {errors.username && <span className="form-error" role="alert">{errors.username.message}</span>}
                   </div>
 
                   <div className="form-group">
-                    <label className="form-label">Password<span className="required">*</span></label>
+                    <label className="form-label" htmlFor="password">Password<span className="required" aria-hidden="true">*</span></label>
                     <div className="input-wrapper has-icon-left has-icon-right">
                       <span className="input-icon"><Lock size={16} /></span>
                       <input {...register('password')} type={showPassword ? 'text' : 'password'} className={`form-input ${errors.password ? 'error' : ''}`} placeholder="Min. 8 characters" id="password" autoComplete="new-password" />
-                      <span className="input-icon-right" onClick={() => setShowPassword(!showPassword)}>
+                      <button type="button" className="input-icon-right" aria-label={showPassword ? "Hide password text" : "Show password text"} onClick={() => setShowPassword(!showPassword)} style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
                         {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                      </span>
+                      </button>
                     </div>
-                    {errors.password && <span className="form-error">{errors.password.message}</span>}
+                    {errors.password && <span className="form-error" role="alert">{errors.password.message}</span>}
                   </div>
 
                   <div className="form-group">

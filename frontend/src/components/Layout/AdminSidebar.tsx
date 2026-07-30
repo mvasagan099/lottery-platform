@@ -68,15 +68,15 @@ export default function AdminSidebar({ isOpen, onClose }: { isOpen?: boolean, on
   })).filter(section => section.links.length > 0)
 
   return (
-    <aside className={`sidebar ${isOpen ? 'mobile-open' : ''}`}>
+    <aside className={`sidebar ${isOpen ? 'mobile-open' : ''}`} aria-label="Admin Navigation">
       <div style={{ padding: '0 20px 16px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-        <Link to="/" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <Link to="/" style={{ display: 'flex', alignItems: 'center', gap: '8px' }} aria-label="MegaDraw Homepage">
           <Zap size={18} style={{ color: 'var(--color-secondary)' }} />
           <span style={{ fontFamily: 'var(--font-display)', fontWeight: 900, color: 'white', fontSize: '18px' }}>
             Mega<span style={{ color: 'var(--color-secondary)' }}>Draw</span>
           </span>
         </Link>
-        <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.35)', fontWeight: 600, letterSpacing: '0.05em', marginTop: '4px' }}>
+        <div style={{ fontSize: '11px', color: '#94A3B8', fontWeight: 600, letterSpacing: '0.05em', marginTop: '4px' }}>
           ADMIN PANEL
         </div>
       </div>

@@ -16,13 +16,14 @@ export default function ForgotPasswordPage() {
   })
 
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--gradient-hero)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '80px 20px 20px' }}>
+    <main className="forgot-password-main" style={{ minHeight: '100vh', background: 'var(--gradient-hero)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '80px 20px 20px' }}>
       <div style={{ width: '100%', maxWidth: '400px' }}>
         <div style={{ textAlign: 'center', marginBottom: '32px' }}>
-          <Link to="/" style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', color: 'white', fontFamily: 'var(--font-display)', fontSize: '28px', fontWeight: 900 }}>
+          <Link to="/" style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', color: 'white', fontFamily: 'var(--font-display)', fontSize: '28px', fontWeight: 900 }} aria-label="MegaDraw Homepage">
             <Zap size={24} style={{ color: 'var(--color-secondary)' }} />
             Mega<span style={{ color: 'var(--color-secondary)' }}>Draw</span>
           </Link>
+          <h1 className="sr-only">Forgot Password</h1>
         </div>
 
         <div className="card card-body">
@@ -42,7 +43,7 @@ export default function ForgotPasswordPage() {
                 Enter your email and we'll send you a reset link.
               </p>
               <div className="form-group" style={{ marginBottom: '16px' }}>
-                <label className="form-label">Email Address</label>
+                <label className="form-label" htmlFor="forgot-email">Email Address</label>
                 <div className="input-wrapper has-icon-left">
                   <span className="input-icon"><Mail size={16} /></span>
                   <input
@@ -69,6 +70,6 @@ export default function ForgotPasswordPage() {
           )}
         </div>
       </div>
-    </div>
+    </main>
   )
 }

@@ -30,30 +30,33 @@ export default function ResetPasswordPage() {
   })
 
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--gradient-hero)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '80px 20px' }}>
+    <main className="reset-password-main" style={{ minHeight: '100vh', background: 'var(--gradient-hero)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '80px 20px' }}>
       <div style={{ width: '100%', maxWidth: '400px' }}>
         <div style={{ textAlign: 'center', marginBottom: '32px' }}>
-          <Link to="/" style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', color: 'white', fontFamily: 'var(--font-display)', fontSize: '28px', fontWeight: 900 }}>
+          <Link to="/" style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', color: 'white', fontFamily: 'var(--font-display)', fontSize: '28px', fontWeight: 900 }} aria-label="MegaDraw Homepage">
             <Zap size={24} style={{ color: 'var(--color-secondary)' }} />
             Mega<span style={{ color: 'var(--color-secondary)' }}>Draw</span>
           </Link>
+          <h1 className="sr-only">Reset Password</h1>
         </div>
         <div className="card card-body">
           <h2 style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '22px', marginBottom: '20px' }}>Reset Password</h2>
           <form onSubmit={handleSubmit((d) => mutation.mutate(d))} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
             <div className="form-group">
-              <label className="form-label">New Password</label>
+              <label className="form-label" htmlFor="new-password">New Password</label>
               <div className="input-wrapper has-icon-left has-icon-right">
                 <span className="input-icon"><Lock size={16} /></span>
                 <input {...register('password')} type={show ? 'text' : 'password'} className={`form-input ${errors.password ? 'error' : ''}`} placeholder="Min 8 characters" id="new-password" />
-                <span className="input-icon-right" onClick={() => setShow(!show)}>{show ? <EyeOff size={16} /> : <Eye size={16} />}</span>
+                <button type="button" className="input-icon-right" aria-label={show ? "Hide password" : "Show password"} onClick={() => setShow(!show)} style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
+                  {show ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
               </div>
-              {errors.password && <span className="form-error">{errors.password.message}</span>}
+              {errors.password && <span className="form-error" role="alert">{errors.password.message}</span>}
             </div>
             <div className="form-group">
-              <label className="form-label">Confirm Password</label>
+              <label className="form-label" htmlFor="confirm-password">Confirm Password</label>
               <input {...register('confirmPassword')} type="password" className={`form-input ${errors.confirmPassword ? 'error' : ''}`} placeholder="Repeat password" id="confirm-password" />
-              {errors.confirmPassword && <span className="form-error">{errors.confirmPassword.message}</span>}
+              {errors.confirmPassword && <span className="form-error" role="alert">{errors.confirmPassword.message}</span>}
             </div>
             <button type="submit" className="btn btn-primary btn-lg btn-full" disabled={mutation.isPending}>
               {mutation.isPending ? <><div className="btn-spinner" /> Resetting...</> : 'Reset Password'}
@@ -61,6 +64,6 @@ export default function ResetPasswordPage() {
           </form>
         </div>
       </div>
-    </div>
+    </main>
   )
 }

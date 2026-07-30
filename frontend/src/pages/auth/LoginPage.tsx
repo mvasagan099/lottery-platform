@@ -67,7 +67,7 @@ export default function LoginPage() {
   const onSubmit = (data: FormData) => mutation.mutate(data as any)
 
   return (
-    <div style={{
+    <main className="login-page-main" style={{
       minHeight: '100vh',
       background: 'var(--gradient-hero)',
       display: 'flex',
@@ -79,11 +79,11 @@ export default function LoginPage() {
         {/* Logo */}
         <div style={{ textAlign: 'center', marginBottom: '32px' }}>
           <Link to="/" style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', color: 'white', fontFamily: 'var(--font-display)', fontSize: '28px', fontWeight: 900 }}>
-            <img src="/logo.png" alt="MegaDraw" style={{ height: '48px' }} />
+            <img src="/logo.png" alt="MegaDraw Logo" width="160" height="48" style={{ height: '48px', width: 'auto' }} />
           </Link>
-          <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: '14px', marginTop: '6px' }}>
+          <h1 style={{ color: '#E2E8F0', fontSize: '15px', marginTop: '6px', fontWeight: 500 }}>
             Sign in to your account
-          </div>
+          </h1>
         </div>
 
         <div className="card">
@@ -91,7 +91,7 @@ export default function LoginPage() {
             <form onSubmit={handleSubmit(onSubmit)} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               {/* Email */}
               <div className="form-group">
-                <label className="form-label">Email Address<span className="required">*</span></label>
+                <label className="form-label" htmlFor="email">Email Address<span className="required" aria-hidden="true">*</span></label>
                 <div className="input-wrapper has-icon-left">
                   <span className="input-icon"><Mail size={16} /></span>
                   <input
@@ -103,13 +103,13 @@ export default function LoginPage() {
                     id="email"
                   />
                 </div>
-                {errors.email && <span className="form-error">{errors.email.message}</span>}
+                {errors.email && <span className="form-error" role="alert">{errors.email.message}</span>}
               </div>
 
               {/* Password */}
               <div className="form-group">
-                <label className="form-label">
-                  Password<span className="required">*</span>
+                <label className="form-label" htmlFor="password">
+                  Password<span className="required" aria-hidden="true">*</span>
                 </label>
                 <div className="input-wrapper has-icon-left has-icon-right">
                   <span className="input-icon"><Lock size={16} /></span>
@@ -121,18 +121,24 @@ export default function LoginPage() {
                     autoComplete="current-password"
                     id="password"
                   />
-                  <span className="input-icon-right" onClick={() => setShowPassword(!showPassword)}>
+                  <button
+                    type="button"
+                    className="input-icon-right"
+                    aria-label={showPassword ? "Hide password text" : "Show password text"}
+                    onClick={() => setShowPassword(!showPassword)}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+                  >
                     {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                  </span>
+                  </button>
                 </div>
-                {errors.password && <span className="form-error">{errors.password.message}</span>}
+                {errors.password && <span className="form-error" role="alert">{errors.password.message}</span>}
               </div>
 
               {/* 2FA */}
               {needs2FA && (
                 <div className="form-group">
                   <div className="form-label" style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span>Verification Code (2FA or Email)</span>
+                    <label htmlFor="totp">Verification Code (2FA or Email)</label>
                     <button
                       type="button"
                       className="btn btn-ghost btn-sm"
@@ -143,7 +149,7 @@ export default function LoginPage() {
                       {requestOtpMutation.isPending ? 'Sending...' : 'Send Code via Email'}
                     </button>
                   </div>
-                  <input {...register('totp')} type="text" className="form-input" placeholder="000000" maxLength={6} inputMode="numeric" />
+                  <input {...register('totp')} type="text" className="form-input" placeholder="000000" maxLength={6} inputMode="numeric" id="totp" />
                 </div>
               )}
 
@@ -172,10 +178,10 @@ export default function LoginPage() {
           </div>
         </div>
 
-        <div style={{ textAlign: 'center', marginTop: '16px', fontSize: '12px', color: 'rgba(255,255,255,0.4)' }}>
+        <div style={{ textAlign: 'center', marginTop: '16px', fontSize: '12px', color: '#94A3B8' }}>
           18+ only | Gamble Responsibly
         </div>
       </div>
-    </div>
+    </main>
   )
 }

@@ -29,6 +29,7 @@ export default function AdminRoute() {
       <button 
         className="btn btn-primary btn-icon admin-mobile-toggle"
         onClick={() => setIsSidebarOpen(true)}
+        aria-label="Toggle Admin Sidebar Menu"
       >
         <Menu size={24} />
       </button>
