@@ -529,7 +529,7 @@ export default async function walletRoutes(app: FastifyInstance) {
       await prisma.$transaction(async (tx) => {
         // Lock the wallet row to prevent concurrent deductions
         const lockedWallet = await tx.$queryRaw<{balance: number}[]>`
-          SELECT id, balance FROM "Wallet" WHERE "userId" = ${userId} FOR UPDATE
+          SELECT id, balance FROM "wallets" WHERE "userId" = ${userId} FOR UPDATE
         `
         if (!lockedWallet[0] || Number(lockedWallet[0].balance) < body.amount) {
           throw new Error('Insufficient balance')
