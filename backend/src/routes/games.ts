@@ -223,19 +223,25 @@ export default async function gameRoutes(app: FastifyInstance) {
       return reply.status(400).send({ success: false, error: 'No upcoming draw available' })
     }
 
+    // MED-02 FIX: Do NOT check balance outside the transaction (TOCTOU race).
+    // Two concurrent requests could both pass a pre-transaction balance check
+    // using the same stale value. Instead we lock the wallet row inside the
+    // transaction with a raw SELECT FOR UPDATE, matching the pattern used in
+    // wallet.ts for withdrawals and transfers.
+    // The wallets_balance_nonneg CHECK constraint is a last-resort safety net,
+    // but we want a clean 400 error, not a raw constraint-violation 500.
+
     const totalCost = Number(game.ticketPrice) * body.lines.length * body.draws
 
-    // Check wallet balance
     const wallet = await prisma.wallet.findUnique({
       where: { userId },
-      select: { id: true, balance: true, bonusBalance: true },
+      select: { id: true },
     })
-
-    if (!wallet || Number(wallet.balance) + Number(wallet.bonusBalance) < totalCost) {
+    if (!wallet) {
       return reply.status(400).send({
         success: false,
-        error: 'Insufficient funds. Please deposit to continue.',
-        code: 'INSUFFICIENT_FUNDS',
+        error: 'Wallet not found. Please contact support.',
+        code: 'WALLET_NOT_FOUND',
       })
     }
 
@@ -243,20 +249,41 @@ export default async function gameRoutes(app: FastifyInstance) {
     const ticketNumber = generateTicketNumber()
     const qrData = `MegaDraw:${ticketNumber}:${game.slug}:${draw.drawNumber}`
 
-    // Create ticket in transaction
-    const ticket = await prisma.$transaction(async (tx) => {
-      // Deduct from wallet (use bonus first)
-      const bonusUsed = Math.min(Number(wallet.bonusBalance), totalCost)
-      const mainUsed = totalCost - bonusUsed
+    // Create ticket in transaction — balance check + deduction is atomic
+    let ticket: any
+    try {
+      ticket = await prisma.$transaction(async (tx) => {
+        // MED-02: Lock the wallet row so no concurrent transaction can read the
+        // same balance and both pass the insufficient-funds check.
+        const [lockedWallet] = await tx.$queryRaw<Array<{ id: string; balance: any; bonus_balance: any }>>`
+          SELECT id, balance, bonus_balance as "bonusBalance"
+          FROM wallets
+          WHERE id = ${wallet.id}
+          FOR UPDATE
+        `
 
-      await tx.wallet.update({
-        where: { id: wallet.id },
-        data: {
-          balance: { decrement: mainUsed },
-          bonusBalance: { decrement: bonusUsed },
-          totalSpent: { increment: totalCost },
-        },
-      })
+        const balance      = Number(lockedWallet.balance)
+        const bonusBalance = Number(lockedWallet.bonus_balance ?? 0)
+
+        if (balance + bonusBalance < totalCost) {
+          throw Object.assign(
+            new Error('Insufficient funds. Please deposit to continue.'),
+            { code: 'INSUFFICIENT_FUNDS' }
+          )
+        }
+
+        // Deduct from wallet (use bonus first)
+        const bonusUsed = Math.min(bonusBalance, totalCost)
+        const mainUsed  = totalCost - bonusUsed
+
+        await tx.wallet.update({
+          where: { id: wallet.id },
+          data: {
+            balance:      { decrement: mainUsed },
+            bonusBalance: { decrement: bonusUsed },
+            totalSpent:   { increment: totalCost },
+          },
+        })
 
       // Create ticket
       const newTicket = await tx.ticket.create({
@@ -291,8 +318,8 @@ export default async function gameRoutes(app: FastifyInstance) {
           type: 'TICKET_PURCHASE',
           status: 'COMPLETED',
           amount: -totalCost,
-          balanceBefore: Number(wallet.balance),
-          balanceAfter: Number(wallet.balance) - mainUsed,
+          balanceBefore: balance + bonusBalance,
+          balanceAfter: (balance + bonusBalance) - totalCost,
           reference: `TKT-${ticketNumber}`,
           description: `${game.name} ticket - Draw #${draw.drawNumber}`,
           ticketId: newTicket.id,
@@ -307,7 +334,18 @@ export default async function gameRoutes(app: FastifyInstance) {
       })
 
       return newTicket
-    })
+      }) // end $transaction
+    } catch (err: any) {
+      if (err?.code === 'INSUFFICIENT_FUNDS') {
+        return reply.status(400).send({
+          success: false,
+          error: err.message,
+          code: 'INSUFFICIENT_FUNDS',
+        })
+      }
+      // Re-throw unexpected errors (Prisma constraint violations etc.)
+      throw err
+    }
 
     // Send confirmation notification
     await prisma.notification.create({

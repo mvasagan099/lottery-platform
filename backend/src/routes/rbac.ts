@@ -1,9 +1,20 @@
 import { FastifyInstance } from 'fastify';
 import { prisma } from '../server';
+import { authenticate, requireAdmin, auditLog } from '../middleware/auth';
 import crypto from 'crypto';
 
+// CRIT-01 FIX: /rbac/* previously had zero authentication — any anonymous
+// caller could enumerate roles and assign themselves SUPER_ADMIN via
+// POST /rbac/users/:id/roles with no Authorization header.
+// Fix: global preHandler hooks enforce authentication + admin authorization
+// on every route in this file, exactly as admin.ts does.
+
 export default async function rbacRoutes(app: FastifyInstance) {
-  
+
+  // All RBAC routes require a valid session AND admin/super-admin role.
+  app.addHook('preHandler', authenticate)
+  app.addHook('preHandler', requireAdmin)
+
   // ── Roles ─────────────────────────────────────────────────────────────
 
   // Get all roles with their assigned users count and permission count
@@ -57,6 +68,8 @@ export default async function rbacRoutes(app: FastifyInstance) {
         const role = await prisma.role.create({
           data: { name, description, department, priority: priority || 0 },
         });
+        // CRIT-01: Audit log — was missing on all mutating routes
+        await auditLog(request.user.userId, 'RBAC_ROLE_CREATED', 'Role', role.id, undefined, { name, department }, request)
         return { success: true, message: 'Role created', data: role };
       } catch (error) {
         request.log.error(error);
@@ -66,15 +79,17 @@ export default async function rbacRoutes(app: FastifyInstance) {
   );
 
   // Update role
-  app.patch<{ Params: { id: string }, Body: { name?: string; description?: string; department?: string; priority?: number } }>(
+  app.patch<{ Params: { id: string }; Body: { name?: string; description?: string; department?: string; priority?: number; isActive?: boolean } }>(
     '/:id',
     async (request, reply) => {
       try {
-        const { name, description, department, priority } = request.body;
+        const { id } = request.params;
+        const oldRole = await prisma.role.findUnique({ where: { id }, select: { name: true, department: true, isActive: true, priority: true } })
         const role = await prisma.role.update({
-          where: { id: request.params.id },
-          data: { name, description, department, priority },
+          where: { id },
+          data: request.body,
         });
+        await auditLog(request.user.userId, 'RBAC_ROLE_UPDATED', 'Role', id, oldRole ?? undefined, request.body, request)
         return { success: true, message: 'Role updated', data: role };
       } catch (error) {
         request.log.error(error);
@@ -84,33 +99,38 @@ export default async function rbacRoutes(app: FastifyInstance) {
   );
 
   // Clone role
-  app.post<{ Params: { id: string } }>(
+  app.post<{ Params: { id: string }; Body: { name: string } }>(
     '/:id/clone',
     async (request, reply) => {
       try {
+        const { id } = request.params;
+        const { name } = request.body;
+
         const sourceRole = await prisma.role.findUnique({
-          where: { id: request.params.id },
-          include: { permissions: true }
+          where: { id },
+          include: { permissions: true },
         });
+
         if (!sourceRole) {
           return reply.status(404).send({ success: false, message: 'Source role not found' });
         }
 
-        const clonedRole = await prisma.role.create({
+        const newRole = await prisma.role.create({
           data: {
-            name: `${sourceRole.name} (Copy)`,
-            description: sourceRole.description,
+            name,
+            description: `Clone of ${sourceRole.name}`,
             department: sourceRole.department,
             priority: sourceRole.priority,
             permissions: {
               create: sourceRole.permissions.map(p => ({
-                permissionId: p.permissionId
-              }))
-            }
-          }
+                id: crypto.randomUUID(),
+                permissionId: p.permissionId,
+              })),
+            },
+          },
         });
-
-        return { success: true, message: 'Role cloned successfully', data: clonedRole };
+        await auditLog(request.user.userId, 'RBAC_ROLE_CLONED', 'Role', newRole.id, { sourceRoleId: id }, { name }, request)
+        return { success: true, message: 'Role cloned', data: newRole };
       } catch (error) {
         request.log.error(error);
         return reply.status(500).send({ success: false, message: 'Failed to clone role' });
@@ -118,13 +138,27 @@ export default async function rbacRoutes(app: FastifyInstance) {
     }
   );
 
+  // Delete role
+  app.delete<{ Params: { id: string } }>('/:id', async (request, reply) => {
+    try {
+      const { id } = request.params;
+      const role = await prisma.role.findUnique({ where: { id }, select: { name: true } })
+      await prisma.role.delete({ where: { id } });
+      await auditLog(request.user.userId, 'RBAC_ROLE_DELETED', 'Role', id, role ?? undefined, undefined, request)
+      return { success: true, message: 'Role deleted' };
+    } catch (error) {
+      request.log.error(error);
+      return reply.status(500).send({ success: false, message: 'Failed to delete role' });
+    }
+  });
+
   // ── Permissions ───────────────────────────────────────────────────────
 
-  // Get all available system permissions (Matrix)
+  // Get all permissions
   app.get('/permissions', async (request, reply) => {
     try {
       const permissions = await prisma.permission.findMany({
-        orderBy: [{ module: 'asc' }, { action: 'asc' }],
+        orderBy: [{ action: 'asc' }],
       });
       return { success: true, data: permissions };
     } catch (error) {
@@ -153,6 +187,7 @@ export default async function rbacRoutes(app: FastifyInstance) {
           }),
         ]);
 
+        await auditLog(request.user.userId, 'RBAC_PERMISSIONS_UPDATED', 'Role', id, undefined, { permissionIds }, request)
         return { success: true, message: 'Permissions updated successfully' };
       } catch (error) {
         request.log.error(error);
@@ -185,6 +220,7 @@ export default async function rbacRoutes(app: FastifyInstance) {
           }
         });
 
+        await auditLog(request.user.userId, 'RBAC_ROLE_ASSIGNED', 'User', userId, undefined, { roleId, expiresAt }, request)
         return { success: true, message: 'Role assigned successfully', data: assignment };
       } catch (error) {
         request.log.error(error);
@@ -206,6 +242,7 @@ export default async function rbacRoutes(app: FastifyInstance) {
           }
         });
 
+        await auditLog(request.user.userId, 'RBAC_ROLE_UNASSIGNED', 'User', userId, { roleId }, undefined, request)
         return { success: true, message: 'Role removed successfully' };
       } catch (error) {
         request.log.error(error);
