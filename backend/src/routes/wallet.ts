@@ -325,20 +325,23 @@ export default async function walletRoutes(app: FastifyInstance) {
     let valid = false
     const cachedOtp = await redis.get(`email_otp:${userId}:withdraw`)
     
-    if (cachedOtp && cachedOtp === body.totp) {
-      valid = true
-      await redis.del(`email_otp:${userId}:withdraw`)
-    } else if (user.twoFactorEnabled && user.twoFactorSecret) {
-      if (!body.totp) {
-        return reply.status(400).send({ success: false, error: '2FA code is required', code: '2FA_REQUIRED' })
+    if (body.totp) {
+      if (cachedOtp && cachedOtp === body.totp) {
+        valid = true
+        await redis.del(`email_otp:${userId}:withdraw`)
+      } else if (user.twoFactorEnabled && user.twoFactorSecret) {
+        valid = otplib.authenticator.verify({ token: body.totp, secret: user.twoFactorSecret })
       }
-      valid = otplib.authenticator.verify({ token: body.totp, secret: user.twoFactorSecret })
+      
+      if (!valid) {
+        return reply.status(400).send({ success: false, error: 'Invalid verification code' })
+      }
     } else {
-      return reply.status(403).send({ success: false, error: 'You must enable 2-Step Verification or request an Email OTP before withdrawing funds.', code: '2FA_SETUP_REQUIRED' })
-    }
-
-    if (!valid) {
-      return reply.status(400).send({ success: false, error: 'Invalid verification code' })
+      if (user.twoFactorEnabled && user.twoFactorSecret) {
+        return reply.status(400).send({ success: false, error: '2FA code is required', code: '2FA_REQUIRED' })
+      } else {
+        return reply.status(403).send({ success: false, error: 'You must enable 2-Step Verification or request an Email OTP before withdrawing funds.', code: '2FA_SETUP_REQUIRED' })
+      }
     }
 
     const wallet = await prisma.wallet.findUnique({
@@ -444,20 +447,23 @@ export default async function walletRoutes(app: FastifyInstance) {
     let valid = false
     const cachedOtp = await redis.get(`email_otp:${userId}:withdraw`)
     
-    if (cachedOtp && cachedOtp === body.totp) {
-      valid = true
-      await redis.del(`email_otp:${userId}:withdraw`)
-    } else if (user.twoFactorEnabled && user.twoFactorSecret) {
-      if (!body.totp) {
-        return reply.status(400).send({ success: false, error: '2FA code is required', code: '2FA_REQUIRED' })
+    if (body.totp) {
+      if (cachedOtp && cachedOtp === body.totp) {
+        valid = true
+        await redis.del(`email_otp:${userId}:withdraw`)
+      } else if (user.twoFactorEnabled && user.twoFactorSecret) {
+        valid = otplib.authenticator.verify({ token: body.totp, secret: user.twoFactorSecret })
       }
-      valid = otplib.authenticator.verify({ token: body.totp, secret: user.twoFactorSecret })
+      
+      if (!valid) {
+        return reply.status(400).send({ success: false, error: 'Invalid verification code' })
+      }
     } else {
-      return reply.status(403).send({ success: false, error: 'You must enable 2-Step Verification or request an Email OTP before transferring funds.', code: '2FA_SETUP_REQUIRED' })
-    }
-
-    if (!valid) {
-      return reply.status(400).send({ success: false, error: 'Invalid verification code' })
+      if (user.twoFactorEnabled && user.twoFactorSecret) {
+        return reply.status(400).send({ success: false, error: '2FA code is required', code: '2FA_REQUIRED' })
+      } else {
+        return reply.status(403).send({ success: false, error: 'You must enable 2-Step Verification or request an Email OTP before transferring funds.', code: '2FA_SETUP_REQUIRED' })
+      }
     }
 
     if (user.kycStatus !== 'APPROVED') {
