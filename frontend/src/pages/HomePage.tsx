@@ -63,7 +63,7 @@ export default function HomePage() {
       {/* ── Hero ─────────────────────────────────────────────────── */}
       <section className="hero" style={{ background: 'transparent', padding: '0', overflow: 'hidden' }}>
         <div className="container">
-          {topGame && (
+          {topGame ? (
             <div className="oz-hero-card">
               <div className="oz-hero-left">
                 <div style={{ display: 'flex', alignItems: 'center' }}>
@@ -115,11 +115,27 @@ export default function HomePage() {
                   <div style={{ 
                     fontSize: 'clamp(36px, 10vw, 72px)', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '2px', fontFamily: 'var(--font-display)', lineHeight: 1, marginTop: '12px',
                     background: 'linear-gradient(to bottom, #ffe885, #f5a623)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text',
-                    filter: 'drop-shadow(0 4px 12px rgba(245, 166, 35, 0.4))'
+                    filter: 'drop-shadow(0 4px 12px rgba(245, 166, 35, 0.43))'
                   }}>
                     MILLION
                   </div>
                 )}
+              </div>
+            </div>
+          ) : (
+            <div className="oz-hero-card" style={{ minHeight: '390px', background: '#2b5de4', boxShadow: 'none' }}>
+              <div className="oz-hero-left" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                <div className="skeleton-blue" style={{ width: '200px', height: '60px', borderRadius: '12px' }} />
+                <div className="skeleton-blue" style={{ width: '150px', height: '24px', borderRadius: '6px' }} />
+                <div className="skeleton-blue" style={{ width: '250px', height: '32px', borderRadius: '8px' }} />
+                <div style={{ display: 'flex', gap: '16px', marginTop: '24px' }}>
+                  <div className="skeleton-blue" style={{ width: '120px', height: '44px', borderRadius: '24px' }} />
+                  <div className="skeleton-blue" style={{ width: '120px', height: '44px', borderRadius: '24px' }} />
+                </div>
+              </div>
+              <div className="oz-hero-right" style={{ justifyContent: 'center', alignItems: 'center', display: 'flex', gap: '12px' }}>
+                <div className="skeleton-blue" style={{ width: '80px', height: '80px', borderRadius: '50%' }} />
+                <div className="skeleton-blue" style={{ width: '160px', height: '80px', borderRadius: '12px' }} />
               </div>
             </div>
           )}
@@ -239,38 +255,55 @@ export default function HomePage() {
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            {allGames.slice(0, 3).map((game: any) => (
-              <Link key={game.id} to={`/games/${game.slug}`} className="card" style={{ textDecoration: 'none', display: 'block' }}>
-                <div style={{
-                  display: 'flex', alignItems: 'center', gap: '20px',
-                  padding: '20px', flexWrap: 'wrap',
-                }}>
-                  <div style={{ minWidth: '180px' }}>
-                    <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '18px' }}>{game.name}</div>
-                    <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>
-                      {game.nextDraw ? `Draw #${game.nextDraw.drawNumber}` : 'No upcoming draw'}
+            {allGames.length > 0 ? (
+              allGames.slice(0, 3).map((game: any) => (
+                <Link key={game.id} to={`/games/${game.slug}`} className="card" style={{ textDecoration: 'none', display: 'block' }}>
+                  <div style={{
+                    display: 'flex', alignItems: 'center', gap: '20px',
+                    padding: '20px', flexWrap: 'wrap',
+                  }}>
+                    <div style={{ minWidth: '180px' }}>
+                      <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '18px' }}>{game.name}</div>
+                      <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>
+                        {game.nextDraw ? `Draw #${game.nextDraw.drawNumber}` : 'No upcoming draw'}
+                      </div>
+                    </div>
+                    <div style={{ flex: 1, display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                      {game.nextDraw?.winningNumbers ? (
+                        <>
+                          {(game.nextDraw.winningNumbers as number[]).map((n: number) => (
+                            <div key={n} className="number-ball winning sm">{n}</div>
+                          ))}
+                        </>
+                      ) : (
+                        <span style={{ fontSize: '14px', color: 'var(--text-muted)', fontStyle: 'italic' }}>Draw not yet held</span>
+                      )}
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontFamily: 'var(--font-display)', fontWeight: 900, fontSize: '22px', whiteSpace: 'nowrap' }}>
+                      <span>🪙</span>
+                      <span style={{ background: 'var(--gradient-gold)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>
+                        {(Number(game.jackpotAmount) / 1_000_000).toFixed(0)}M
+                      </span>
                     </div>
                   </div>
-                  <div style={{ flex: 1, display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                    {game.nextDraw?.winningNumbers ? (
-                      <>
-                        {(game.nextDraw.winningNumbers as number[]).map((n: number) => (
-                          <div key={n} className="number-ball winning sm">{n}</div>
-                        ))}
-                      </>
-                    ) : (
-                      <span style={{ fontSize: '14px', color: 'var(--text-muted)', fontStyle: 'italic' }}>Draw not yet held</span>
-                    )}
+                </Link>
+              ))
+            ) : (
+              Array.from({ length: 3 }).map((_, i) => (
+                <div key={i} className="card" style={{ height: '80px', display: 'flex', alignItems: 'center', padding: '20px', gap: '20px' }}>
+                  <div style={{ minWidth: '180px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <div className="skeleton" style={{ width: '120px', height: '20px' }} />
+                    <div className="skeleton" style={{ width: '80px', height: '14px' }} />
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontFamily: 'var(--font-display)', fontWeight: 900, fontSize: '22px', whiteSpace: 'nowrap' }}>
-                    <span>🪙</span>
-                    <span style={{ background: 'var(--gradient-gold)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>
-                      {(Number(game.jackpotAmount) / 1_000_000).toFixed(0)}M
-                    </span>
+                  <div style={{ flex: 1, display: 'flex', gap: '8px' }}>
+                    {Array.from({ length: 6 }).map((_, j) => (
+                      <div key={j} className="skeleton" style={{ width: '32px', height: '32px', borderRadius: '50%' }} />
+                    ))}
                   </div>
+                  <div className="skeleton" style={{ width: '80px', height: '28px', borderRadius: '6px' }} />
                 </div>
-              </Link>
-            ))}
+              ))
+            )}
           </div>
         </div>
       </section>

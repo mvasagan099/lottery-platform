@@ -1215,6 +1215,13 @@ tbody tr:last-child td { border-bottom: none; }
   border-radius: var(--border-radius);
 }
 
+.skeleton-blue {
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.1) 25%, rgba(255, 255, 255, 0.25) 50%, rgba(255, 255, 255, 0.1) 75%);
+  background-size: 200% 100%;
+  animation: skeleton-wave 1.5s ease-in-out infinite;
+  border-radius: var(--border-radius);
+}
+
 /* ── Progress Bar ─────────────────────────────────────────── */
 .progress {
   height: 8px;
